@@ -10,7 +10,6 @@ import {
   Shield,
   Settings,
   UserCircle,
-  Calendar,
   Clock,
   TrendingUp,
   AlertTriangle,
@@ -22,6 +21,7 @@ import {
   Video,
   CreditCard,
 } from 'lucide-react';
+import logo from '@/assets/logo.png';
 
 interface SidebarProps {
   panel: 'admin' | 'hr' | 'bd';
@@ -70,9 +70,9 @@ export function Sidebar({ panel }: SidebarProps) {
     : bdNavItems;
 
   const panelConfig = {
-    admin: { label: 'Admin Panel', className: 'admin-gradient' },
-    hr: { label: 'HR Panel', className: 'hr-gradient' },
-    bd: { label: 'BD Panel', className: 'bd-gradient' },
+    admin: { label: 'Admin Panel' },
+    hr: { label: 'HR Panel' },
+    bd: { label: 'BD Panel' },
   };
 
   return (
@@ -80,9 +80,7 @@ export function Sidebar({ panel }: SidebarProps) {
       <div className="flex h-full flex-col">
         {/* Logo */}
         <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
-          <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center", panelConfig[panel].className)}>
-            <Building2 className="w-5 h-5 text-white" />
-          </div>
+          <img src={logo} alt="Logo" className="w-9 h-9 rounded-lg" />
           <div>
             <h2 className="font-semibold text-sidebar-foreground text-sm">Enterprise CRM</h2>
             <p className="text-xs text-sidebar-foreground/60">{panelConfig[panel].label}</p>

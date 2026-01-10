@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, Loader2, Building2 } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
+import logo from '@/assets/logo.png';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -44,9 +45,7 @@ export function LoginForm() {
       <div className="w-full max-w-md animate-fade-in">
         <div className="flex items-center justify-center mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-              <Building2 className="w-7 h-7 text-primary-foreground" />
-            </div>
+            <img src={logo} alt="Logo" className="w-12 h-12 rounded-xl" />
             <div>
               <h1 className="text-2xl font-bold text-foreground">Enterprise CRM</h1>
               <p className="text-sm text-muted-foreground">Management System</p>
