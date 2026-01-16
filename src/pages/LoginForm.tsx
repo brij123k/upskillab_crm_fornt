@@ -6,7 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, Loader2 } from 'lucide-react';
+import {postDataHandler} from '@/config/services'
 import logo from '@/assets/logo.png';
+import { setAuth } from '@/auth';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -16,29 +18,21 @@ export function LoginForm() {
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  e.preventDefault();
 
-    try {
-      await login(email, password);
-      // Redirect based on role will happen in App.tsx
-      const user = email.toLowerCase();
-      if (user.includes('admin')) {
-        navigate('/admin');
-      } else if (user.includes('hr')) {
-        navigate('/hr');
-      } else {
-        navigate('/bd');
-      }
-    } catch (err) {
-      setError('Invalid email or password');
-    }
-  };
+  try {
+    const res = await postDataHandler("login", {
+      email: email,
+      password: password,
+    });
 
-  const handleDemoLogin = (demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword('demo123');
-  };
+    setAuth(res); // 🔥 save token + user
+    navigate("/");     // go to dashboard router
+  } catch (err) {
+    setError("Invalid email or password");
+  }
+};
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -47,7 +41,7 @@ export function LoginForm() {
           <div className="flex items-center gap-3">
             <img src={logo} alt="Logo" className="w-12 h-12 rounded-xl" />
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Enterprise CRM</h1>
+              <h1 className="text-2xl font-bold text-foreground">CRM</h1>
               <p className="text-sm text-muted-foreground">Management System</p>
             </div>
           </div>
@@ -115,46 +109,7 @@ export function LoginForm() {
               </Button>
             </form>
 
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">Demo Accounts</span>
-                </div>
-              </div>
-
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin('admin@demo.com')}
-                  className="text-xs"
-                >
-                  Admin
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin('hr@demo.com')}
-                  className="text-xs"
-                >
-                  HR
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin('bd@demo.com')}
-                  className="text-xs"
-                >
-                  BD
-                </Button>
-              </div>
-            </div>
+           
           </CardContent>
         </Card>
       </div>

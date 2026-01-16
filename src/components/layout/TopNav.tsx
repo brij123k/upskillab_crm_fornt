@@ -1,4 +1,4 @@
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,15 +11,15 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Bell, Search, Calendar, LogOut, User, Settings, ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-
+import { getUser } from '@/auth';
 interface TopNavProps {
   panel: 'admin' | 'hr' | 'bd';
 }
 
 export function TopNav({ panel }: TopNavProps) {
-  const { user, logout } = useAuth();
+  const {logout } = useAuth();
   const navigate = useNavigate();
-
+  const user = getUser()
   const handleLogout = () => {
     logout();
     navigate('/login');

@@ -22,7 +22,7 @@ import {
   CreditCard,
 } from 'lucide-react';
 import logo from '@/assets/logo.png';
-
+import { getUser } from "@/auth";
 interface SidebarProps {
   panel: 'admin' | 'hr' | 'bd';
 }
@@ -75,6 +75,7 @@ export function Sidebar({ panel }: SidebarProps) {
     bd: { label: 'BD Panel' },
   };
 
+  const user = getUser()
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 sidebar-gradient border-r border-sidebar-border">
       <div className="flex h-full flex-col">
@@ -82,8 +83,8 @@ export function Sidebar({ panel }: SidebarProps) {
         <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
           <img src={logo} alt="Logo" className="w-9 h-9 rounded-lg" />
           <div>
-            <h2 className="font-semibold text-sidebar-foreground text-sm">Enterprise CRM</h2>
-            <p className="text-xs text-sidebar-foreground/60">{panelConfig[panel].label}</p>
+            <h2 className="font-semibold text-sidebar-foreground text-sm">{panelConfig[panel].label}</h2>
+            <p className="text-xs text-sidebar-foreground/60">{user.name}</p>
           </div>
         </div>
 
