@@ -17,7 +17,7 @@ const getAuthHeadersFormData = (token:string) => ({
 });
 
 // Common response handler
-const handleResponse = (res:any, successMessage:string) => {
+const handleResponse = (res:any, successMessage?:string) => {
   if (res?.status === 200 || res?.status === 201) {
     return res.data;
   } else {
@@ -29,7 +29,7 @@ const handleResponse = (res:any, successMessage:string) => {
 };
 
 const handleError = (error:any) => {
-  console.error("API Error:", error);
+  // console.error("API Error:", error);
   const errorMsg = error.response?.data?.message || 
                   error.response?.data?.error || 
                   error.message || 
@@ -88,7 +88,7 @@ export const postDataHandlerWithTokenFormData = async (endPoint:any, data:any,is
 
 
 export const putDataHandler = async (endPoint:any, data:any,isUrl=false) => {
-  console.log(endPoint, data, "5")
+  // console.log(endPoint, data, "5")
   return makeRequest("PUT", endPoint, { data,isUrl });
 };
 
@@ -190,7 +190,7 @@ export const getDataHandler = async (endPointOrUrl:any, query = {}, data = {}, i
 
 export const getDataHandlerWithToken = async (endPoint:any, query:any, data:any, isUrl = false) => {
   const storedAuth = localStorage.getItem("access_token");
-  console.log(storedAuth,"2")
+  // console.log(storedAuth,"2")
   if (!storedAuth) {
     throw new Error('No authentication token found');
   }

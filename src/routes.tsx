@@ -10,14 +10,14 @@ import NotFound from "@/pages/NotFound";
 // Admin Pages
 import { AdminDashboard } from "@/pages/admin/AdminDashboard";
 import { UsersPage } from "@/pages/admin/UsersPage";
-
+import {LeadsPage} from "@/pages/admin/LeadsPage"
 // HR Pages
 import { HRDashboard } from "@/pages/hr/HRDashboard";
 import { EmployeesPage } from "@/pages/hr/EmployeesPage";
 
 // BD Pages
 import { BDDashboard } from "@/pages/bd/BDDashboard";
-import { LeadsPage } from "@/pages/bd/LeadsPage";
+// import { LeadsPage } from "@/pages/bd/LeadsPage";
 import ProtectedRoute from "@/ProtectedRoute";
 import DashboardRedirect from "@/DashboardRedirect";
 import { VerifyOTP } from "@/pages/VerifyOTP";
@@ -62,7 +62,7 @@ const AppRoutes = () => {
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="departments" element={<PlaceholderPage title="Departments & Hierarchy" />} />
-          <Route path="leads" element={<PlaceholderPage title="Leads & Data Control" />} />
+          <Route path="leads" element={<LeadsPage />} />
           <Route path="finance" element={<PlaceholderPage title="Finance" />} />
           <Route path="reports" element={<PlaceholderPage title="Reports & Analytics" />} />
           <Route path="security" element={<PlaceholderPage title="Security & Audit" />} />

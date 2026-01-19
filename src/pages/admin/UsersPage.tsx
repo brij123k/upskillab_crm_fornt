@@ -139,7 +139,7 @@ export function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [loadingRoles, setLoadingRoles] = useState(false);
   const [loadingDepartments, setLoadingDepartments] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'departments'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'roles'>('users');
   
   // Modal states
   const [newUserOpen, setNewUserOpen] = useState(false);
@@ -407,7 +407,7 @@ export function UsersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Users Management</h1>
-          <p className="text-muted-foreground">Manage users, roles and departments</p>
+          <p className="text-muted-foreground">Manage users, roles</p>
         </div>
         <div className="flex items-center gap-2">
           {fetchingData && (
@@ -575,10 +575,6 @@ export function UsersPage() {
 
           <Dialog open={newDepartmentOpen} onOpenChange={setNewDepartmentOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">
-                <Building className="w-4 h-4 mr-2" />
-                New Department
-              </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -621,18 +617,6 @@ export function UsersPage() {
           >
             <Shield className="w-4 h-4 inline mr-2" />
             Roles
-          </button>
-          <button
-            onClick={() => setActiveTab('departments')}
-            className={cn(
-              "py-2 px-1 border-b-2 font-medium text-sm",
-              activeTab === 'departments'
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-            )}
-          >
-            <Building className="w-4 h-4 inline mr-2" />
-            Departments
           </button>
         </nav>
       </div>
@@ -896,53 +880,6 @@ export function UsersPage() {
         </Card>
       )}
 
-      {/* Departments Tab */}
-      {activeTab === 'departments' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">All Departments ({departments.length})</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loadingDepartments ? (
-              <div className="text-center py-8">
-                <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
-                <p className="mt-2 text-muted-foreground">Loading departments...</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {departments.map((dept) => (
-                  <Card key={dept._id}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">{dept.name}</CardTitle>
-                      <p className="text-xs text-muted-foreground">
-                        Created {formatDate(dept.createdAt)}
-                      </p>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="text-sm">
-                          <span className="font-medium">Parent Department:</span>{' '}
-                          <span className="text-muted-foreground">
-                            {dept.parentDepartmentId ? 'Yes' : 'None'}
-                          </span>
-                        </div>
-                        <div className="pt-2 flex justify-end">
-                          <Button variant="outline" size="sm" disabled>
-                            <Edit className="w-3 h-3 mr-1" />
-                            Edit
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Profile Modal */}
       <Dialog open={profileModalOpen} onOpenChange={setProfileModalOpen}>

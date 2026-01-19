@@ -1,5 +1,5 @@
 export const setAuth = (data: any) => {
-  console.log(data)
+  // console.log(data)
   localStorage.setItem("access_token", data.access_token);
   localStorage.setItem("user", JSON.stringify(data.user));
 };
@@ -10,7 +10,7 @@ export const clearAuth = () => {
 };
 
 export const getToken = () => {
-  console.log(localStorage.getItem("access_token"))
+  // console.log(localStorage.getItem("access_token"))
   return localStorage.getItem("access_token");
 };
 
