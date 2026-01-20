@@ -78,6 +78,7 @@ import ApiConfig from '@/config/apiConfig';
 import { ProgressModal } from '@/components/modal/ProgressModal';
 import { CSVUploadModal } from '@/components/modal/CSVUploadModal';
 import { UserSelectWithSearch } from '@/components/modal/UserSelectWithSearch';
+import { SearchableSelect } from '@/components/modal/SearchableSelect';
 
 interface LeadType {
   _id: string;
@@ -632,6 +633,7 @@ const [assignUserId, setAssignUserId] = useState<string>('');
   };
 
   // Assign leads to user
+// Assign leads to user
 const handleAssignLeads = async () => {
   if (selectedLeads.length === 0) {
     toast({
@@ -642,16 +644,18 @@ const handleAssignLeads = async () => {
     return;
   }
   
-  // Prepare data for API
+  // Prepare data for API - FIXED: Use assignUserId instead of selectedUser
   const dataToSend: any = {
     leadIds: selectedLeads
   };
   
-  if (assignUserId) {
+  // Add assignedTo if user is selected
+  if (assignUserId && assignUserId !== "") {
     dataToSend.assignedTo = assignUserId;
   }
   
-  if (assignDepartmentId) {
+  // Add departmentId if department is selected
+  if (assignDepartmentId && assignDepartmentId !== "") {
     dataToSend.departmentId = assignDepartmentId;
   }
   
@@ -665,21 +669,29 @@ const handleAssignLeads = async () => {
     return;
   }
   
+  // Debug log to see what's being sent
+  console.log("Assigning leads with data:", dataToSend);
+  
   try {
     setAssigningLeads(true);
     
-    const response = await postDataHandlerWithToken("assignLead", dataToSend);
+    // Make sure you're calling the correct API endpoint
+    const response = await patchTokenDataHandler("assignLead", dataToSend);
     
     toast({
       title: "Success",
       description: response?.message || "Leads assigned successfully",
     });
     
+    // Reset modal state
     setAssignModalOpen(false);
     setAssignDepartmentId('');
     setAssignUserId('');
+    
+    // Refresh leads
     fetchLeads();
   } catch (error: any) {
+    console.error("Assign leads error:", error);
     toast({
       title: "Error",
       description: error.response?.data?.message || "Failed to assign leads",
@@ -1306,14 +1318,6 @@ const handleAssignLeads = async () => {
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Reset
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={fetchLeads}
-              >
-                <Filter className="w-4 h-4 mr-2" />
-                Apply Filters
-              </Button>
             </div>
           </div>
         </CardHeader>
@@ -1801,13 +1805,13 @@ const handleAssignLeads = async () => {
         progressItems={progressItems}
       />
 
-      {/* Assign Leads Modal */}
-      <Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
+{/* Assign Leads Modal */}
+<Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
   <DialogContent className="sm:max-w-[500px]">
     <DialogHeader>
       <DialogTitle>Assign Leads</DialogTitle>
       <DialogDescription>
-        Assign {selectedLeads.length} selected leads to a user
+        Assign {selectedLeads.length} selected leads to a user or department
       </DialogDescription>
     </DialogHeader>
     <div className="grid gap-4 py-4">
@@ -1819,9 +1823,9 @@ const handleAssignLeads = async () => {
             value={assignDepartmentId}
             onValueChange={(value) => {
               setAssignDepartmentId(value);
-              // Clear user if department changes
-              if (value !== assignDepartmentId) {
-                setAssignUserId('');
+              // Clear user when department changes
+              if (value === "all" || value === "") {
+                setAssignUserId("");
               }
             }}
             disabled={assigningLeads || loadingDepartments}
@@ -1830,7 +1834,7 @@ const handleAssignLeads = async () => {
               <SelectValue placeholder="Select department (optional)" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Departments</SelectItem>
+              <SelectItem value=" ">No specific department</SelectItem>
               {departments.map((dept) => (
                 <SelectItem key={dept._id} value={dept._id}>
                   {dept.name}
@@ -1839,27 +1843,58 @@ const handleAssignLeads = async () => {
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Filter users by department
+            Filter users by department or assign only department
           </p>
         </div>
         
-        {/* User Selection with Search */}
+        {/* User Selection with Department Filtering */}
         <div className="space-y-2">
           <Label>Select User (Optional)</Label>
-          <UserSelectWithSearch
-  value={leadForm.assignedTo || ''}
-  onValueChange={(value) => setLeadForm({...leadForm, assignedTo: value})}
-  users={users}
-  loading={loadingUsers}
-  placeholder="Select user"
-  disabled={addingLead}
-  allowEmpty={true}
-/>
+         <SearchableSelect
+    value={assignUserId}
+    onValueChange={(value) => {
+      setAssignUserId(value);
+      // Auto-select department if user has one
+      if (value && userDepartments[value]) {
+        setAssignDepartmentId(userDepartments[value]);
+      }
+    }}
+    options={users
+      .filter(user => {
+        // Filter by selected department if set
+        if (assignDepartmentId && assignDepartmentId !== "" && assignDepartmentId !== "all") {
+          return userDepartments[user._id] === assignDepartmentId;
+        }
+        return true; // Show all users if no department filter
+      })
+      .map(user => ({
+        value: user._id,
+        label: user.name,
+        email: user.email,
+        department: user.profile?.departmentId?.name
+      }))}
+    placeholder={assignDepartmentId ? 
+      "Select user from department" : 
+      "Select user (all users)"}
+    searchPlaceholder="Search user by name, email, or department..."
+    emptyMessage="No users found."
+    disabled={assigningLeads || loadingUsers}
+    showAllOption={false}
+  />
           <p className="text-xs text-muted-foreground">
-            Leave empty to only assign department
+            Selecting a user will auto-select their department
           </p>
         </div>
       </div>
+      
+      {/* Validation message */}
+      {!assignUserId && !assignDepartmentId && (
+        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+          <p className="text-sm text-yellow-800">
+            Please select at least a user or department to assign leads
+          </p>
+        </div>
+      )}
       
       <div className="p-3 bg-muted rounded-md">
         <p className="text-sm font-medium">Selected Leads ({selectedLeads.length})</p>
@@ -1888,7 +1923,10 @@ const handleAssignLeads = async () => {
       }} disabled={assigningLeads}>
         Cancel
       </Button>
-      <Button onClick={handleAssignLeads} disabled={selectedLeads.length === 0 || assigningLeads}>
+      <Button 
+        onClick={handleAssignLeads} 
+        disabled={selectedLeads.length === 0 || assigningLeads || (!assignUserId && !assignDepartmentId)}
+      >
         {assigningLeads ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

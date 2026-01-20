@@ -10,6 +10,7 @@ import NotFound from "@/pages/NotFound";
 // Admin Pages
 import { AdminDashboard } from "@/pages/admin/AdminDashboard";
 import { UsersPage } from "@/pages/admin/UsersPage";
+import { DepartmentsPage } from "@/pages/admin/DepartmentsPage";
 import {LeadsPage} from "@/pages/admin/LeadsPage"
 // HR Pages
 import { HRDashboard } from "@/pages/hr/HRDashboard";
@@ -61,7 +62,7 @@ const AppRoutes = () => {
                 </ProtectedRoute>}>
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<UsersPage />} />
-          <Route path="departments" element={<PlaceholderPage title="Departments & Hierarchy" />} />
+          <Route path="departments" element={<DepartmentsPage />} />
           <Route path="leads" element={<LeadsPage />} />
           <Route path="finance" element={<PlaceholderPage title="Finance" />} />
           <Route path="reports" element={<PlaceholderPage title="Reports & Analytics" />} />

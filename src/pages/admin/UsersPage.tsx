@@ -104,6 +104,7 @@ interface RoleType {
   _id: string;
   name: string;
   isSuperAdmin: boolean;
+  reportingRole?: string; // Add this line
   permissions: Array<{
     module: string;
     actions: string[];
@@ -113,7 +114,16 @@ interface RoleType {
   updatedAt: string;
   __v: number;
 }
+interface PermissionType {
+  module: string;
+  actions: string[];
+}
 
+interface RoleForm {
+  name: string;
+  reportingRole?: string;
+  permissions: PermissionType[];
+}
 interface DepartmentType {
   _id: string;
   name: string;
@@ -156,7 +166,18 @@ export function UsersPage() {
   const [togglingBlock, setTogglingBlock] = useState<string | null>(null);
   const [creatingProfile, setCreatingProfile] = useState(false);
   const [fetchingData, setFetchingData] = useState(false);
-  
+  const [selectedRole, setSelectedRole] = useState<RoleType | null>(null);
+const [editingRole, setEditingRole] = useState(false);
+const [roleForm, setRoleForm] = useState<RoleForm>({
+  name: '',
+  reportingRole: '',
+  permissions: [
+    { module: 'users', actions: [] },
+    { module: 'leads', actions: [] }
+  ]
+});
+const [addingRole, setAddingRole] = useState(false);
+const [updatingRole, setUpdatingRole] = useState(false);
   // Form states
   const [newUserForm, setNewUserForm] = useState<NewUserForm>({
     name: '',
@@ -194,22 +215,130 @@ export function UsersPage() {
   };
 
   const fetchRoles = async () => {
-    try {
-      setLoadingRoles(true);
-      const response = await getDataHandlerWithToken("getAllRoles", null, null);
-      if (response) {
-        setRoles(response);
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch roles",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingRoles(false);
+  try {
+    setLoadingRoles(true);
+    const response = await getDataHandlerWithToken("getAllRoles", null, null);
+    if (response) {
+      setRoles(response);
     }
-  };
+  } catch (error) {
+    toast({
+      title: "Error",
+      description: "Failed to fetch roles",
+      variant: "destructive",
+    });
+  } finally {
+    setLoadingRoles(false);
+  }
+};
+// Add new role
+const handleAddRole = async () => {
+  try {
+    setAddingRole(true);
+    
+    // Prepare permissions
+    const permissions = roleForm.permissions
+      .filter(perm => perm.actions.length > 0)
+      .map(perm => ({
+        module: perm.module,
+        actions: perm.actions
+      }));
+    
+    // Prepare data for API
+    const dataToSend: any = {
+      name: roleForm.name,
+      permissions: permissions
+    };
+    
+    // Add reporting role if selected
+    if (roleForm.reportingRole && roleForm.reportingRole !== "") {
+      dataToSend.reportingRole = roleForm.reportingRole;
+    }
+    
+    const response = await postDataHandlerWithToken("addNewRole", dataToSend);
+    
+    toast({
+      title: "Success",
+      description: response?.message || "Role created successfully",
+    });
+    
+    // Reset form and close modal
+    setRoleForm({
+      name: '',
+      reportingRole: '',
+      permissions: [
+        { module: 'users', actions: [] },
+        { module: 'leads', actions: [] }
+      ]
+    });
+    setNewRoleOpen(false);
+    fetchRoles();
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.response?.data?.message || "Failed to create role",
+      variant: "destructive",
+    });
+  } finally {
+    setAddingRole(false);
+  }
+};
+// Update role
+const handleUpdateRole = async () => {
+  if (!selectedRole) return;
+  
+  try {
+    setUpdatingRole(true);
+    
+    // Prepare permissions
+    const permissions = roleForm.permissions
+      .filter(perm => perm.actions.length > 0)
+      .map(perm => ({
+        module: perm.module,
+        actions: perm.actions
+      }));
+    
+    // Prepare data for API
+    const dataToSend: any = {
+      name: roleForm.name,
+      permissions: permissions
+    };
+    
+    // Add reporting role if selected
+    if (roleForm.reportingRole && roleForm.reportingRole !== "") {
+      dataToSend.reportingRole = roleForm.reportingRole;
+    }
+    
+    const endpoint = ApiConfig.updateRole(selectedRole._id);
+    const response = await patchTokenDataHandler(endpoint, dataToSend, true);
+    
+    toast({
+      title: "Success",
+      description: response?.message || "Role updated successfully",
+    });
+    
+    // Reset and close
+    setEditingRole(false);
+    setSelectedRole(null);
+    setRoleForm({
+      name: '',
+      reportingRole: '',
+      permissions: [
+        { module: 'users', actions: [] },
+        { module: 'leads', actions: [] }
+      ]
+    });
+    fetchRoles();
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.response?.data?.message || "Failed to update role",
+      variant: "destructive",
+    });
+  } finally {
+    setUpdatingRole(false);
+  }
+};
 
   const fetchDepartments = async () => {
     try {
@@ -554,24 +683,13 @@ export function UsersPage() {
           </Dialog>
 
           <Dialog open={newRoleOpen} onOpenChange={setNewRoleOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <ShieldPlus className="w-4 h-4 mr-2" />
-                New Role
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Coming Soon</DialogTitle>
-                <DialogDescription>
-                  Role creation feature will be available soon.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button onClick={() => setNewRoleOpen(false)}>OK</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+  <DialogTrigger asChild>
+    <Button variant="outline">
+      <ShieldPlus className="w-4 h-4 mr-2" />
+      New Role
+    </Button>
+  </DialogTrigger>
+</Dialog>
 
           <Dialog open={newDepartmentOpen} onOpenChange={setNewDepartmentOpen}>
             <DialogTrigger asChild>
@@ -820,65 +938,109 @@ export function UsersPage() {
       )}
 
       {/* Roles Tab */}
-      {activeTab === 'roles' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">All Roles ({roles.length})</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loadingRoles ? (
-              <div className="text-center py-8">
-                <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
-                <p className="mt-2 text-muted-foreground">Loading roles...</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {roles.map((role) => (
-                  <Card key={role._id} className="relative">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">{role.name}</CardTitle>
-                        {role.isSuperAdmin && (
-                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                            Super Admin
+     {activeTab === 'roles' && (
+  <Card>
+    <CardHeader>
+      <div className="flex items-center justify-between">
+        <CardTitle className="text-lg">All Roles ({roles.length})</CardTitle>
+        <Button onClick={() => setNewRoleOpen(true)} variant="outline">
+          <ShieldPlus className="w-4 h-4 mr-2" />
+          New Role
+        </Button>
+      </div>
+    </CardHeader>
+    <CardContent>
+      {loadingRoles ? (
+        <div className="text-center py-8">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
+          <p className="mt-2 text-muted-foreground">Loading roles...</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {roles.map((role) => (
+            <Card key={role._id} className="relative">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">{role.name}</CardTitle>
+                  {role.isSuperAdmin && (
+                    <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                      Super Admin
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Created {formatDate(role.createdAt)}
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {/* Reporting Role */}
+                  {role.reportingRole && (
+                    <div>
+                      <div className="text-xs font-medium text-muted-foreground mb-1">
+                        Reports To:
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        {roles.find(r => r._id === role.reportingRole)?.name || role.reportingRole}
+                      </Badge>
+                    </div>
+                  )}
+                  
+                  {/* Permissions */}
+                  <div>
+                    <div className="text-sm font-medium mb-1">Permissions:</div>
+                    <div className="flex flex-wrap gap-1">
+                      {role.permissions.length > 0 ? (
+                        role.permissions.map((perm, idx) => (
+                          <Badge key={idx} variant="secondary" className="text-xs">
+                            {perm.module}
                           </Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Created {formatDate(role.createdAt)}
-                      </p>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="text-sm font-medium">Permissions:</div>
-                        <div className="flex flex-wrap gap-1">
-                          {role.permissions.length > 0 ? (
-                            role.permissions.map((perm, idx) => (
-                              <Badge key={idx} variant="secondary" className="text-xs">
-                                {perm.module}
-                              </Badge>
-                            ))
-                          ) : (
-                            <span className="text-xs text-muted-foreground">No specific permissions</span>
-                          )}
-                        </div>
-                        <div className="pt-2 flex justify-end">
-                          <Button variant="outline" size="sm" disabled>
-                            <Edit className="w-3 h-3 mr-1" />
-                            Edit
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                        ))
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No specific permissions</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Actions */}
+                  {!role.isSuperAdmin && (
+                    <div className="pt-2 flex justify-end gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          setSelectedRole(role);
+                          setRoleForm({
+                            name: role.name,
+                            reportingRole: role.reportingRole || '',
+                            permissions: [
+                              { 
+                                module: 'users', 
+                                actions: role.permissions.find(p => p.module === 'users')?.actions || [] 
+                              },
+                              { 
+                                module: 'leads', 
+                                actions: role.permissions.find(p => p.module === 'leads')?.actions || [] 
+                              }
+                            ]
+                          });
+                          setEditingRole(true);
+                        }}
+                      >
+                        <Edit className="w-3 h-3 mr-1" />
+                        Edit
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
+    </CardContent>
+  </Card>
+)}
 
 
       {/* Profile Modal */}
@@ -1120,6 +1282,370 @@ export function UsersPage() {
           )}
         </DialogContent>
       </Dialog>
+
+
+      {/* New Role Modal */}
+<Dialog open={newRoleOpen} onOpenChange={setNewRoleOpen}>
+  <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle>Create New Role</DialogTitle>
+      <DialogDescription>
+        Create a new role with specific permissions.
+      </DialogDescription>
+    </DialogHeader>
+    <div className="space-y-4 py-4">
+      <div className="grid gap-2">
+        <Label htmlFor="role-name">Role Name *</Label>
+        <Input
+          id="role-name"
+          value={roleForm.name}
+          onChange={(e) => setRoleForm({...roleForm, name: e.target.value})}
+          placeholder="e.g., Sales Manager"
+          disabled={addingRole}
+        />
+      </div>
+      
+      <div className="grid gap-2">
+        <Label htmlFor="reporting-role">Reporting Role (Optional)</Label>
+        <Select
+          value={roleForm.reportingRole || ''}
+          onValueChange={(value) => setRoleForm({...roleForm, reportingRole: value})}
+          disabled={addingRole || loadingRoles}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select reporting role (optional)" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value=" ">No reporting role</SelectItem>
+            {roles
+              .filter(role => !role.isSuperAdmin)
+              .map((role) => (
+                <SelectItem key={role._id} value={role._id}>
+                  {role.name}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+      </div>
+      
+      <div className="space-y-4">
+        <Label>Permissions *</Label>
+        
+        {/* Users Permissions */}
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-sm">Users Module</CardTitle>
+          </CardHeader>
+          <CardContent className="py-2">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant={roleForm.permissions[0].actions.includes("read") ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  const newPermissions = [...roleForm.permissions];
+                  const userPermIndex = newPermissions.findIndex(p => p.module === "users");
+                  const currentActions = newPermissions[userPermIndex].actions;
+                  
+                  if (currentActions.includes("read")) {
+                    newPermissions[userPermIndex].actions = currentActions.filter(a => a !== "read");
+                  } else {
+                    newPermissions[userPermIndex].actions = [...currentActions, "read"];
+                  }
+                  
+                  setRoleForm({...roleForm, permissions: newPermissions});
+                }}
+                disabled={addingRole}
+              >
+                Read
+              </Button>
+              
+              <Button
+                type="button"
+                variant={roleForm.permissions[0].actions.includes("write") ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  const newPermissions = [...roleForm.permissions];
+                  const userPermIndex = newPermissions.findIndex(p => p.module === "users");
+                  const currentActions = newPermissions[userPermIndex].actions;
+                  
+                  if (currentActions.includes("write")) {
+                    newPermissions[userPermIndex].actions = currentActions.filter(a => a !== "write");
+                  } else {
+                    newPermissions[userPermIndex].actions = [...currentActions, "write"];
+                  }
+                  
+                  setRoleForm({...roleForm, permissions: newPermissions});
+                }}
+                disabled={addingRole}
+              >
+                Write (Create/Update)
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* Leads Permissions */}
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-sm">Leads Module</CardTitle>
+          </CardHeader>
+          <CardContent className="py-2">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant={roleForm.permissions[1].actions.includes("read") ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  const newPermissions = [...roleForm.permissions];
+                  const leadPermIndex = newPermissions.findIndex(p => p.module === "leads");
+                  const currentActions = newPermissions[leadPermIndex].actions;
+                  
+                  if (currentActions.includes("read")) {
+                    newPermissions[leadPermIndex].actions = currentActions.filter(a => a !== "read");
+                  } else {
+                    newPermissions[leadPermIndex].actions = [...currentActions, "read"];
+                  }
+                  
+                  setRoleForm({...roleForm, permissions: newPermissions});
+                }}
+                disabled={addingRole}
+              >
+                Read
+              </Button>
+              
+              <Button
+                type="button"
+                variant={roleForm.permissions[1].actions.includes("write") ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  const newPermissions = [...roleForm.permissions];
+                  const leadPermIndex = newPermissions.findIndex(p => p.module === "leads");
+                  const currentActions = newPermissions[leadPermIndex].actions;
+                  
+                  if (currentActions.includes("write")) {
+                    newPermissions[leadPermIndex].actions = currentActions.filter(a => a !== "write");
+                  } else {
+                    newPermissions[leadPermIndex].actions = [...currentActions, "write"];
+                  }
+                  
+                  setRoleForm({...roleForm, permissions: newPermissions});
+                }}
+                disabled={addingRole}
+              >
+                Write (Create/Update)
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <div className="text-xs text-muted-foreground">
+          * Write permission includes both create and update actions
+        </div>
+      </div>
+    </div>
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setNewRoleOpen(false)} disabled={addingRole}>
+        Cancel
+      </Button>
+      <Button onClick={handleAddRole} disabled={addingRole || !roleForm.name}>
+        {addingRole ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Creating...
+          </>
+        ) : (
+          'Create Role'
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
+{/* Edit Role Modal */}
+<Dialog open={editingRole} onOpenChange={setEditingRole}>
+  <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+    {selectedRole && (
+      <>
+        <DialogHeader>
+          <DialogTitle>Edit Role: {selectedRole.name}</DialogTitle>
+          <DialogDescription>
+            Update role permissions and details.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="edit-role-name">Role Name *</Label>
+            <Input
+              id="edit-role-name"
+              value={roleForm.name}
+              onChange={(e) => setRoleForm({...roleForm, name: e.target.value})}
+              placeholder="e.g., Sales Manager"
+              disabled={updatingRole}
+            />
+          </div>
+          
+          <div className="grid gap-2">
+            <Label htmlFor="edit-reporting-role">Reporting Role (Optional)</Label>
+            <Select
+              value={roleForm.reportingRole || ''}
+              onValueChange={(value) => setRoleForm({...roleForm, reportingRole: value})}
+              disabled={updatingRole || loadingRoles}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select reporting role (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value=" ">No reporting role</SelectItem>
+                {roles
+                  .filter(role => !role.isSuperAdmin && role._id !== selectedRole._id)
+                  .map((role) => (
+                    <SelectItem key={role._id} value={role._id}>
+                      {role.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="space-y-4">
+            <Label>Permissions *</Label>
+            
+            {/* Users Permissions */}
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">Users Module</CardTitle>
+              </CardHeader>
+              <CardContent className="py-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={roleForm.permissions[0].actions.includes("read") ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      const newPermissions = [...roleForm.permissions];
+                      const userPermIndex = newPermissions.findIndex(p => p.module === "users");
+                      const currentActions = newPermissions[userPermIndex].actions;
+                      
+                      if (currentActions.includes("read")) {
+                        newPermissions[userPermIndex].actions = currentActions.filter(a => a !== "read");
+                      } else {
+                        newPermissions[userPermIndex].actions = [...currentActions, "read"];
+                      }
+                      
+                      setRoleForm({...roleForm, permissions: newPermissions});
+                    }}
+                    disabled={updatingRole}
+                  >
+                    Read
+                  </Button>
+                  
+                  <Button
+                    type="button"
+                    variant={roleForm.permissions[0].actions.includes("write") ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      const newPermissions = [...roleForm.permissions];
+                      const userPermIndex = newPermissions.findIndex(p => p.module === "users");
+                      const currentActions = newPermissions[userPermIndex].actions;
+                      
+                      if (currentActions.includes("write")) {
+                        newPermissions[userPermIndex].actions = currentActions.filter(a => a !== "write");
+                      } else {
+                        newPermissions[userPermIndex].actions = [...currentActions, "write"];
+                      }
+                      
+                      setRoleForm({...roleForm, permissions: newPermissions});
+                    }}
+                    disabled={updatingRole}
+                  >
+                    Write (Create/Update)
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Leads Permissions */}
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">Leads Module</CardTitle>
+              </CardHeader>
+              <CardContent className="py-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={roleForm.permissions[1].actions.includes("read") ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      const newPermissions = [...roleForm.permissions];
+                      const leadPermIndex = newPermissions.findIndex(p => p.module === "leads");
+                      const currentActions = newPermissions[leadPermIndex].actions;
+                      
+                      if (currentActions.includes("read")) {
+                        newPermissions[leadPermIndex].actions = currentActions.filter(a => a !== "read");
+                      } else {
+                        newPermissions[leadPermIndex].actions = [...currentActions, "read"];
+                      }
+                      
+                      setRoleForm({...roleForm, permissions: newPermissions});
+                    }}
+                    disabled={updatingRole}
+                  >
+                    Read
+                  </Button>
+                  
+                  <Button
+                    type="button"
+                    variant={roleForm.permissions[1].actions.includes("write") ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      const newPermissions = [...roleForm.permissions];
+                      const leadPermIndex = newPermissions.findIndex(p => p.module === "leads");
+                      const currentActions = newPermissions[leadPermIndex].actions;
+                      
+                      if (currentActions.includes("write")) {
+                        newPermissions[leadPermIndex].actions = currentActions.filter(a => a !== "write");
+                      } else {
+                        newPermissions[leadPermIndex].actions = [...currentActions, "write"];
+                      }
+                      
+                      setRoleForm({...roleForm, permissions: newPermissions});
+                    }}
+                    disabled={updatingRole}
+                  >
+                    Write (Create/Update)
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <div className="text-xs text-muted-foreground">
+              * Write permission includes both create and update actions
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => {
+            setEditingRole(false);
+            setSelectedRole(null);
+          }} disabled={updatingRole}>
+            Cancel
+          </Button>
+          <Button onClick={handleUpdateRole} disabled={updatingRole || !roleForm.name}>
+            {updatingRole ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              'Update Role'
+            )}
+          </Button>
+        </DialogFooter>
+      </>
+    )}
+  </DialogContent>
+</Dialog>
     </div>
   );
 }
