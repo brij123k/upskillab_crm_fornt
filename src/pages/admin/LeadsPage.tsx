@@ -870,6 +870,214 @@ const handleAssignLeads = async () => {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
   };
+  const exportCurrentPageToCSV = () => {
+  try {
+    if (leads.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No leads to export",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Define CSV headers
+    const headers = [
+      "ID",
+      "Name",
+      "Phone",
+      "Email",
+      "Source",
+      "Department",
+      "Stage",
+      "Status",
+      "Health Score",
+      "Assigned To",
+      "Assigned Email",
+      "Created At",
+      "Last Modified",
+      "Is Active"
+    ];
+
+    // Prepare CSV rows from current page data
+    const rows = leads.map((lead: LeadType) => [
+      lead._id,
+      `"${lead.name.replace(/"/g, '""')}"`,
+      lead.phone,
+      lead.email,
+      lead.source,
+      lead.departmentId?.name || "",
+      lead.stageId?.name || "",
+      lead.status,
+      lead.healthScore,
+      lead.assignedTo?.name || "",
+      lead.assignedTo?.email || "",
+      new Date(lead.createdAt).toLocaleString(),
+      new Date(lead.modifiedAt).toLocaleString(),
+      lead.isActive ? "Yes" : "No"
+    ]);
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.join(","))
+    ].join("\n");
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    
+    // Generate filename
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+    const filename = `leads_page_${page}_${timestamp}.csv`;
+    
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    toast({
+      title: "Download Complete",
+      description: `Exported ${leads.length} leads from page ${page}`,
+    });
+
+  } catch (error: any) {
+    console.error("Export error:", error);
+    toast({
+      title: "Export Failed",
+      description: error.message || "Failed to export leads",
+      variant: "destructive",
+    });
+  }
+};
+
+  // Add this function after your state declarations
+const exportToCSV = async () => {
+  try {
+    // Build query params for all data (no pagination)
+    const queryParams: Record<string, any> = {};
+
+    // Apply all active filters (only if not "all")
+    if (filters.search && filters.search !== "all") queryParams.search = filters.search;
+    if (filters.status && filters.status !== "all") queryParams.status = filters.status;
+    if (filters.source && filters.source !== "all") queryParams.source = filters.source;
+    if (filters.departmentId && filters.departmentId !== "all") queryParams.departmentId = filters.departmentId;
+    if (filters.stageId && filters.stageId !== "all") queryParams.stageId = filters.stageId;
+    if (filters.assignedTo && filters.assignedTo !== "all") queryParams.assignedTo = filters.assignedTo;
+    if (filters.modifiedBy && filters.modifiedBy !== "all") queryParams.modifiedBy = filters.modifiedBy;
+    
+    if (filters.isActive && filters.isActive !== "all") {
+      queryParams.isActive = filters.isActive === "true" ? true : 
+                           filters.isActive === "false" ? false : filters.isActive;
+    }
+    
+    if (filters.sort && filters.sort !== "all") queryParams.sort = filters.sort;
+    
+    if (filters.dateFilter && filters.dateFilter !== "all") {
+      queryParams.dateFilter = filters.dateFilter;
+    }
+    
+    if (filters.fromDate && filters.fromDate !== "all") queryParams.fromDate = filters.fromDate;
+    if (filters.toDate && filters.toDate !== "all") queryParams.toDate = filters.toDate;
+
+    // Fetch all data without pagination
+    queryParams.page = 1;
+    queryParams.limit = 10000; // Large number to get all data
+
+    // Show loading toast
+    toast({
+      title: "Preparing Download",
+      description: "Fetching all lead data...",
+    });
+
+    const response = await getDataHandlerWithToken("getAllLeads", queryParams, null);
+    
+    if (!response?.data) {
+      throw new Error("No data to export");
+    }
+
+    const leadsData = response.data;
+    
+    // Define CSV headers
+    const headers = [
+      "ID",
+      "Name",
+      "Phone",
+      "Email",
+      "Source",
+      "Department",
+      "Stage",
+      "Status",
+      "Health Score",
+      "Assigned To",
+      "Assigned Email",
+      "Created At",
+      "Last Modified",
+      "Is Active"
+    ];
+
+    // Prepare CSV rows
+    const rows = leadsData.map((lead: LeadType) => [
+      lead._id,
+      `"${lead.name.replace(/"/g, '""')}"`, // Escape quotes
+      lead.phone,
+      lead.email,
+      lead.source,
+      lead.departmentId?.name || "",
+      lead.stageId?.name || "",
+      lead.status,
+      lead.healthScore,
+      lead.assignedTo?.name || "",
+      lead.assignedTo?.email || "",
+      new Date(lead.createdAt).toLocaleString(),
+      new Date(lead.modifiedAt).toLocaleString(),
+      lead.isActive ? "Yes" : "No"
+    ]);
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.join(","))
+    ].join("\n");
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+    const filterInfo = [];
+    if (filters.search) filterInfo.push(`search-${filters.search}`);
+    if (filters.status !== "all") filterInfo.push(`status-${filters.status}`);
+    if (filters.source !== "all") filterInfo.push(`source-${filters.source}`);
+    
+    const filename = `leads_export_${timestamp}${filterInfo.length > 0 ? `_${filterInfo.join('_')}` : ''}.csv`;
+    
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    toast({
+      title: "Download Complete",
+      description: `Exported ${leadsData.length} leads to CSV`,
+    });
+
+  } catch (error: any) {
+    console.error("Export error:", error);
+    toast({
+      title: "Export Failed",
+      description: error.message || "Failed to export leads",
+      variant: "destructive",
+    });
+  }
+};
 
   return (
     <div className="space-y-6 animate-fade-in bg-transparent">
@@ -1550,9 +1758,36 @@ const handleAssignLeads = async () => {
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon">
-                <Download className="h-4 w-4" />
-              </Button>
+              <DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <Button variant="outline" size="icon" disabled={loading || totalLeads === 0}>
+      {loading ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <Download className="h-4 w-4" />
+      )}
+    </Button>
+  </DropdownMenuTrigger>
+  <DropdownMenuContent align="end">
+    <DropdownMenuItem 
+      onClick={exportToCSV}
+      disabled={loading || totalLeads === 0}
+    >
+      <Download className="mr-2 h-4 w-4" />
+      Export All Filtered Data ({totalLeads} leads)
+    </DropdownMenuItem>
+    <DropdownMenuItem 
+      onClick={() => {
+        // Export current page data
+        exportCurrentPageToCSV();
+      }}
+      disabled={loading || leads.length === 0}
+    >
+      <FileSpreadsheet className="mr-2 h-4 w-4" />
+      Export Current Page ({leads.length} leads)
+    </DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>
             </div>
           </div>
         </CardHeader>

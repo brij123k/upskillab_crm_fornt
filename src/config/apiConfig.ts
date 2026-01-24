@@ -1,4 +1,5 @@
-const url = "http://localhost:3000"
+// const url = "http://localhost:3000"
+const url = "https://crm-backend-1i7j.onrender.com/"
 const ApiConfig = {
   url,
   login:`${url}/users/login`,
