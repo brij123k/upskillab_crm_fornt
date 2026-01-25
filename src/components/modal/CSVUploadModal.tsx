@@ -14,8 +14,6 @@ interface CSVUploadModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   users: Array<{ _id: string; name: string; email: string }>;
-  departments: Array<{ _id: string; name: string }>; // Add this
-  userDepartments?: Record<string, string>; // Add this
   onUploadSuccess: () => void;
 }
 
@@ -34,21 +32,18 @@ export function CSVUploadModal({
   open,
   onOpenChange,
   users,
-  departments,
-  userDepartments,
   onUploadSuccess
 }: CSVUploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [parsedLeads, setParsedLeads] = useState<CSVLead[]>([]);
-  const [assignedTo, setAssignedTo] = useState<string>('');
   const [uploading, setUploading] = useState(false);
   const [parsing, setParsing] = useState(false);
-const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
-const [selectedUserId, setSelectedUserId] = useState<string>('');
-const [searchQuery, setSearchQuery] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
+
   const downloadCSVTemplate = () => {
-    const headers = ['name', 'phone', 'email','source', 'source_campaign'];
-    const example = ['John Doe', '1234567890', 'john@example.com','', 'Summer Campaign'];
+    const headers = ['name', 'phone', 'email', 'source', 'source_campaign'];
+    const example = ['John Doe', '1234567890', 'john@example.com', 'manual', 'Summer Campaign'];
     const csvContent = [headers, example].map(row => row.join(',')).join('\n');
     
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -172,93 +167,90 @@ const [searchQuery, setSearchQuery] = useState('');
     reader.readAsText(csvFile);
   };
 
-
-const handleUpload = async () => {
-  if (parsedLeads.length === 0) {
-    toast({
-      title: 'No Data',
-      description: 'No valid leads to upload',
-      variant: 'destructive',
-    });
-    return;
-  }
-
-  const validLeads = parsedLeads.filter(lead => lead.isValid);
-  if (validLeads.length === 0) {
-    toast({
-      title: 'Invalid Data',
-      description: 'No valid leads found in CSV',
-      variant: 'destructive',
-    });
-    return;
-  }
-
-  setUploading(true);
-
-  try {
-    // Process leads one by one
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const lead of validLeads) {
-      try {
-        const dataToSend: any = {
-          name: lead.name,
-          phone: lead.phone,
-          email: lead.email,
-          source: lead.source || 'manual',
-          departmentId: selectedDepartmentId,
-          stageId:'696cadcadcbcf508621922e6',
-          source_campaign: lead.source_campaign || undefined,
-          assignedTo: selectedUserId || lead.assignedTo || undefined
-        };
-
-        // Remove undefined values
-        Object.keys(dataToSend).forEach(key => {
-          if (dataToSend[key] === undefined || dataToSend[key] === '') {
-            delete dataToSend[key];
-          }
-        });
-
-        await postDataHandlerWithToken('createNewLead', dataToSend);
-        successCount++;
-      } catch (error) {
-        errorCount++;
-        console.error('Failed to upload lead:', error);
-      }
+  const handleUpload = async () => {
+    if (parsedLeads.length === 0) {
+      toast({
+        title: 'No Data',
+        description: 'No valid leads to upload',
+        variant: 'destructive',
+      });
+      return;
     }
 
-    toast({
-      title: 'Upload Complete',
-      description: `Successfully uploaded ${successCount} leads. ${errorCount} failed.`,
-    });
+    const validLeads = parsedLeads.filter(lead => lead.isValid);
+    if (validLeads.length === 0) {
+      toast({
+        title: 'Invalid Data',
+        description: 'No valid leads found in CSV',
+        variant: 'destructive',
+      });
+      return;
+    }
 
-    // Reset and close
-    setFile(null);
-    setParsedLeads([]);
-    setSelectedDepartmentId('');
-    setSelectedUserId('');
-    setSearchQuery('');
-    onOpenChange(false);
-    onUploadSuccess();
-  } catch (error) {
-    toast({
-      title: 'Upload Failed',
-      description: 'Failed to upload leads',
-      variant: 'destructive',
-    });
-  } finally {
-    setUploading(false);
-  }
-};
+    setUploading(true);
+
+    try {
+      // Process leads one by one
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const lead of validLeads) {
+        try {
+          const dataToSend: any = {
+            name: lead.name,
+            phone: lead.phone,
+            email: lead.email,
+            source: lead.source || 'manual',
+            stageId: '696cadcadcbcf508621922e6',
+            source_campaign: lead.source_campaign || undefined,
+            assignedTo: selectedUserId || lead.assignedTo || undefined
+          };
+
+          // Remove undefined values
+          Object.keys(dataToSend).forEach(key => {
+            if (dataToSend[key] === undefined || dataToSend[key] === '') {
+              delete dataToSend[key];
+            }
+          });
+
+          await postDataHandlerWithToken('createNewLead', dataToSend);
+          successCount++;
+        } catch (error) {
+          errorCount++;
+          console.error('Failed to upload lead:', error);
+        }
+      }
+
+      toast({
+        title: 'Upload Complete',
+        description: `Successfully uploaded ${successCount} leads. ${errorCount} failed.`,
+      });
+
+      // Reset and close
+      setFile(null);
+      setParsedLeads([]);
+      setSelectedUserId('');
+      setSearchQuery('');
+      onOpenChange(false);
+      onUploadSuccess();
+    } catch (error) {
+      toast({
+        title: 'Upload Failed',
+        description: 'Failed to upload leads',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const getUserName = (id: string) => {
     return users.find(u => u._id === id)?.name || id;
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} >
-      <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto ">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Upload CSV File</DialogTitle>
           <DialogDescription>
@@ -335,93 +327,59 @@ const handleUpload = async () => {
             </div>
 
             {/* Bulk Assignment (Optional) */}
-<div className="space-y-4">
-  {/* Department Selection */}
-  <div className="space-y-2">
-    <h3 className="font-medium">3. Optional: Assign All Leads</h3>
-    <div className="grid grid-cols-2 gap-4">
-      <div className="space-y-2">
-        <Label>Department (Optional)</Label>
-        <Select
-          value={selectedDepartmentId}
-          onValueChange={(value) => {
-            setSelectedDepartmentId(value);
-            // Clear user if department changes
-            if (value !== selectedDepartmentId) {
-              setSelectedUserId('');
-            }
-          }}
-          disabled={uploading}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select department" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Departments</SelectItem>
-            {departments.map((dept) => (
-              <SelectItem key={dept._id} value={dept._id}>
-                {dept.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      
-      <div className="space-y-2">
-        <Label>User (Optional)</Label>
-        <Select
-          value={selectedUserId}
-          onValueChange={setSelectedUserId}
-          disabled={uploading}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select user" />
-          </SelectTrigger>
-          <SelectContent>
-            <div className="p-2 border-b">
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search users..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 h-8 text-sm"
-                  onClick={(e) => e.stopPropagation()}
-                />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <h3 className="font-medium">3. Optional: Assign All Leads</h3>
+                <div className="space-y-2">
+                  <Label>Assign To (Optional)</Label>
+                  <Select
+                    value={selectedUserId}
+                    onValueChange={setSelectedUserId}
+                    disabled={uploading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select user to assign all leads" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <div className="p-2 border-b">
+                        <div className="relative">
+                          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search users..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-8 h-8 text-sm"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      </div>
+                      <SelectItem value=" ">Not assigned</SelectItem>
+                      {users
+                        .filter(user => {
+                          // Filter by search query
+                          if (searchQuery) {
+                            const query = searchQuery.toLowerCase();
+                            return user.name.toLowerCase().includes(query) || 
+                                   user.email.toLowerCase().includes(query);
+                          }
+                          return true;
+                        })
+                        .map((user) => (
+                          <SelectItem key={user._id} value={user._id}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{user.name}</span>
+                              <span className="text-xs text-muted-foreground">{user.email}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  This will assign all leads to the selected user
+                </p>
               </div>
             </div>
-            <SelectItem value=" ">Not assigned</SelectItem>
-            {users
-              .filter(user => {
-                // Filter by department if selected
-                if (selectedDepartmentId && userDepartments) {
-                  return userDepartments[user._id] === selectedDepartmentId;
-                }
-                // Filter by search query
-                if (searchQuery) {
-                  const query = searchQuery.toLowerCase();
-                  return user.name.toLowerCase().includes(query) || 
-                         user.email.toLowerCase().includes(query);
-                }
-                return true;
-              })
-              .map((user) => (
-                <SelectItem key={user._id} value={user._id}>
-                  <div className="flex flex-col">
-                    <span className="font-medium">{user.name}</span>
-                    <span className="text-xs text-muted-foreground">{user.email}</span>
-                  </div>
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
-    <p className="text-xs text-muted-foreground">
-      This will override individual assignment in CSV
-    </p>
-  </div>
-</div>
 
             {/* Preview Section */}
             {parsedLeads.length > 0 && (

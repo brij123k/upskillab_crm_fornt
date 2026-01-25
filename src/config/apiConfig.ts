@@ -13,6 +13,7 @@ const ApiConfig = {
   getAllDepartments:`${url}/departments`,
   getAllStages:`${url}/lead-stages`,
   addNewEmp:`${url}/users/register`,
+  updateUser:(userId:string)=>`${url}/users/user/${userId}`,
   addNewRole:`${url}/roles`,
   addNewDepartments:`${url}/departments`,
   updateDepartments:(departmentId:string)=>`${url}/departments/${departmentId}`,

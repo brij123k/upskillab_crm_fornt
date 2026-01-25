@@ -23,35 +23,28 @@ import {
   MoreHorizontal, 
   Edit, 
   Eye, 
-  Filter,
   Download,
   RefreshCw,
   Loader2,
   Users,
   FileUp,
-  Calendar,
-  Building,
-  ArrowUpDown,
-  CheckCircle,
-  XCircle,
-  TrendingUp,
-  Clock,
-  User,
-  Mail,
-  Phone,
-  Globe,
-  History,
-  Link,
+  FileDown,
+  FileSpreadsheet,
   ChevronLeft,
   ChevronRight,
   FileText,
   Upload,
-  Check,
   X,
+  CheckCircle,
+  XCircle,
+  TrendingUp,
+  Phone,
+  Mail,
   CheckSquare,
   Square,
-  FileSpreadsheet,
-  FileDown
+  Filter,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -72,24 +65,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { getDataHandlerWithToken, postDataHandlerWithToken, patchTokenDataHandler } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { ProgressModal } from '@/components/modal/ProgressModal';
 import { CSVUploadModal } from '@/components/modal/CSVUploadModal';
-import { UserSelectWithSearch } from '@/components/modal/UserSelectWithSearch';
 import { SearchableSelect } from '@/components/modal/SearchableSelect';
 
 interface LeadType {
   _id: string;
+  leadId: number;
   name: string;
   phone: string;
   email: string;
   source: string;
-  departmentId: {
-    _id: string;
-    name: string;
-  };
   stageId: {
     _id: string;
     name: string;
@@ -135,11 +123,6 @@ interface LeadHistoryType {
   __v: number;
 }
 
-interface DepartmentType {
-  _id: string;
-  name: string;
-}
-
 interface StageType {
   _id: string;
   name: string;
@@ -151,10 +134,6 @@ interface UserType {
   name: string;
   email: string;
   profile?: {
-    departmentId?: {
-      _id: string;
-      name: string;
-    };
   };
 }
 
@@ -163,7 +142,6 @@ interface LeadForm {
   phone: string;
   email: string;
   source: string;
-  departmentId: string;
   stageId: string;
   source_campaign?: string;
   assignedTo?: string;
@@ -174,7 +152,6 @@ interface BulkLead {
   phone: string;
   email: string;
   source: string;
-  departmentId: string;
   stageId: string;
   source_campaign?: string;
   assignedTo?: string;
@@ -184,7 +161,6 @@ interface Filters {
   search: string;
   status: string;
   source: string;
-  departmentId: string;
   stageId: string;
   assignedTo: string;
   modifiedBy: string;
@@ -205,7 +181,6 @@ interface ProgressItem {
 export function LeadsPage() {
   const [leads, setLeads] = useState<LeadType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [departments, setDepartments] = useState<DepartmentType[]>([]);
   const [stages, setStages] = useState<StageType[]>([]);
   const [users, setUsers] = useState<UserType[]>([]);
   const [leadHistory, setLeadHistory] = useState<LeadHistoryType[]>([]);
@@ -221,7 +196,6 @@ export function LeadsPage() {
     search: '',
     status: 'all',
     source: 'all',
-    departmentId: 'all',
     stageId: 'all',
     assignedTo: 'all',
     modifiedBy: 'all',
@@ -256,14 +230,13 @@ export function LeadsPage() {
     phone: '',
     email: '',
     source: 'manual',
-    departmentId: '',
     stageId: '696cadcadcbcf508621922e6',
     source_campaign: '',
     assignedTo: ''
   });
   
   const [bulkLeads, setBulkLeads] = useState<BulkLead[]>([
-    { name: '', phone: '', email: '', source: 'manual', departmentId: '', stageId: '', assignedTo: '' }
+    { name: '', phone: '', email: '', source: 'manual', stageId: '696cadcadcbcf508621922e6', assignedTo: '' }
   ]);
   
   // Progress tracking
@@ -276,14 +249,14 @@ export function LeadsPage() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [assigningLeads, setAssigningLeads] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [loadingStages, setLoadingStages] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
-const [userDepartments, setUserDepartments] = useState<Record<string, string>>({});
-const [searchUserQuery, setSearchUserQuery] = useState('');
-const [searchCSVUserQuery, setSearchCSVUserQuery] = useState('');
-const [assignDepartmentId, setAssignDepartmentId] = useState<string>('');
-const [assignUserId, setAssignUserId] = useState<string>('');
+  
+  // Filter visibility
+  const [showFilters, setShowFilters] = useState(false);
+  
+  const [assignUserId, setAssignUserId] = useState<string>('');
+
   // Build query params
   const buildQueryParams = () => {
     const params: Record<string, any> = {};
@@ -296,7 +269,6 @@ const [assignUserId, setAssignUserId] = useState<string>('');
     if (filters.search && filters.search !== "all") params.search = filters.search;
     if (filters.status && filters.status !== "all") params.status = filters.status;
     if (filters.source && filters.source !== "all") params.source = filters.source;
-    if (filters.departmentId && filters.departmentId !== "all") params.departmentId = filters.departmentId;
     if (filters.stageId && filters.stageId !== "all") params.stageId = filters.stageId;
     if (filters.assignedTo && filters.assignedTo !== "all") params.assignedTo = filters.assignedTo;
     if (filters.modifiedBy && filters.modifiedBy !== "all") params.modifiedBy = filters.modifiedBy;
@@ -341,25 +313,6 @@ const [assignUserId, setAssignUserId] = useState<string>('');
     }
   };
 
-  // Fetch departments
-  const fetchDepartments = async () => {
-    try {
-      setLoadingDepartments(true);
-      const response = await getDataHandlerWithToken("getAllDepartments", null, null);
-      if (response) {
-        setDepartments(response);
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch departments",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingDepartments(false);
-    }
-  };
-
   // Fetch stages
   const fetchStages = async () => {
     try {
@@ -381,31 +334,22 @@ const [assignUserId, setAssignUserId] = useState<string>('');
 
   // Fetch users
   const fetchUsers = async () => {
-  try {
-    setLoadingUsers(true);
-    const response = await getDataHandlerWithToken("getAllUser", null, null);
-    if (response) {
-      setUsers(response);
-      
-      // Create department mapping for users
-      const deptMap: Record<string, string> = {};
-      response.forEach((user: UserType) => {
-        if (user.profile?.departmentId?._id) {
-          deptMap[user._id] = user.profile.departmentId._id;
-        }
+    try {
+      setLoadingUsers(true);
+      const response = await getDataHandlerWithToken("getAllUser", null, null);
+      if (response) {
+        setUsers(response);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch users",
+        variant: "destructive",
       });
-      setUserDepartments(deptMap);
+    } finally {
+      setLoadingUsers(false);
     }
-  } catch (error) {
-    toast({
-      title: "Error",
-      description: "Failed to fetch users",
-      variant: "destructive",
-    });
-  } finally {
-    setLoadingUsers(false);
-  }
-};
+  };
 
   // Fetch lead history
   const fetchLeadHistory = async (leadId: string) => {
@@ -430,7 +374,6 @@ const [assignUserId, setAssignUserId] = useState<string>('');
   // Initialize data
   useEffect(() => {
     fetchLeads();
-    fetchDepartments();
     fetchStages();
     fetchUsers();
   }, [page, limit, filters]);
@@ -473,8 +416,7 @@ const [assignUserId, setAssignUserId] = useState<string>('');
         phone: '',
         email: '',
         source: 'manual',
-        departmentId: '',
-        stageId: '',
+        stageId: '696cadcadcbcf508621922e6',
         source_campaign: '',
         assignedTo: ''
       });
@@ -498,7 +440,7 @@ const [assignUserId, setAssignUserId] = useState<string>('');
       setProgressModalOpen(true);
       
       const validLeads = bulkLeads.filter(lead => 
-        lead.name && lead.phone && lead.email && lead.departmentId && lead.stageId
+        lead.name && lead.phone && lead.email && lead.stageId
       );
       
       if (validLeads.length === 0) {
@@ -559,7 +501,7 @@ const [assignUserId, setAssignUserId] = useState<string>('');
       
       // Reset form after delay
       setTimeout(() => {
-        setBulkLeads([{ name: '', phone: '', email: '', source: 'manual', departmentId: '', stageId: '', assignedTo: '' }]);
+        setBulkLeads([{ name: '', phone: '', email: '', source: 'manual', stageId: '', assignedTo: '' }]);
         setBulkLeadOpen(false);
         setProgressModalOpen(false);
         fetchLeads();
@@ -633,74 +575,64 @@ const [assignUserId, setAssignUserId] = useState<string>('');
   };
 
   // Assign leads to user
-// Assign leads to user
-const handleAssignLeads = async () => {
-  if (selectedLeads.length === 0) {
-    toast({
-      title: "Error",
-      description: "Please select at least one lead",
-      variant: "destructive",
-    });
-    return;
-  }
-  
-  // Prepare data for API - FIXED: Use assignUserId instead of selectedUser
-  const dataToSend: any = {
-    leadIds: selectedLeads
+  const handleAssignLeads = async () => {
+    if (selectedLeads.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please select at least one lead",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Prepare data for API
+    const dataToSend: any = {
+      leadIds: selectedLeads
+    };
+    
+    // Add assignedTo if user is selected
+    if (assignUserId && assignUserId !== "") {
+      dataToSend.assignedTo = assignUserId;
+    }
+    
+    
+    // If no user
+    if (!assignUserId) {
+      toast({
+        title: "Error",
+        description: "Please select user",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      setAssigningLeads(true);
+      
+      const response = await patchTokenDataHandler("assignLead", dataToSend);
+      
+      toast({
+        title: "Success",
+        description: response?.message || "Leads assigned successfully",
+      });
+      
+      // Reset modal state
+      setAssignModalOpen(false);
+      setAssignUserId('');
+      
+      // Refresh leads
+      fetchLeads();
+    } catch (error: any) {
+      console.error("Assign leads error:", error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to assign leads",
+        variant: "destructive",
+      });
+    } finally {
+      setAssigningLeads(false);
+    }
   };
-  
-  // Add assignedTo if user is selected
-  if (assignUserId && assignUserId !== "") {
-    dataToSend.assignedTo = assignUserId;
-  }
-  
-  // Add departmentId if department is selected
-  if (assignDepartmentId && assignDepartmentId !== "") {
-    dataToSend.departmentId = assignDepartmentId;
-  }
-  
-  // If no user or department selected
-  if (!assignUserId && !assignDepartmentId) {
-    toast({
-      title: "Error",
-      description: "Please select at least a user or department",
-      variant: "destructive",
-    });
-    return;
-  }
-  
-  // Debug log to see what's being sent
-  console.log("Assigning leads with data:", dataToSend);
-  
-  try {
-    setAssigningLeads(true);
-    
-    // Make sure you're calling the correct API endpoint
-    const response = await patchTokenDataHandler("assignLead", dataToSend);
-    
-    toast({
-      title: "Success",
-      description: response?.message || "Leads assigned successfully",
-    });
-    
-    // Reset modal state
-    setAssignModalOpen(false);
-    setAssignDepartmentId('');
-    setAssignUserId('');
-    
-    // Refresh leads
-    fetchLeads();
-  } catch (error: any) {
-    console.error("Assign leads error:", error);
-    toast({
-      title: "Error",
-      description: error.response?.data?.message || "Failed to assign leads",
-      variant: "destructive",
-    });
-  } finally {
-    setAssigningLeads(false);
-  }
-};
 
   // View lead details
   const handleViewLead = (lead: LeadType) => {
@@ -717,7 +649,6 @@ const handleAssignLeads = async () => {
       phone: lead.phone,
       email: lead.email,
       source: lead.source,
-      departmentId: lead.departmentId._id,
       stageId: lead.stageId._id,
       source_campaign: '',
       assignedTo: lead.assignedTo?._id || ''
@@ -736,7 +667,7 @@ const handleAssignLeads = async () => {
 
   // Add bulk lead row
   const addBulkLeadRow = () => {
-    setBulkLeads([...bulkLeads, { name: '', phone: '', email: '', source: 'manual', departmentId: '', stageId: '', assignedTo: '' }]);
+    setBulkLeads([...bulkLeads, { name: '', phone: '', email: '', source: 'manual', stageId: '696cadcadcbcf508621922e6', assignedTo: '' }]);
   };
 
   // Remove bulk lead row
@@ -835,7 +766,6 @@ const handleAssignLeads = async () => {
       search: '',
       status: 'all',
       source: 'all',
-      departmentId: 'all',
       stageId: 'all',
       assignedTo: 'all',
       modifiedBy: 'all',
@@ -870,214 +800,211 @@ const handleAssignLeads = async () => {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
   };
+
+  // Export current page to CSV
   const exportCurrentPageToCSV = () => {
-  try {
-    if (leads.length === 0) {
+    try {
+      if (leads.length === 0) {
+        toast({
+          title: "No Data",
+          description: "No leads to export",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Define CSV headers
+      const headers = [
+        "ID",
+        "Name",
+        "Phone",
+        "Email",
+        "Source",
+        "Stage",
+        "Status",
+        "Health Score",
+        "Assigned To",
+        "Assigned Email",
+        "Created At",
+        "Last Modified",
+        "Is Active"
+      ];
+
+      // Prepare CSV rows from current page data
+      const rows = leads.map((lead: LeadType) => [
+        lead._id,
+        `"${lead.name.replace(/"/g, '""')}"`,
+        lead.phone,
+        lead.email,
+        lead.source,
+        lead.stageId?.name || "",
+        lead.status,
+        lead.healthScore,
+        lead.assignedTo?.name || "",
+        lead.assignedTo?.email || "",
+        new Date(lead.createdAt).toLocaleString(),
+        new Date(lead.modifiedAt).toLocaleString(),
+        lead.isActive ? "Yes" : "No"
+      ]);
+
+      // Create CSV content
+      const csvContent = [
+        headers.join(","),
+        ...rows.map(row => row.join(","))
+      ].join("\n");
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      
+      // Generate filename
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+      const filename = `leads_page_${page}_${timestamp}.csv`;
+      
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
       toast({
-        title: "No Data",
-        description: "No leads to export",
+        title: "Download Complete",
+        description: `Exported ${leads.length} leads from page ${page}`,
+      });
+
+    } catch (error: any) {
+      console.error("Export error:", error);
+      toast({
+        title: "Export Failed",
+        description: error.message || "Failed to export leads",
         variant: "destructive",
       });
-      return;
     }
+  };
 
-    // Define CSV headers
-    const headers = [
-      "ID",
-      "Name",
-      "Phone",
-      "Email",
-      "Source",
-      "Department",
-      "Stage",
-      "Status",
-      "Health Score",
-      "Assigned To",
-      "Assigned Email",
-      "Created At",
-      "Last Modified",
-      "Is Active"
-    ];
+  // Export all filtered data to CSV
+  const exportToCSV = async () => {
+    try {
+      // Build query params for all data (no pagination)
+      const queryParams: Record<string, any> = {};
 
-    // Prepare CSV rows from current page data
-    const rows = leads.map((lead: LeadType) => [
-      lead._id,
-      `"${lead.name.replace(/"/g, '""')}"`,
-      lead.phone,
-      lead.email,
-      lead.source,
-      lead.departmentId?.name || "",
-      lead.stageId?.name || "",
-      lead.status,
-      lead.healthScore,
-      lead.assignedTo?.name || "",
-      lead.assignedTo?.email || "",
-      new Date(lead.createdAt).toLocaleString(),
-      new Date(lead.modifiedAt).toLocaleString(),
-      lead.isActive ? "Yes" : "No"
-    ]);
+      // Apply all active filters (only if not "all")
+      if (filters.search && filters.search !== "all") queryParams.search = filters.search;
+      if (filters.status && filters.status !== "all") queryParams.status = filters.status;
+      if (filters.source && filters.source !== "all") queryParams.source = filters.source;
+      if (filters.stageId && filters.stageId !== "all") queryParams.stageId = filters.stageId;
+      if (filters.assignedTo && filters.assignedTo !== "all") queryParams.assignedTo = filters.assignedTo;
+      if (filters.modifiedBy && filters.modifiedBy !== "all") queryParams.modifiedBy = filters.modifiedBy;
+      
+      if (filters.isActive && filters.isActive !== "all") {
+        queryParams.isActive = filters.isActive === "true" ? true : 
+                             filters.isActive === "false" ? false : filters.isActive;
+      }
+      
+      if (filters.sort && filters.sort !== "all") queryParams.sort = filters.sort;
+      
+      if (filters.dateFilter && filters.dateFilter !== "all") {
+        queryParams.dateFilter = filters.dateFilter;
+      }
+      
+      if (filters.fromDate && filters.fromDate !== "all") queryParams.fromDate = filters.fromDate;
+      if (filters.toDate && filters.toDate !== "all") queryParams.toDate = filters.toDate;
 
-    // Create CSV content
-    const csvContent = [
-      headers.join(","),
-      ...rows.map(row => row.join(","))
-    ].join("\n");
+      // Fetch all data without pagination
+      queryParams.page = 1;
+      queryParams.limit = 10000;
 
-    // Create and download file
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    
-    // Generate filename
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
-    const filename = `leads_page_${page}_${timestamp}.csv`;
-    
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+      // Show loading toast
+      toast({
+        title: "Preparing Download",
+        description: "Fetching all lead data...",
+      });
 
-    toast({
-      title: "Download Complete",
-      description: `Exported ${leads.length} leads from page ${page}`,
-    });
+      const response = await getDataHandlerWithToken("getAllLeads", queryParams, null);
+      
+      if (!response?.data) {
+        throw new Error("No data to export");
+      }
 
-  } catch (error: any) {
-    console.error("Export error:", error);
-    toast({
-      title: "Export Failed",
-      description: error.message || "Failed to export leads",
-      variant: "destructive",
-    });
-  }
-};
+      const leadsData = response.data;
+      
+      // Define CSV headers
+      const headers = [
+        "ID",
+        "Name",
+        "Phone",
+        "Email",
+        "Source",
+        "Stage",
+        "Status",
+        "Health Score",
+        "Assigned To",
+        "Assigned Email",
+        "Created At",
+        "Last Modified",
+        "Is Active"
+      ];
 
-  // Add this function after your state declarations
-const exportToCSV = async () => {
-  try {
-    // Build query params for all data (no pagination)
-    const queryParams: Record<string, any> = {};
+      // Prepare CSV rows
+      const rows = leadsData.map((lead: LeadType) => [
+        lead._id,
+        `"${lead.name.replace(/"/g, '""')}"`,
+        lead.phone,
+        lead.email,
+        lead.source,
+        lead.stageId?.name || "",
+        lead.status,
+        lead.healthScore,
+        lead.assignedTo?.name || "",
+        lead.assignedTo?.email || "",
+        new Date(lead.createdAt).toLocaleString(),
+        new Date(lead.modifiedAt).toLocaleString(),
+        lead.isActive ? "Yes" : "No"
+      ]);
 
-    // Apply all active filters (only if not "all")
-    if (filters.search && filters.search !== "all") queryParams.search = filters.search;
-    if (filters.status && filters.status !== "all") queryParams.status = filters.status;
-    if (filters.source && filters.source !== "all") queryParams.source = filters.source;
-    if (filters.departmentId && filters.departmentId !== "all") queryParams.departmentId = filters.departmentId;
-    if (filters.stageId && filters.stageId !== "all") queryParams.stageId = filters.stageId;
-    if (filters.assignedTo && filters.assignedTo !== "all") queryParams.assignedTo = filters.assignedTo;
-    if (filters.modifiedBy && filters.modifiedBy !== "all") queryParams.modifiedBy = filters.modifiedBy;
-    
-    if (filters.isActive && filters.isActive !== "all") {
-      queryParams.isActive = filters.isActive === "true" ? true : 
-                           filters.isActive === "false" ? false : filters.isActive;
+      // Create CSV content
+      const csvContent = [
+        headers.join(","),
+        ...rows.map(row => row.join(","))
+      ].join("\n");
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+      const filterInfo = [];
+      if (filters.search) filterInfo.push(`search-${filters.search}`);
+      if (filters.status !== "all") filterInfo.push(`status-${filters.status}`);
+      if (filters.source !== "all") filterInfo.push(`source-${filters.source}`);
+      
+      const filename = `leads_export_${timestamp}${filterInfo.length > 0 ? `_${filterInfo.join('_')}` : ''}.csv`;
+      
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Download Complete",
+        description: `Exported ${leadsData.length} leads to CSV`,
+      });
+
+    } catch (error: any) {
+      console.error("Export error:", error);
+      toast({
+        title: "Export Failed",
+        description: error.message || "Failed to export leads",
+        variant: "destructive",
+      });
     }
-    
-    if (filters.sort && filters.sort !== "all") queryParams.sort = filters.sort;
-    
-    if (filters.dateFilter && filters.dateFilter !== "all") {
-      queryParams.dateFilter = filters.dateFilter;
-    }
-    
-    if (filters.fromDate && filters.fromDate !== "all") queryParams.fromDate = filters.fromDate;
-    if (filters.toDate && filters.toDate !== "all") queryParams.toDate = filters.toDate;
-
-    // Fetch all data without pagination
-    queryParams.page = 1;
-    queryParams.limit = 10000; // Large number to get all data
-
-    // Show loading toast
-    toast({
-      title: "Preparing Download",
-      description: "Fetching all lead data...",
-    });
-
-    const response = await getDataHandlerWithToken("getAllLeads", queryParams, null);
-    
-    if (!response?.data) {
-      throw new Error("No data to export");
-    }
-
-    const leadsData = response.data;
-    
-    // Define CSV headers
-    const headers = [
-      "ID",
-      "Name",
-      "Phone",
-      "Email",
-      "Source",
-      "Department",
-      "Stage",
-      "Status",
-      "Health Score",
-      "Assigned To",
-      "Assigned Email",
-      "Created At",
-      "Last Modified",
-      "Is Active"
-    ];
-
-    // Prepare CSV rows
-    const rows = leadsData.map((lead: LeadType) => [
-      lead._id,
-      `"${lead.name.replace(/"/g, '""')}"`, // Escape quotes
-      lead.phone,
-      lead.email,
-      lead.source,
-      lead.departmentId?.name || "",
-      lead.stageId?.name || "",
-      lead.status,
-      lead.healthScore,
-      lead.assignedTo?.name || "",
-      lead.assignedTo?.email || "",
-      new Date(lead.createdAt).toLocaleString(),
-      new Date(lead.modifiedAt).toLocaleString(),
-      lead.isActive ? "Yes" : "No"
-    ]);
-
-    // Create CSV content
-    const csvContent = [
-      headers.join(","),
-      ...rows.map(row => row.join(","))
-    ].join("\n");
-
-    // Create and download file
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    
-    // Generate filename with timestamp
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
-    const filterInfo = [];
-    if (filters.search) filterInfo.push(`search-${filters.search}`);
-    if (filters.status !== "all") filterInfo.push(`status-${filters.status}`);
-    if (filters.source !== "all") filterInfo.push(`source-${filters.source}`);
-    
-    const filename = `leads_export_${timestamp}${filterInfo.length > 0 ? `_${filterInfo.join('_')}` : ''}.csv`;
-    
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-
-    toast({
-      title: "Download Complete",
-      description: `Exported ${leadsData.length} leads to CSV`,
-    });
-
-  } catch (error: any) {
-    console.error("Export error:", error);
-    toast({
-      title: "Export Failed",
-      description: error.message || "Failed to export leads",
-      variant: "destructive",
-    });
-  }
-};
+  };
 
   return (
     <div className="space-y-6 animate-fade-in bg-transparent">
@@ -1198,31 +1125,6 @@ const exportToCSV = async () => {
                               <SelectItem value="facebook">Facebook</SelectItem>
                               <SelectItem value="google">Google</SelectItem>
                               <SelectItem value="api">API</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Department *</Label>
-                          <Select
-                            value={lead.departmentId}
-                            onValueChange={(value) => updateBulkLeadRow(index, 'departmentId', value)}
-                            disabled={addingBulkLeads || loadingDepartments}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select department" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {loadingDepartments ? (
-                                <div className="py-2 text-center">
-                                  <Loader2 className="w-4 h-4 mx-auto animate-spin" />
-                                </div>
-                              ) : (
-                                departments.map((dept) => (
-                                  <SelectItem key={dept._id} value={dept._id}>
-                                    {dept.name}
-                                  </SelectItem>
-                                ))
-                              )}
                             </SelectContent>
                           </Select>
                         </div>
@@ -1419,58 +1321,6 @@ const exportToCSV = async () => {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="department">Department *</Label>
-                    <Select
-                      value={leadForm.departmentId}
-                      onValueChange={(value) => setLeadForm({...leadForm, departmentId: value})}
-                      disabled={addingLead || loadingDepartments}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {loadingDepartments ? (
-                          <div className="py-2 text-center">
-                            <Loader2 className="w-4 h-4 mx-auto animate-spin" />
-                          </div>
-                        ) : (
-                          departments.map((dept) => (
-                            <SelectItem key={dept._id} value={dept._id}>
-                              {dept.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="stage">Stage *</Label>
-                    <Select
-                      value={leadForm.stageId}
-                      onValueChange={(value) => setLeadForm({...leadForm, stageId: value})}
-                      disabled={addingLead || loadingStages}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select stage" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {loadingStages ? (
-                          <div className="py-2 text-center">
-                            <Loader2 className="w-4 h-4 mx-auto animate-spin" />
-                          </div>
-                        ) : (
-                          stages.map((stage) => (
-                            <SelectItem key={stage._id} value={stage._id}>
-                              {stage.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="assignedTo">Assign To (Optional)</Label>
                   <Select
@@ -1512,199 +1362,199 @@ const exportToCSV = async () => {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Filters</CardTitle>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={resetFilters}
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Reset
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label>Search</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search leads..."
-                  value={filters.search}
-                  onChange={(e) => setFilters({...filters, search: e.target.value})}
-                  className="pl-10"
-                />
+      {/* Filters Toggle */}
+      <div className="flex items-center justify-between">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowFilters(!showFilters)}
+          className="flex items-center gap-2"
+        >
+          <Filter className="w-4 h-4" />
+          {showFilters ? (
+            <>
+              Hide Filters
+              <ChevronUp className="w-4 h-4" />
+            </>
+          ) : (
+            <>
+              Show Filters
+              <ChevronDown className="w-4 h-4" />
+            </>
+          )}
+        </Button>
+        
+        {showFilters && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={resetFilters}
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Reset Filters
+          </Button>
+        )}
+      </div>
+
+      {/* Filters - Collapsible */}
+      {showFilters && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label>Search</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search leads..."
+                    value={filters.search}
+                    onChange={(e) => setFilters({...filters, search: e.target.value})}
+                    className="pl-10"
+                  />
+                </div>
               </div>
+              
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={filters.status}
+                  onValueChange={(value) => setFilters({...filters, status: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="lost">Lost</SelectItem>
+                    <SelectItem value="converted">Converted</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Source</Label>
+                <Select
+                  value={filters.source}
+                  onValueChange={(value) => setFilters({...filters, source: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All sources" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sources</SelectItem>
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="facebook">Facebook</SelectItem>
+                    <SelectItem value="google">Google</SelectItem>
+                    <SelectItem value="api">API</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Stage</Label>
+                <Select
+                  value={filters.stageId}
+                  onValueChange={(value) => setFilters({...filters, stageId: value})}
+                  disabled={loadingStages}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All stages" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Stages</SelectItem>
+                    {stages.map((stage) => (
+                      <SelectItem key={stage._id} value={stage._id}>
+                        {stage.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Assigned To</Label>
+                <Select
+                  value={filters.assignedTo}
+                  onValueChange={(value) => setFilters({...filters, assignedTo: value})}
+                  disabled={loadingUsers}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All users" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Users</SelectItem>
+                    {users.map((user) => (
+                      <SelectItem key={user._id} value={user._id}>
+                        {user.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Date Filter</Label>
+                <Select
+                  value={filters.dateFilter}
+                  onValueChange={(value) => setFilters({...filters, dateFilter: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">This Week</SelectItem>
+                    <SelectItem value="month">This Month</SelectItem>
+                    <SelectItem value="year">This Year</SelectItem>
+                    <SelectItem value="custom">Custom Range</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Sort By</Label>
+                <Select
+                  value={filters.sort}
+                  onValueChange={(value) => setFilters({...filters, sort: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="new">Newest First</SelectItem>
+                    <SelectItem value="old">Oldest First</SelectItem>
+                    <SelectItem value="name_asc">Name A-Z</SelectItem>
+                    <SelectItem value="name_desc">Name Z-A</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {filters.dateFilter === 'custom' && (
+                <>
+                  <div className="space-y-2">
+                    <Label>From Date</Label>
+                    <Input
+                      type="date"
+                      value={filters.fromDate}
+                      onChange={(e) => setFilters({...filters, fromDate: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>To Date</Label>
+                    <Input
+                      type="date"
+                      value={filters.toDate}
+                      onChange={(e) => setFilters({...filters, toDate: e.target.value})}
+                    />
+                  </div>
+                </>
+              )}
             </div>
-            
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select
-                value={filters.status}
-                onValueChange={(value) => setFilters({...filters, status: value})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="lost">Lost</SelectItem>
-                  <SelectItem value="converted">Converted</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Source</Label>
-              <Select
-                value={filters.source}
-                onValueChange={(value) => setFilters({...filters, source: value})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All sources" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Sources</SelectItem>
-                  <SelectItem value="manual">Manual</SelectItem>
-                  <SelectItem value="facebook">Facebook</SelectItem>
-                  <SelectItem value="google">Google</SelectItem>
-                  <SelectItem value="api">API</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Department</Label>
-              <Select
-                value={filters.departmentId}
-                onValueChange={(value) => setFilters({...filters, departmentId: value})}
-                disabled={loadingDepartments}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All departments" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept._id} value={dept._id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Stage</Label>
-              <Select
-                value={filters.stageId}
-                onValueChange={(value) => setFilters({...filters, stageId: value})}
-                disabled={loadingStages}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All stages" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Stages</SelectItem>
-                  {stages.map((stage) => (
-                    <SelectItem key={stage._id} value={stage._id}>
-                      {stage.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Assigned To</Label>
-              <Select
-                value={filters.assignedTo}
-                onValueChange={(value) => setFilters({...filters, assignedTo: value})}
-                disabled={loadingUsers}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All users" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Users</SelectItem>
-                  {users.map((user) => (
-                    <SelectItem key={user._id} value={user._id}>
-                      {user.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Date Filter</Label>
-              <Select
-                value={filters.dateFilter}
-                onValueChange={(value) => setFilters({...filters, dateFilter: value})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select period" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Time</SelectItem>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="week">This Week</SelectItem>
-                  <SelectItem value="month">This Month</SelectItem>
-                  <SelectItem value="year">This Year</SelectItem>
-                  <SelectItem value="custom">Custom Range</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Sort By</Label>
-              <Select
-                value={filters.sort}
-                onValueChange={(value) => setFilters({...filters, sort: value})}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="new">Newest First</SelectItem>
-                  <SelectItem value="old">Oldest First</SelectItem>
-                  <SelectItem value="name_asc">Name A-Z</SelectItem>
-                  <SelectItem value="name_desc">Name Z-A</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {filters.dateFilter === 'custom' && (
-              <>
-                <div className="space-y-2">
-                  <Label>From Date</Label>
-                  <Input
-                    type="date"
-                    value={filters.fromDate}
-                    onChange={(e) => setFilters({...filters, fromDate: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>To Date</Label>
-                  <Input
-                    type="date"
-                    value={filters.toDate}
-                    onChange={(e) => setFilters({...filters, toDate: e.target.value})}
-                  />
-                </div>
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Leads Table */}
       <Card>
@@ -1759,35 +1609,32 @@ const exportToCSV = async () => {
                 <ChevronRight className="h-4 w-4" />
               </Button>
               <DropdownMenu>
-  <DropdownMenuTrigger asChild>
-    <Button variant="outline" size="icon" disabled={loading || totalLeads === 0}>
-      {loading ? (
-        <Loader2 className="h-4 w-4 animate-spin" />
-      ) : (
-        <Download className="h-4 w-4" />
-      )}
-    </Button>
-  </DropdownMenuTrigger>
-  <DropdownMenuContent align="end">
-    <DropdownMenuItem 
-      onClick={exportToCSV}
-      disabled={loading || totalLeads === 0}
-    >
-      <Download className="mr-2 h-4 w-4" />
-      Export All Filtered Data ({totalLeads} leads)
-    </DropdownMenuItem>
-    <DropdownMenuItem 
-      onClick={() => {
-        // Export current page data
-        exportCurrentPageToCSV();
-      }}
-      disabled={loading || leads.length === 0}
-    >
-      <FileSpreadsheet className="mr-2 h-4 w-4" />
-      Export Current Page ({leads.length} leads)
-    </DropdownMenuItem>
-  </DropdownMenuContent>
-</DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" disabled={loading || totalLeads === 0}>
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem 
+                    onClick={exportToCSV}
+                    disabled={loading || totalLeads === 0}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Export All Filtered Data ({totalLeads} leads)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={exportCurrentPageToCSV}
+                    disabled={loading || leads.length === 0}
+                  >
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    Export Current Page ({leads.length} leads)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </CardHeader>
@@ -1827,11 +1674,9 @@ const exportToCSV = async () => {
                     <TableHead>Lead</TableHead>
                     <TableHead>Contact</TableHead>
                     <TableHead>Source</TableHead>
-                    <TableHead>Department</TableHead>
                     <TableHead>Stage</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Assigned To</TableHead>
-                    <TableHead>Created</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1853,7 +1698,7 @@ const exportToCSV = async () => {
                       <TableCell>
                         <div className="font-medium">{lead.name}</div>
                         <div className="text-xs text-muted-foreground">
-                          ID: {lead._id.substring(0, 8)}...
+                          ID: {lead.leadId}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -1869,11 +1714,7 @@ const exportToCSV = async () => {
                         </div>
                       </TableCell>
                       <TableCell>{getSourceBadge(lead.source)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {lead.departmentId?.name || <span className="text-muted-foreground">Not assigned</span>}
-                        </div>
-                      </TableCell>
+                      
                       <TableCell>
                         <Badge variant="outline">
                           {lead.stageId.name}
@@ -1896,9 +1737,6 @@ const exportToCSV = async () => {
                         ) : (
                           <span className="text-muted-foreground">Not assigned</span>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">{formatDate(lead.createdAt)}</div>
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -2020,16 +1858,14 @@ const exportToCSV = async () => {
 
       {/* CSV Upload Modal */}
       <CSVUploadModal
-  open={csvUploadOpen}
-  onOpenChange={setCsvUploadOpen}
-  users={users}
-  departments={departments} // Add this
-  userDepartments={userDepartments} // Add this
-  onUploadSuccess={() => {
-    setCsvUploadOpen(false);
-    fetchLeads();
-  }}
-/>
+        open={csvUploadOpen}
+        onOpenChange={setCsvUploadOpen}
+        users={users}
+        onUploadSuccess={() => {
+          setCsvUploadOpen(false);
+          fetchLeads();
+        }}
+      />
 
       {/* Progress Modal */}
       <ProgressModal
@@ -2040,140 +1876,91 @@ const exportToCSV = async () => {
         progressItems={progressItems}
       />
 
-{/* Assign Leads Modal */}
-<Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
-  <DialogContent className="sm:max-w-[500px]">
-    <DialogHeader>
-      <DialogTitle>Assign Leads</DialogTitle>
-      <DialogDescription>
-        Assign {selectedLeads.length} selected leads to a user or department
-      </DialogDescription>
-    </DialogHeader>
-    <div className="grid gap-4 py-4">
-      <div className="space-y-4">
-        {/* Department Selection */}
-        <div className="space-y-2">
-          <Label>Select Department (Optional)</Label>
-          <Select
-            value={assignDepartmentId}
-            onValueChange={(value) => {
-              setAssignDepartmentId(value);
-              // Clear user when department changes
-              if (value === "all" || value === "") {
-                setAssignUserId("");
-              }
-            }}
-            disabled={assigningLeads || loadingDepartments}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select department (optional)" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value=" ">No specific department</SelectItem>
-              {departments.map((dept) => (
-                <SelectItem key={dept._id} value={dept._id}>
-                  {dept.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            Filter users by department or assign only department
-          </p>
-        </div>
-        
-        {/* User Selection with Department Filtering */}
-        <div className="space-y-2">
-          <Label>Select User (Optional)</Label>
-         <SearchableSelect
-    value={assignUserId}
-    onValueChange={(value) => {
-      setAssignUserId(value);
-      // Auto-select department if user has one
-      if (value && userDepartments[value]) {
-        setAssignDepartmentId(userDepartments[value]);
-      }
-    }}
-    options={users
-      .filter(user => {
-        // Filter by selected department if set
-        if (assignDepartmentId && assignDepartmentId !== "" && assignDepartmentId !== "all") {
-          return userDepartments[user._id] === assignDepartmentId;
-        }
-        return true; // Show all users if no department filter
-      })
-      .map(user => ({
-        value: user._id,
-        label: user.name,
-        email: user.email,
-        department: user.profile?.departmentId?.name
-      }))}
-    placeholder={assignDepartmentId ? 
-      "Select user from department" : 
-      "Select user (all users)"}
-    searchPlaceholder="Search user by name, email, or department..."
-    emptyMessage="No users found."
-    disabled={assigningLeads || loadingUsers}
-    showAllOption={false}
-  />
-          <p className="text-xs text-muted-foreground">
-            Selecting a user will auto-select their department
-          </p>
-        </div>
-      </div>
-      
-      {/* Validation message */}
-      {!assignUserId && !assignDepartmentId && (
-        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-          <p className="text-sm text-yellow-800">
-            Please select at least a user or department to assign leads
-          </p>
-        </div>
-      )}
-      
-      <div className="p-3 bg-muted rounded-md">
-        <p className="text-sm font-medium">Selected Leads ({selectedLeads.length})</p>
-        <div className="mt-2 max-h-32 overflow-y-auto">
-          {leads
-            .filter(lead => selectedLeads.includes(lead._id))
-            .slice(0, 5)
-            .map(lead => (
-              <div key={lead._id} className="text-sm py-1 border-b last:border-0">
-                {lead.name} - {lead.email}
+      {/* Assign Leads Modal */}
+      <Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Assign Leads</DialogTitle>
+            <DialogDescription>
+              Assign {selectedLeads.length} selected leads to a user
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-4">
+              {/* User Selection */}
+              <div className="space-y-2">
+                <Label>Select User (Optional)</Label>
+                <SearchableSelect
+                  value={assignUserId}
+                  onValueChange={(value) => {
+                    setAssignUserId(value);
+                  }}
+                  options={users.map(user => ({
+                    value: user._id,
+                    label: user.name,
+                    email: user.email,
+                  }))}
+                  placeholder="Select user (all users)"
+                  searchPlaceholder="Search user by name, email..."
+                  emptyMessage="No users found."
+                  disabled={assigningLeads || loadingUsers}
+                  showAllOption={false}
+                />
+                
               </div>
-            ))}
-          {selectedLeads.length > 5 && (
-            <div className="text-sm py-1 text-muted-foreground">
-              + {selectedLeads.length - 5} more leads
             </div>
-          )}
-        </div>
-      </div>
-    </div>
-    <DialogFooter>
-      <Button variant="outline" onClick={() => {
-        setAssignModalOpen(false);
-        setAssignDepartmentId('');
-        setAssignUserId('');
-      }} disabled={assigningLeads}>
-        Cancel
-      </Button>
-      <Button 
-        onClick={handleAssignLeads} 
-        disabled={selectedLeads.length === 0 || assigningLeads || (!assignUserId && !assignDepartmentId)}
-      >
-        {assigningLeads ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Assigning...
-          </>
-        ) : (
-          'Assign Now'
-        )}
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+            
+            {/* Validation message */}
+            {!assignUserId && (
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <p className="text-sm text-yellow-800">
+                  Please select a user to assign leads
+                </p>
+              </div>
+            )}
+            
+            <div className="p-3 bg-muted rounded-md">
+              <p className="text-sm font-medium">Selected Leads ({selectedLeads.length})</p>
+              <div className="mt-2 max-h-32 overflow-y-auto">
+                {leads
+                  .filter(lead => selectedLeads.includes(lead._id))
+                  .slice(0, 5)
+                  .map(lead => (
+                    <div key={lead._id} className="text-sm py-1 border-b last:border-0">
+                      {lead.name} - {lead.email}
+                    </div>
+                  ))}
+                {selectedLeads.length > 5 && (
+                  <div className="text-sm py-1 text-muted-foreground">
+                    + {selectedLeads.length - 5} more leads
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setAssignModalOpen(false);
+              setAssignUserId('');
+            }} disabled={assigningLeads}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAssignLeads} 
+              disabled={selectedLeads.length === 0 || assigningLeads || (!assignUserId)}
+            >
+              {assigningLeads ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Assigning...
+                </>
+              ) : (
+                'Assign Now'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* View Lead Modal */}
       <Dialog open={viewLeadOpen} onOpenChange={setViewLeadOpen}>
@@ -2206,10 +1993,6 @@ const exportToCSV = async () => {
                     <div className="p-2 bg-muted rounded-md">
                       {getSourceBadge(selectedLead.source)}
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Department</Label>
-                    <div className="p-2 bg-muted rounded-md">{selectedLead.departmentId.name}</div>
                   </div>
                   <div className="space-y-2">
                     <Label>Stage</Label>
@@ -2416,58 +2199,6 @@ const exportToCSV = async () => {
                   placeholder="Campaign name"
                   disabled={updatingLead}
                 />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-department">Department</Label>
-                <Select
-                  value={leadForm.departmentId}
-                  onValueChange={(value) => setLeadForm({...leadForm, departmentId: value})}
-                  disabled={updatingLead || loadingDepartments}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingDepartments ? (
-                      <div className="py-2 text-center">
-                        <Loader2 className="w-4 h-4 mx-auto animate-spin" />
-                      </div>
-                    ) : (
-                      departments.map((dept) => (
-                        <SelectItem key={dept._id} value={dept._id}>
-                          {dept.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-stage">Stage</Label>
-                <Select
-                  value={leadForm.stageId}
-                  onValueChange={(value) => setLeadForm({...leadForm, stageId: value})}
-                  disabled={updatingLead || loadingStages}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select stage" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingStages ? (
-                      <div className="py-2 text-center">
-                        <Loader2 className="w-4 h-4 mx-auto animate-spin" />
-                      </div>
-                    ) : (
-                      stages.map((stage) => (
-                        <SelectItem key={stage._id} value={stage._id}>
-                          {stage.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
               </div>
             </div>
           </div>
