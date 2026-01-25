@@ -18,7 +18,7 @@ import { EmployeesPage } from "@/pages/hr/EmployeesPage";
 
 // BD Pages
 import { BDDashboard } from "@/pages/bd/BDDashboard";
-// import { LeadsPage } from "@/pages/bd/LeadsPage";
+import { BDLeadsPage } from "@/pages/bd/LeadsPage";
 import ProtectedRoute from "@/ProtectedRoute";
 import DashboardRedirect from "@/DashboardRedirect";
 import { VerifyOTP } from "@/pages/VerifyOTP";
@@ -56,7 +56,7 @@ const AppRoutes = () => {
         {/* Admin Panel */}
         <Route path="/admin" element={ 
             <ProtectedRoute>
-                 <RoleProtectedRoute allowedRoles={["admin"]}>
+                 <RoleProtectedRoute allowedRoles={["Admin"]}>
                 <PanelLayout panel="admin" />
                 </RoleProtectedRoute>
                 </ProtectedRoute>}>
@@ -97,7 +97,7 @@ const AppRoutes = () => {
                 </ProtectedRoute>}>
 
           <Route index element={<BDDashboard />} />
-          <Route path="leads" element={<LeadsPage />} />
+          <Route path="leads" element={<BDLeadsPage />} />
           <Route path="tasks" element={<PlaceholderPage title="Tasks & Follow-ups" />} />
           <Route path="calls" element={<PlaceholderPage title="Calls" />} />
           <Route path="meetings" element={<PlaceholderPage title="Meetings" />} />

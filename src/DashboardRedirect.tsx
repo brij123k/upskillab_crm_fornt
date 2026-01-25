@@ -7,7 +7,7 @@ const DashboardRedirect = () => {
   if (!user) return <Navigate to="/login" replace />;
 
   switch (user.role.name) {
-    case "admin":
+    case "Admin":
       return <Navigate to="/admin" replace />;
     case "hr":
       return <Navigate to="/hr" replace />;

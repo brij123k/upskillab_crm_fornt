@@ -26,7 +26,7 @@ export function PermissionsSelector({
   title = "Permissions",
   description = "Select modules and actions for this role"
 }: PermissionsSelectorProps) {
-  
+  console.log(permissions)
   const toggleAction = (moduleId: string, actionId: string) => {
     const updatedPermissions = [...permissions];
     const moduleIndex = updatedPermissions.findIndex(p => p.module === moduleId);
@@ -55,25 +55,56 @@ export function PermissionsSelector({
     onChange(updatedPermissions);
   };
 
+  // Helper to get module label
+  const getModuleLabel = (moduleId: string) => {
+    return modulesConfig[moduleId]?.label || moduleId;
+  };
+
   return (
     <div className="space-y-4">
-      <div>
-        <h4 className="font-medium">{title}</h4>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
+      {title && (
+        <div>
+          <h4 className="font-medium">{title}</h4>
+          {description && (
+            <p className="text-sm text-muted-foreground">{description}</p>
+          )}
+        </div>
+      )}
+      
+      {/* Show current selection summary */}
+      {permissions.length > 0 && (
+        <div className="p-3 bg-muted rounded-lg">
+          <div className="text-sm font-medium mb-2">Currently selected:</div>
+          <div className="flex flex-wrap gap-2">
+            {permissions.map((perm, idx) => (
+              <Badge key={idx} variant="outline" className="bg-primary/10">
+                {getModuleLabel(perm.module)} ({perm.actions.length})
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
       
       <div className="space-y-3">
         {Object.values(modulesConfig).map((module) => {
+            console.log(module)
           const modulePermission = permissions.find(p => p.module === module.id);
           const selectedActions = modulePermission?.actions || [];
+        //   console.log(selectedActions)
+          const hasAnySelected = selectedActions.length > 0;
           
           return (
-            <Card key={module.id}>
+            <Card key={module.id} className={cn(
+              "transition-all",
+              hasAnySelected && "border-primary/30 bg-primary/5"
+            )}>
               <CardHeader className="py-3">
                 <CardTitle className="text-sm flex items-center justify-between">
-                  <span>{module.label}</span>
+                  <span className={cn(hasAnySelected && "text-primary font-semibold")}>
+                    {module.label}
+                  </span>
                   {selectedActions.length > 0 && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-xs bg-primary text-primary-foreground">
                       {selectedActions.length} selected
                     </Badge>
                   )}
@@ -92,7 +123,8 @@ export function PermissionsSelector({
                         onClick={() => toggleAction(module.id, action.id)}
                         disabled={disabled}
                         className={cn(
-                          isSelected && "bg-primary text-primary-foreground hover:bg-primary/90"
+                          isSelected && "bg-primary text-primary-foreground hover:bg-primary/90",
+                          "transition-all"
                         )}
                       >
                         {isSelected ? (
@@ -105,6 +137,25 @@ export function PermissionsSelector({
                     );
                   })}
                 </div>
+                
+                {/* Show selected actions for this module */}
+                {selectedActions.length > 0 && (
+                  <div className="mt-3 pt-3 border-t">
+                    <div className="text-xs font-medium text-muted-foreground mb-1">
+                      Selected for {module.label}:
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedActions.map((actionId) => {
+                        const action = module.actions.find(a => a.id === actionId);
+                        return (
+                          <Badge key={actionId} variant="secondary" className="text-xs">
+                            {action?.label || actionId}
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );

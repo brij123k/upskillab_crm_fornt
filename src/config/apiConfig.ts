@@ -9,6 +9,7 @@ const ApiConfig = {
 
   // admin
   getAllUser:`${url}/users`,
+  getUserByDepartmentId:(departmentId:string)=>`${url}/profiles/department/${departmentId}`,
   getAllRoles:`${url}/roles`,
   getAllDepartments:`${url}/departments`,
   getAllStages:`${url}/lead-stages`,
@@ -25,6 +26,7 @@ const ApiConfig = {
   createNewLead:`${url}/leads`,
   updateLead:(leadid:string)=>`${url}/leads/${leadid}`,
   changeStatusLead:(leadid:string)=>`${url}/leads/${leadid}/status`,
+  changeStageLead:(leadid:string)=>`${url}/leads/${leadid}/stage`,
   leadHistory:(leadid:string)=>`${url}/lead-history/${leadid}`,
   assignLead:`${url}/leads/lead/assign`,
   assignLeadToDepartment:`${url}/leads/lead/assign-department`,

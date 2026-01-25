@@ -480,145 +480,229 @@ export function UsersTab({
             </Card>
 
             {/* Edit User Modal */}
-            <Dialog open={editUserOpen} onOpenChange={setEditUserOpen}>
-                <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-                    {selectedUser && (
-                        <>
-                            <DialogHeader>
-                                <DialogTitle>Edit User: {selectedUser.name}</DialogTitle>
-                                <DialogDescription>
-                                    Update user information and profile details.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Name</Label>
-                                        <Input
-                                            value={editUserForm.name}
-                                            onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
-                                            placeholder="John Doe"
-                                            disabled={updatingUser}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Email</Label>
-                                        <Input
-                                            type="email"
-                                            value={editUserForm.email}
-                                            onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
-                                            placeholder="john@company.com"
-                                            disabled={updatingUser}
-                                        />
-                                    </div>
-                                </div>
+           <Dialog open={editUserOpen} onOpenChange={setEditUserOpen}>
+  <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+    {selectedUser && (
+      <>
+        <DialogHeader>
+          <DialogTitle>Edit User: {selectedUser.name}</DialogTitle>
+          <DialogDescription>
+            Update user information and permissions.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          {/* Basic Information */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Name *</Label>
+              <Input
+                value={editUserForm.name}
+                onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
+                placeholder="John Doe"
+                disabled={updatingUser}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email *</Label>
+              <Input
+                type="email"
+                value={editUserForm.email}
+                onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
+                placeholder="john@company.com"
+                disabled={updatingUser}
+              />
+            </div>
+          </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Phone Number</Label>
-                                        <Input
-                                            value={editUserForm.number}
-                                            onChange={(e) => setEditUserForm({ ...editUserForm, number: e.target.value })}
-                                            placeholder="1234567890"
-                                            disabled={updatingUser}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Role</Label>
-                                        <Select
-                                            value={editUserForm.role}
-                                            onValueChange={(value) => setEditUserForm({ ...editUserForm, role: value })}
-                                            disabled={updatingUser}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select a role" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {roles.map((role) => (
-                                                    <SelectItem key={role._id} value={role._id}>
-                                                        {role.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Phone Number *</Label>
+              <Input
+                value={editUserForm.number}
+                onChange={(e) => setEditUserForm({ ...editUserForm, number: e.target.value })}
+                placeholder="1234567890"
+                disabled={updatingUser}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Role *</Label>
+              <Select
+                value={editUserForm.role}
+                onValueChange={(value) => setEditUserForm({ ...editUserForm, role: value })}
+                disabled={updatingUser}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem key={role._id} value={role._id}>
+                      {role.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-                                <div className="space-y-4 border-t pt-4">
-                                    <h4 className="font-medium">Profile Details</h4>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Department</Label>
-                                            <Select
-                                                value={editUserForm.departmentId}
-                                                onValueChange={(value) => setEditUserForm({ ...editUserForm, departmentId: value })}
-                                                disabled={updatingUser}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select department" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {departments.map((dept) => (
-                                                        <SelectItem key={dept._id} value={dept._id}>
-                                                            {dept.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Education</Label>
-                                            <Input
-                                                value={editUserForm.education}
-                                                onChange={(e) => setEditUserForm({ ...editUserForm, education: e.target.value })}
-                                                placeholder="e.g., Bachelor's Degree"
-                                                disabled={updatingUser}
-                                            />
-                                        </div>
-                                    </div>
+          {/* Current Role Permissions Display */}
+          {selectedUser.role.permissions && selectedUser.role.permissions.length > 0 && (
+            <div className="space-y-3 border rounded-lg p-4">
+              <h4 className="font-medium text-sm">Current Role Permissions</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                These permissions come from the user's role ({selectedUser.role.name}) and cannot be edited here.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {selectedUser.role.permissions.map((perm, idx) => (
+                  <div key={idx} className="text-xs">
+                    <Badge variant="outline" className="mb-1">
+                      {perm.module}
+                    </Badge>
+                    <div className="flex flex-wrap gap-1 ml-2">
+                      {perm.actions.map((action, actionIdx) => (
+                        <Badge key={actionIdx} variant="secondary" className="text-xs">
+                          {action}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-                                    <div className="space-y-2">
-                                        <Label>Salary</Label>
-                                        <Input
-                                            type="number"
-                                            value={editUserForm.salary}
-                                            onChange={(e) => setEditUserForm({ ...editUserForm, salary: e.target.value })}
-                                            placeholder="e.g., 50000"
-                                            disabled={updatingUser}
-                                        />
-                                    </div>
-                                </div>
+          {/* Profile Details - Only if user has a profile */}
+          {selectedUser.profile && (
+            <div className="space-y-4 border-t pt-4">
+              <h4 className="font-medium">Profile Details</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Department</Label>
+                  <Select
+                    value={editUserForm.departmentId}
+                    onValueChange={(value) => setEditUserForm({ ...editUserForm, departmentId: value })}
+                    disabled={updatingUser}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept._id} value={dept._id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Education</Label>
+                  <Input
+                    value={editUserForm.education}
+                    onChange={(e) => setEditUserForm({ ...editUserForm, education: e.target.value })}
+                    placeholder="e.g., Bachelor's Degree"
+                    disabled={updatingUser}
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Salary</Label>
+                <Input
+                  type="number"
+                  value={editUserForm.salary}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, salary: e.target.value })}
+                  placeholder="e.g., 50000"
+                  disabled={updatingUser}
+                />
+              </div>
+            </div>
+          )}
 
-                                {/* Extra Access Controls */}
-                                <div className="space-y-4 border-t pt-4">
-                                    <PermissionsSelector
-                                        permissions={editUserForm.extraAccessControls}
-                                        onChange={(perms) => setEditUserForm({ ...editUserForm, extraAccessControls: perms })}
-                                        disabled={updatingUser}
-                                        title="Extra Access Controls"
-                                        description="Grant additional permissions beyond the user's role"
-                                    />
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button variant="outline" onClick={() => setEditUserOpen(false)} disabled={updatingUser}>
-                                    Cancel
-                                </Button>
-                                <Button onClick={handleUpdateUser} disabled={updatingUser}>
-                                    {updatingUser ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Updating...
-                                        </>
-                                    ) : (
-                                        'Update User'
-                                    )}
-                                </Button>
-                            </DialogFooter>
-                        </>
-                    )}
-                </DialogContent>
-            </Dialog>
+          {/* Extra Access Controls */}
+          <div className="space-y-4 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-medium">Extra Access Controls</h4>
+                <p className="text-sm text-muted-foreground">
+                  Grant additional permissions beyond the user's role
+                </p>
+              </div>
+              {editUserForm.extraAccessControls.length > 0 && (
+                <Badge variant="outline">
+                  {editUserForm.extraAccessControls.length} modules
+                </Badge>
+              )}
+            </div>
+            
+            {selectedUser.profile?.extraAccessControls && selectedUser.profile.extraAccessControls.length > 0 && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Current extra access controls:</strong> User already has {selectedUser.profile.extraAccessControls.length} extra permission module(s).
+                </p>
+              </div>
+            )}
+            
+            <PermissionsSelector
+              permissions={editUserForm.extraAccessControls}
+              onChange={(perms) => setEditUserForm({ ...editUserForm, extraAccessControls: perms })}
+              disabled={updatingUser}
+              title=""
+              description="Select modules and actions to add extra permissions"
+            />
+            
+            {editUserForm.extraAccessControls.length > 0 && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                <h5 className="text-sm font-medium text-green-800 mb-2">Selected Extra Permissions:</h5>
+                <div className="space-y-2">
+                  {editUserForm.extraAccessControls.map((control, idx) => (
+                    <div key={idx} className="text-sm">
+                      <div className="font-medium text-green-700">
+                        {control.module.charAt(0).toUpperCase() + control.module.slice(1)}:
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {control.actions.map((action, actionIdx) => (
+                          <Badge key={actionIdx} variant="secondary" className="text-xs bg-green-100 text-green-800">
+                            {action}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <DialogFooter className="gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setEditUserOpen(false)} 
+            disabled={updatingUser}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleUpdateUser} 
+            disabled={updatingUser}
+            className="min-w-[120px]"
+          >
+            {updatingUser ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              'Update User'
+            )}
+          </Button>
+        </DialogFooter>
+      </>
+    )}
+  </DialogContent>
+</Dialog>
 
             {/* Profile Modal */}
             <Dialog open={profileModalOpen} onOpenChange={setProfileModalOpen}>

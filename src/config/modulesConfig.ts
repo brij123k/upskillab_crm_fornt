@@ -20,11 +20,12 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'delete', label: 'Delete Lead' },
       { id: 'assign', label: 'Assign Lead' },
       { id: 'status_change', label: 'Change Lead Status' },
+      { id: 'stage_change', label: 'Change Lead Stage' },
       { id: 'export', label: 'Export Leads' }
     ]
   },
   users: {
-    id: 'users',
+    id: 'user',
     label: 'User Management',
     actions: [
       { id: 'create', label: 'Create User' },
@@ -37,7 +38,7 @@ export const modulesConfig: Record<string, ModuleConfig> = {
     ]
   },
   roles: {
-    id: 'roles',
+    id: 'role',
     label: 'Role Management',
     actions: [
       { id: 'create', label: 'Create Role' },
@@ -48,7 +49,7 @@ export const modulesConfig: Record<string, ModuleConfig> = {
     ]
   },
   departments: {
-    id: 'departments',
+    id: 'department',
     label: 'Department Management',
     actions: [
       { id: 'create', label: 'Create Department' },
@@ -56,18 +57,6 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'update', label: 'Update Department' },
       { id: 'delete', label: 'Delete Department' },
       { id: 'assign', label: 'Assign to Department' }
-    ]
-  },
-  campaigns: {
-    id: 'campaigns',
-    label: 'Campaign Management',
-    actions: [
-      { id: 'create', label: 'Create Campaign' },
-      { id: 'read', label: 'View Campaigns' },
-      { id: 'update', label: 'Update Campaign' },
-      { id: 'delete', label: 'Delete Campaign' },
-      { id: 'assign', label: 'Assign Campaign' },
-      { id: 'export', label: 'Export Campaigns' }
     ]
   },
   reports: {

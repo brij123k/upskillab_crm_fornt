@@ -13,7 +13,7 @@ import { Bell, Search, Calendar, LogOut, User, Settings, ChevronDown } from 'luc
 import { Input } from '@/components/ui/input';
 import { getUser } from '@/auth';
 interface TopNavProps {
-  panel: 'admin' | 'hr' | 'bd';
+  panel: 'Admin' | 'hr' | 'bd';
 }
 
 export function TopNav({ panel }: TopNavProps) {

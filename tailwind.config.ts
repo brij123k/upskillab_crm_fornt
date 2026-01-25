@@ -57,7 +57,7 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
-        admin: {
+        Admin: {
           DEFAULT: "hsl(var(--admin-accent))",
           foreground: "hsl(var(--admin-accent-foreground))",
         },

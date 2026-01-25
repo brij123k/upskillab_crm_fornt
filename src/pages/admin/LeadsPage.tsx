@@ -1,3 +1,4 @@
+// pages/LeadsPage.tsx
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,7 +45,9 @@ import {
   Square,
   Filter,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  ArrowRight,
+  ListTodo
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -70,7 +73,9 @@ import ApiConfig from '@/config/apiConfig';
 import { ProgressModal } from '@/components/modal/ProgressModal';
 import { CSVUploadModal } from '@/components/modal/CSVUploadModal';
 import { SearchableSelect } from '@/components/modal/SearchableSelect';
-
+import { ChangeStageModal } from '@/components/ChangeStageModal';
+import { LeadActionsModal } from '@/components/LeadActionsModal';
+// import { LeadType, StageType, UserType, LeadHistoryType } from '@/types/lead';
 interface LeadType {
   _id: string;
   leadId: number;
@@ -134,6 +139,10 @@ interface UserType {
   name: string;
   email: string;
   profile?: {
+    departmentId?: {
+      _id: string;
+      name: string;
+    };
   };
 }
 
@@ -214,6 +223,8 @@ export function LeadsPage() {
   const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [changeStageModalOpen, setChangeStageModalOpen] = useState(false);
+  const [actionsModalOpen, setActionsModalOpen] = useState(false);
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<LeadType | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<'active' | 'lost' | 'converted'>('active');
@@ -230,13 +241,13 @@ export function LeadsPage() {
     phone: '',
     email: '',
     source: 'manual',
-    stageId: '696cadcadcbcf508621922e6',
+    stageId: '',
     source_campaign: '',
     assignedTo: ''
   });
   
   const [bulkLeads, setBulkLeads] = useState<BulkLead[]>([
-    { name: '', phone: '', email: '', source: 'manual', stageId: '696cadcadcbcf508621922e6', assignedTo: '' }
+    { name: '', phone: '', email: '', source: 'manual', stageId: '', assignedTo: '' }
   ]);
   
   // Progress tracking
@@ -247,6 +258,7 @@ export function LeadsPage() {
   const [addingBulkLeads, setAddingBulkLeads] = useState(false);
   const [updatingLead, setUpdatingLead] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [changingStage, setChangingStage] = useState(false);
   const [assigningLeads, setAssigningLeads] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingStages, setLoadingStages] = useState(false);
@@ -320,6 +332,10 @@ export function LeadsPage() {
       const response = await getDataHandlerWithToken("getAllStages", null, null);
       if (response) {
         setStages(response);
+        // Set default stage if stages exist and leadForm.stageId is empty
+        if (response.length > 0 && !leadForm.stageId) {
+          setLeadForm(prev => ({ ...prev, stageId: response[0]._id }));
+        }
       }
     } catch (error) {
       toast({
@@ -416,7 +432,7 @@ export function LeadsPage() {
         phone: '',
         email: '',
         source: 'manual',
-        stageId: '696cadcadcbcf508621922e6',
+        stageId: stages[0]?._id || '',
         source_campaign: '',
         assignedTo: ''
       });
@@ -501,7 +517,7 @@ export function LeadsPage() {
       
       // Reset form after delay
       setTimeout(() => {
-        setBulkLeads([{ name: '', phone: '', email: '', source: 'manual', stageId: '', assignedTo: '' }]);
+        setBulkLeads([{ name: '', phone: '', email: '', source: 'manual', stageId: stages[0]?._id || '', assignedTo: '' }]);
         setBulkLeadOpen(false);
         setProgressModalOpen(false);
         fetchLeads();
@@ -574,6 +590,37 @@ export function LeadsPage() {
     }
   };
 
+  // Update lead stage
+  const handleChangeStage = async (leadId: string, stageId: string) => {
+    try {
+      setChangingStage(true);
+      const endpoint = ApiConfig.changeStageLead(leadId);
+      const response = await patchTokenDataHandler(endpoint, { stageId }, true);
+      
+      toast({
+        title: "Success",
+        description: response?.message || "Lead stage updated successfully",
+      });
+      
+      setChangeStageModalOpen(false);
+      fetchLeads();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to update lead stage",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setChangingStage(false);
+    }
+  };
+
+  // Handle stage change from modal
+  const handleStageSubmit = async (leadId: string, stageId: string) => {
+    await handleChangeStage(leadId, stageId);
+  };
+
   // Assign leads to user
   const handleAssignLeads = async () => {
     if (selectedLeads.length === 0) {
@@ -594,7 +641,6 @@ export function LeadsPage() {
     if (assignUserId && assignUserId !== "") {
       dataToSend.assignedTo = assignUserId;
     }
-    
     
     // If no user
     if (!assignUserId) {
@@ -619,6 +665,8 @@ export function LeadsPage() {
       // Reset modal state
       setAssignModalOpen(false);
       setAssignUserId('');
+      setSelectedLeads([]);
+      setIsAssignmentMode(false);
       
       // Refresh leads
       fetchLeads();
@@ -656,6 +704,36 @@ export function LeadsPage() {
     setEditLeadOpen(true);
   };
 
+  // Lead actions
+  const leadActions = {
+    onView: (lead: LeadType) => {
+      handleViewLead(lead);
+    },
+    onEdit: (lead: LeadType) => {
+      handleEditLead(lead);
+    },
+    onChangeStatus: (lead: LeadType) => {
+      setSelectedLead(lead);
+      setSelectedStatus(lead.status);
+      setStatusModalOpen(true);
+    },
+    onChangeStage: (lead: LeadType) => {
+      setSelectedLead(lead);
+      setChangeStageModalOpen(true);
+    },
+    onAssign: (lead: LeadType) => {
+      setSelectedLead(lead);
+      setSelectedLeads([lead._id]);
+      setIsAssignmentMode(true);
+      setAssignModalOpen(true);
+    },
+    onConvert: (lead: LeadType) => {
+      setSelectedLead(lead);
+      setSelectedStatus('converted');
+      setStatusModalOpen(true);
+    }
+  };
+
   // Toggle lead selection
   const toggleLeadSelection = (leadId: string) => {
     setSelectedLeads(prev => 
@@ -667,7 +745,7 @@ export function LeadsPage() {
 
   // Add bulk lead row
   const addBulkLeadRow = () => {
-    setBulkLeads([...bulkLeads, { name: '', phone: '', email: '', source: 'manual', stageId: '696cadcadcbcf508621922e6', assignedTo: '' }]);
+    setBulkLeads([...bulkLeads, { name: '', phone: '', email: '', source: 'manual', stageId: stages[0]?._id || '', assignedTo: '' }]);
   };
 
   // Remove bulk lead row
@@ -1322,6 +1400,31 @@ export function LeadsPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="stage">Stage *</Label>
+                  <Select
+                    value={leadForm.stageId}
+                    onValueChange={(value) => setLeadForm({...leadForm, stageId: value})}
+                    disabled={addingLead || loadingStages}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select stage" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {loadingStages ? (
+                        <div className="py-2 text-center">
+                          <Loader2 className="w-4 h-4 mx-auto animate-spin" />
+                        </div>
+                      ) : (
+                        stages.map((stage) => (
+                          <SelectItem key={stage._id} value={stage._id}>
+                            {stage.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="assignedTo">Assign To (Optional)</Label>
                   <Select
                     value={leadForm.assignedTo || ''}
@@ -1346,7 +1449,7 @@ export function LeadsPage() {
                 <Button variant="outline" onClick={() => setNewLeadOpen(false)} disabled={addingLead}>
                   Cancel
                 </Button>
-                <Button onClick={handleAddLead} disabled={addingLead}>
+                <Button onClick={handleAddLead} disabled={addingLead || !leadForm.name || !leadForm.phone || !leadForm.email || !leadForm.stageId}>
                   {addingLead ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1716,7 +1819,8 @@ export function LeadsPage() {
                       <TableCell>{getSourceBadge(lead.source)}</TableCell>
                       
                       <TableCell>
-                        <Badge variant="outline">
+                        <Badge variant="outline" className="flex items-center gap-1">
+                          <ListTodo className="w-3 h-3" />
                           {lead.stageId.name}
                         </Badge>
                       </TableCell>
@@ -1746,6 +1850,13 @@ export function LeadsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedLead(lead);
+                              setActionsModalOpen(true);
+                            }}>
+                              <MoreHorizontal className="mr-2 h-4 w-4" />
+                              View All Actions
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleViewLead(lead)}>
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
@@ -1756,17 +1867,10 @@ export function LeadsPage() {
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => {
                               setSelectedLead(lead);
-                              setSelectedStatus(lead.status);
-                              setStatusModalOpen(true);
+                              setChangeStageModalOpen(true);
                             }}>
-                              {lead.status === 'active' ? (
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                              ) : lead.status === 'lost' ? (
-                                <XCircle className="mr-2 h-4 w-4" />
-                              ) : (
-                                <TrendingUp className="mr-2 h-4 w-4" />
-                              )}
-                              Change Status
+                              <ArrowRight className="mr-2 h-4 w-4" />
+                              Change Stage
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -1874,6 +1978,26 @@ export function LeadsPage() {
         title="Creating Leads"
         description="Processing bulk lead creation..."
         progressItems={progressItems}
+      />
+
+      {/* Lead Actions Modal */}
+      <LeadActionsModal
+        open={actionsModalOpen}
+        onOpenChange={setActionsModalOpen}
+        selectedLead={selectedLead}
+        loading={loading}
+        actions={leadActions}
+      />
+
+      {/* Change Stage Modal */}
+      <ChangeStageModal
+        open={changeStageModalOpen}
+        onOpenChange={setChangeStageModalOpen}
+        selectedLead={selectedLead}
+        stages={stages}
+        loadingStages={loadingStages}
+        changingStage={changingStage}
+        onSubmit={handleStageSubmit}
       />
 
       {/* Assign Leads Modal */}
@@ -2090,6 +2214,19 @@ export function LeadsPage() {
                             </div>
                           )}
                           
+                          {history.actionType === 'stage_changed' && (
+                            <div className="text-sm">
+                              Stage changed from{' '}
+                              <Badge variant="outline" className="mx-1">
+                                {history.changes.stage?.from}
+                              </Badge>
+                              to{' '}
+                              <Badge variant="outline" className="mx-1">
+                                {history.changes.stage?.to}
+                              </Badge>
+                            </div>
+                          )}
+                          
                           {history.actionType === 'updated' && history.changes.from && history.changes.to && (
                             <div className="text-sm space-y-1">
                               {Object.keys(history.changes.from).map((key) => {
@@ -2129,169 +2266,227 @@ export function LeadsPage() {
       </Dialog>
 
       {/* Edit Lead Modal */}
-      <Dialog open={editLeadOpen} onOpenChange={setEditLeadOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Edit Lead</DialogTitle>
-            <DialogDescription>
-              Update the lead information for {selectedLead?.name}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-name">Name</Label>
-                <Input
-                  id="edit-name"
-                  value={leadForm.name}
-                  onChange={(e) => setLeadForm({...leadForm, name: e.target.value})}
-                  placeholder="John Doe"
-                  disabled={updatingLead}
-                />
+     <Dialog open={editLeadOpen} onOpenChange={setEditLeadOpen}>
+  <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-4 sm:mx-0">
+    <DialogHeader>
+      <DialogTitle className="text-lg sm:text-xl">Edit Lead</DialogTitle>
+      <DialogDescription className="text-sm sm:text-base">
+        Update the lead information for {selectedLead?.name}
+      </DialogDescription>
+    </DialogHeader>
+    <div className="grid gap-4 py-4">
+      {/* Name and Phone - Stack on mobile, side-by-side on larger screens */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="edit-name" className="text-sm sm:text-base">Name</Label>
+          <Input
+            id="edit-name"
+            value={leadForm.name}
+            onChange={(e) => setLeadForm({...leadForm, name: e.target.value})}
+            placeholder="John Doe"
+            disabled={updatingLead}
+            className="h-10 sm:h-11 text-sm sm:text-base"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-phone" className="text-sm sm:text-base">Phone</Label>
+          <Input
+            id="edit-phone"
+            value={leadForm.phone}
+            onChange={(e) => setLeadForm({...leadForm, phone: e.target.value})}
+            placeholder="1234567890"
+            disabled={updatingLead}
+            className="h-10 sm:h-11 text-sm sm:text-base"
+          />
+        </div>
+      </div>
+      
+      {/* Email - Full width */}
+      <div className="space-y-2">
+        <Label htmlFor="edit-email" className="text-sm sm:text-base">Email</Label>
+        <Input
+          id="edit-email"
+          type="email"
+          value={leadForm.email}
+          onChange={(e) => setLeadForm({...leadForm, email: e.target.value})}
+          placeholder="john@company.com"
+          disabled={updatingLead}
+          className="h-10 sm:h-11 text-sm sm:text-base"
+        />
+      </div>
+      
+      {/* Source and Campaign - Stack on mobile, side-by-side on larger screens */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="edit-source" className="text-sm sm:text-base">Source</Label>
+          <Select
+            value={leadForm.source}
+            onValueChange={(value) => setLeadForm({...leadForm, source: value})}
+            disabled={updatingLead}
+          >
+            <SelectTrigger className="h-10 sm:h-11 text-sm sm:text-base">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="max-h-[60vh] sm:max-h-none">
+              <SelectItem value="manual" className="text-sm sm:text-base">Manual</SelectItem>
+              <SelectItem value="facebook" className="text-sm sm:text-base">Facebook</SelectItem>
+              <SelectItem value="google" className="text-sm sm:text-base">Google</SelectItem>
+              <SelectItem value="api" className="text-sm sm:text-base">API</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-source_campaign" className="text-sm sm:text-base">
+            Campaign <span className="text-muted-foreground">(Optional)</span>
+          </Label>
+          <Input
+            id="edit-source_campaign"
+            value={leadForm.source_campaign}
+            onChange={(e) => setLeadForm({...leadForm, source_campaign: e.target.value})}
+            placeholder="Campaign name"
+            disabled={updatingLead}
+            className="h-10 sm:h-11 text-sm sm:text-base"
+          />
+        </div>
+      </div>
+      
+      {/* Stage - Full width */}
+      <div className="space-y-2">
+        <Label htmlFor="edit-stage" className="text-sm sm:text-base">Stage</Label>
+        <Select
+          value={leadForm.stageId}
+          onValueChange={(value) => setLeadForm({...leadForm, stageId: value})}
+          disabled={updatingLead || loadingStages}
+        >
+          <SelectTrigger className="h-10 sm:h-11 text-sm sm:text-base">
+            <SelectValue placeholder="Select stage" />
+          </SelectTrigger>
+          <SelectContent className="max-h-[60vh] sm:max-h-none">
+            {loadingStages ? (
+              <div className="py-2 sm:py-3 text-center">
+                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 mx-auto animate-spin" />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-phone">Phone</Label>
-                <Input
-                  id="edit-phone"
-                  value={leadForm.phone}
-                  onChange={(e) => setLeadForm({...leadForm, phone: e.target.value})}
-                  placeholder="1234567890"
-                  disabled={updatingLead}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={leadForm.email}
-                onChange={(e) => setLeadForm({...leadForm, email: e.target.value})}
-                placeholder="john@company.com"
-                disabled={updatingLead}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-source">Source</Label>
-                <Select
-                  value={leadForm.source}
-                  onValueChange={(value) => setLeadForm({...leadForm, source: value})}
-                  disabled={updatingLead}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manual">Manual</SelectItem>
-                    <SelectItem value="facebook">Facebook</SelectItem>
-                    <SelectItem value="google">Google</SelectItem>
-                    <SelectItem value="api">API</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-source_campaign">Campaign (Optional)</Label>
-                <Input
-                  id="edit-source_campaign"
-                  value={leadForm.source_campaign}
-                  onChange={(e) => setLeadForm({...leadForm, source_campaign: e.target.value})}
-                  placeholder="Campaign name"
-                  disabled={updatingLead}
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditLeadOpen(false)} disabled={updatingLead}>
-              Cancel
-            </Button>
-            <Button onClick={handleUpdateLead} disabled={updatingLead}>
-              {updatingLead ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                'Update Lead'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            ) : (
+              stages.map((stage) => (
+                <SelectItem key={stage._id} value={stage._id} className="text-sm sm:text-base">
+                  {stage.name}
+                </SelectItem>
+              ))
+            )}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+    <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+      <Button 
+        variant="outline" 
+        onClick={() => setEditLeadOpen(false)} 
+        disabled={updatingLead}
+        className="w-full sm:w-auto order-2 sm:order-1"
+      >
+        Cancel
+      </Button>
+      <Button 
+        onClick={handleUpdateLead} 
+        disabled={updatingLead}
+        className="w-full sm:w-auto order-1 sm:order-2"
+      >
+        {updatingLead ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Updating...
+          </>
+        ) : (
+          'Update Lead'
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
       {/* Change Status Modal */}
       <Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
-        <DialogContent className="sm:max-w-[400px]">
-          {selectedLead && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Change Lead Status</DialogTitle>
-                <DialogDescription>
-                  Update status for {selectedLead.name}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label>Select Status</Label>
-                  <Select
-                    value={selectedStatus}
-                    onValueChange={(value: any) => setSelectedStatus(value)}
-                    disabled={updatingStatus}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                          Active
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="lost">
-                        <div className="flex items-center gap-2">
-                          <XCircle className="w-4 h-4 text-red-600" />
-                          Lost
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="converted">
-                        <div className="flex items-center gap-2">
-                          <TrendingUp className="w-4 h-4 text-blue-600" />
-                          Converted
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="p-3 bg-muted rounded-md">
-                  <p className="text-sm">
-                    Current status:{' '}
-                    <Badge variant="outline" className="ml-2">
-                      {selectedLead.status}
-                    </Badge>
-                  </p>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setStatusModalOpen(false)} disabled={updatingStatus}>
-                  Cancel
-                </Button>
-                <Button onClick={handleUpdateStatus} disabled={updatingStatus}>
-                  {updatingStatus ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Updating...
-                    </>
-                  ) : (
-                    'Update Status'
-                  )}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+  <DialogContent className="sm:max-w-[400px] max-w-[calc(100vw-2rem)] mx-4 sm:mx-0">
+    {selectedLead && (
+      <>
+        <DialogHeader>
+          <DialogTitle className="text-lg sm:text-xl">
+            Change Lead Status
+          </DialogTitle>
+          <DialogDescription className="text-sm sm:text-base">
+            Update status for {selectedLead.name}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label className="text-sm sm:text-base">Select Status</Label>
+            <Select
+              value={selectedStatus}
+              onValueChange={(value: any) => setSelectedStatus(value)}
+              disabled={updatingStatus}
+            >
+              <SelectTrigger className="h-10 sm:h-12 text-sm sm:text-base">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[60vh] sm:max-h-none">
+                <SelectItem value="active" className="text-sm sm:text-base">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+                    Active
+                  </div>
+                </SelectItem>
+                <SelectItem value="lost" className="text-sm sm:text-base">
+                  <div className="flex items-center gap-2">
+                    <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
+                    Lost
+                  </div>
+                </SelectItem>
+                <SelectItem value="converted" className="text-sm sm:text-base">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                    Converted
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="p-3 sm:p-4 bg-muted rounded-md">
+            <p className="text-sm sm:text-base">
+              Current status:{' '}
+              <Badge variant="outline" className="ml-2 text-xs sm:text-sm">
+                {selectedLead.status}
+              </Badge>
+            </p>
+          </div>
+        </div>
+        <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+          <Button 
+            variant="outline" 
+            onClick={() => setStatusModalOpen(false)} 
+            disabled={updatingStatus}
+            className="w-full sm:w-auto order-2 sm:order-1"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleUpdateStatus} 
+            disabled={updatingStatus}
+            className="w-full sm:w-auto order-1 sm:order-2"
+          >
+            {updatingStatus ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              'Update Status'
+            )}
+          </Button>
+        </DialogFooter>
+      </>
+    )}
+  </DialogContent>
+</Dialog>
     </div>
   );
 }

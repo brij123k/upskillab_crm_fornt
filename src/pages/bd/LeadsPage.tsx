@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ChangeStageModal } from '@/components/ChangeStageModal';
 import { Badge } from '@/components/ui/badge';
 import { 
   Search, 
@@ -70,7 +71,7 @@ import ApiConfig from '@/config/apiConfig';
 import { ProgressModal } from '@/components/modal/ProgressModal';
 import { CSVUploadModal } from '@/components/modal/CSVUploadModal';
 import { SearchableSelect } from '@/components/modal/SearchableSelect';
-
+import { hasPermission } from '@/utils/permissions';
 interface LeadType {
   _id: string;
   leadId: number;
@@ -178,12 +179,15 @@ interface ProgressItem {
   message?: string;
 }
 
-export function LeadsPage() {
+export function BDLeadsPage() {
   const [leads, setLeads] = useState<LeadType[]>([]);
   const [loading, setLoading] = useState(true);
   const [stages, setStages] = useState<StageType[]>([]);
   const [users, setUsers] = useState<UserType[]>([]);
   const [leadHistory, setLeadHistory] = useState<LeadHistoryType[]>([]);
+  const [changeStageModalOpen, setChangeStageModalOpen] = useState(false);
+const [actionsModalOpen, setActionsModalOpen] = useState(false);
+const [changingStage, setChangingStage] = useState(false);
   
   // Pagination
   const [page, setPage] = useState(1);
@@ -191,6 +195,7 @@ export function LeadsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalLeads, setTotalLeads] = useState(0);
   
+
   // Filters
   const [filters, setFilters] = useState<Filters>({
     search: '',
@@ -224,6 +229,9 @@ export function LeadsPage() {
   const [selectAll, setSelectAll] = useState(false);
   const [isAssignmentMode, setIsAssignmentMode] = useState(false);
   
+  const permissions = JSON.parse(
+  localStorage.getItem("permissions") || "[]"
+);
   // Form states
   const [leadForm, setLeadForm] = useState<LeadForm>({
     name: '',
@@ -341,11 +349,11 @@ export function LeadsPage() {
         setUsers(response);
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch users",
-        variant: "destructive",
-      });
+      // toast({
+      //   title: "Error",
+      //   description: "Failed to fetch users",
+      //   variant: "destructive",
+      // });
     } finally {
       setLoadingUsers(false);
     }
@@ -370,6 +378,33 @@ export function LeadsPage() {
       setLoadingHistory(false);
     }
   };
+
+  const handleStageSubmit = async (leadId:string,stageId: string) => {
+  if (!selectedLead) return;
+  
+  try {
+    setChangingStage(true);
+    const endpoint = ApiConfig.changeStageLead(leadId);
+    const response = await patchTokenDataHandler(endpoint, { stageId }, true);
+    
+    toast({
+      title: "Success",
+      description: response?.message || "Lead stage updated successfully",
+    });
+    
+    setChangeStageModalOpen(false);
+    setActionsModalOpen(false);
+    fetchLeads();
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.response?.data?.message || "Failed to update lead stage",
+      variant: "destructive",
+    });
+  } finally {
+    setChangingStage(false);
+  }
+};
 
   // Initialize data
   useEffect(() => {
@@ -1014,8 +1049,9 @@ export function LeadsPage() {
           <h1 className="text-2xl font-bold text-foreground">Lead Management</h1>
           <p className="text-muted-foreground">Manage and track all leads in your pipeline</p>
         </div>
-        <div className="flex items-center gap-2">
-          {isAssignmentMode ? (
+        <div className="flex items-center gap-2">    
+          {hasPermission(permissions, 'leads', 'assign') && (
+          isAssignmentMode ? (
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="bg-blue-50">
                 {selectedLeads.length} leads selected
@@ -1041,12 +1077,16 @@ export function LeadsPage() {
               </Button>
             </div>
           ) : (
+            
             <Button onClick={toggleAssignmentMode}>
               <Users className="w-4 h-4 mr-2" />
-              Lead Assignment
+              Lead Assignments
             </Button>
+          )
           )}
           
+          {hasPermission(permissions, 'leads', 'create') && (
+          <>
           <Dialog open={bulkLeadOpen} onOpenChange={setBulkLeadOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -1359,6 +1399,8 @@ export function LeadsPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </>
+           )}
         </div>
       </div>
 
@@ -1471,7 +1513,7 @@ export function LeadsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              
+              {hasPermission(permissions, 'user', 'read') && (
               <div className="space-y-2">
                 <Label>Assigned To</Label>
                 <Select
@@ -1492,6 +1534,7 @@ export function LeadsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              )}
               
               <div className="space-y-2">
                 <Label>Date Filter</Label>
@@ -1608,6 +1651,7 @@ export function LeadsPage() {
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
+              {hasPermission(permissions, 'leads', 'export') && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon" disabled={loading || totalLeads === 0}>
@@ -1635,6 +1679,7 @@ export function LeadsPage() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -1656,125 +1701,101 @@ export function LeadsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {isAssignmentMode && (
-                      <TableHead className="w-12">
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={selectAll}
-                            onChange={() => setSelectAll(!selectAll)}
-                            className="h-4 w-4"
-                          />
-                        </div>
-                      </TableHead>
-                    )}
-                    <TableHead>Lead</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead>Stage</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Assigned To</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {leads.map((lead) => (
-                    <TableRow key={lead._id} className={cn(
-                      isAssignmentMode && selectedLeads.includes(lead._id) && "bg-blue-50"
-                    )}>
-                      {isAssignmentMode && (
-                        <TableCell>
-                          <input
-                            type="checkbox"
-                            checked={selectedLeads.includes(lead._id)}
-                            onChange={() => toggleLeadSelection(lead._id)}
-                            className="h-4 w-4"
-                          />
-                        </TableCell>
-                      )}
-                      <TableCell>
-                        <div className="font-medium">{lead.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          ID: {lead.leadId}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1 text-sm">
-                            <Phone className="w-3 h-3" />
-                            {lead.phone}
-                          </div>
-                          <div className="flex items-center gap-1 text-sm">
-                            <Mail className="w-3 h-3" />
-                            {lead.email}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getSourceBadge(lead.source)}</TableCell>
-                      
-                      <TableCell>
-                        <Badge variant="outline">
-                          {lead.stageId.name}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(lead.status)}</TableCell>
-                      <TableCell>
-                        {lead.assignedTo ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                              <span className="text-xs font-medium">
-                                {lead.assignedTo.name.charAt(0)}
-                              </span>
-                            </div>
-                            <div>
-                              <div className="text-sm font-medium">{lead.assignedTo.name}</div>
-                              <div className="text-xs text-muted-foreground">{lead.assignedTo.email}</div>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">Not assigned</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => handleViewLead(lead)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditLead(lead)}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit Lead
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => {
-                              setSelectedLead(lead);
-                              setSelectedStatus(lead.status);
-                              setStatusModalOpen(true);
-                            }}>
-                              {lead.status === 'active' ? (
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                              ) : lead.status === 'lost' ? (
-                                <XCircle className="mr-2 h-4 w-4" />
-                              ) : (
-                                <TrendingUp className="mr-2 h-4 w-4" />
-                              )}
-                              Change Status
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+           <Table>
+  <TableHeader>
+    <TableRow>
+      {isAssignmentMode && (
+        <TableHead className="w-12">
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              checked={selectAll}
+              onChange={() => setSelectAll(!selectAll)}
+              className="h-4 w-4"
+            />
+          </div>
+        </TableHead>
+      )}
+      <TableHead>Lead</TableHead>
+      <TableHead>Contact</TableHead>
+      <TableHead>Source</TableHead>
+      <TableHead>Stage</TableHead>
+      <TableHead>Status</TableHead>
+      <TableHead>Assigned To</TableHead>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    {leads.map((lead) => (
+      <TableRow 
+        key={lead._id} 
+        className={cn(
+          isAssignmentMode && selectedLeads.includes(lead._id) && "bg-blue-50",
+          "cursor-pointer hover:bg-muted/50" // Add hover effect
+        )}
+        onClick={() => {
+          setSelectedLead(lead);
+          setActionsModalOpen(true);
+        }}
+      >
+        {isAssignmentMode && (
+          <TableCell onClick={(e) => e.stopPropagation()}>
+            <input
+              type="checkbox"
+              checked={selectedLeads.includes(lead._id)}
+              onChange={(e) => {
+                e.stopPropagation();
+                toggleLeadSelection(lead._id);
+              }}
+              className="h-4 w-4"
+            />
+          </TableCell>
+        )}
+        <TableCell>
+          <div className="font-medium">{lead.name}</div>
+          <div className="text-xs text-muted-foreground">
+            ID: {lead.leadId}
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1 text-sm">
+              <Phone className="w-3 h-3" />
+              {lead.phone}
+            </div>
+            <div className="flex items-center gap-1 text-sm">
+              <Mail className="w-3 h-3" />
+              {lead.email}
+            </div>
+          </div>
+        </TableCell>
+        <TableCell>{getSourceBadge(lead.source)}</TableCell>
+        <TableCell>
+          <Badge variant="outline">
+            {lead.stageId.name}
+          </Badge>
+        </TableCell>
+        <TableCell>{getStatusBadge(lead.status)}</TableCell>
+        <TableCell>
+          {lead.assignedTo ? (
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-xs font-medium">
+                  {lead.assignedTo.name.charAt(0)}
+                </span>
+              </div>
+              <div>
+                <div className="text-sm font-medium">{lead.assignedTo.name}</div>
+                <div className="text-xs text-muted-foreground">{lead.assignedTo.email}</div>
+              </div>
+            </div>
+          ) : (
+            <span className="text-muted-foreground">Not assigned</span>
+          )}
+        </TableCell>
+      </TableRow>
+    ))}
+  </TableBody>
+</Table>
             </div>
           )}
 
@@ -2292,6 +2313,155 @@ export function LeadsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+
+      {/* Lead Actions Modal */}
+<Dialog open={actionsModalOpen} onOpenChange={setActionsModalOpen}>
+  <DialogContent className="sm:max-w-[500px]">
+    {selectedLead && (
+      <>
+        <DialogHeader>
+          <DialogTitle>Lead Actions</DialogTitle>
+          <DialogDescription>
+            Select an action for {selectedLead.name}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {hasPermission(permissions, 'leads', 'read') && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setActionsModalOpen(false);
+                  handleViewLead(selectedLead);
+                }}
+                className="h-auto py-4 justify-start"
+              >
+                <div className="flex items-center gap-3">
+                  <Eye className="w-5 h-5" />
+                  <div className="text-left">
+                    <div className="font-medium">View Details</div>
+                    <div className="text-xs text-muted-foreground">View complete lead information</div>
+                  </div>
+                </div>
+              </Button>
+            )}
+            
+            {hasPermission(permissions, 'leads', 'update') && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setActionsModalOpen(false);
+                  handleEditLead(selectedLead);
+                }}
+                className="h-auto py-4 justify-start"
+              >
+                <div className="flex items-center gap-3">
+                  <Edit className="w-5 h-5" />
+                  <div className="text-left">
+                    <div className="font-medium">Edit Lead</div>
+                    <div className="text-xs text-muted-foreground">Update lead information</div>
+                  </div>
+                </div>
+              </Button>
+            )}
+            
+            {hasPermission(permissions, 'leads', 'status_change') && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setActionsModalOpen(false);
+                  setSelectedStatus(selectedLead.status);
+                  setStatusModalOpen(true);
+                }}
+                className="h-auto py-4 justify-start"
+              >
+                <div className="flex items-center gap-3">
+                  {selectedLead.status === 'active' ? (
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  ) : selectedLead.status === 'lost' ? (
+                    <XCircle className="w-5 h-5 text-red-600" />
+                  ) : (
+                    <TrendingUp className="w-5 h-5 text-blue-600" />
+                  )}
+                  <div className="text-left">
+                    <div className="font-medium">Change Status</div>
+                    <div className="text-xs text-muted-foreground">Update lead status</div>
+                  </div>
+                </div>
+              </Button>
+            )}
+            
+            {hasPermission(permissions, 'leads', 'stage_change') && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setActionsModalOpen(false);
+                  setChangeStageModalOpen(true);
+                }}
+                className="h-auto py-4 justify-start"
+              >
+                <div className="flex items-center gap-3">
+                  <TrendingUp className="w-5 h-5 text-purple-600" />
+                  <div className="text-left">
+                    <div className="font-medium">Change Stage</div>
+                    <div className="text-xs text-muted-foreground">Move to different stage</div>
+                  </div>
+                </div>
+              </Button>
+            )}
+          </div>
+          
+          <div className="pt-4 border-t">
+            <h4 className="font-medium mb-2">Quick Info</h4>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <span className="text-muted-foreground">Current Stage:</span>
+                <Badge variant="outline" className="ml-2">
+                  {selectedLead.stageId.name}
+                </Badge>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Status:</span>
+                <span className="ml-2">
+                  {getStatusBadge(selectedLead.status)}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Source:</span>
+                <span className="ml-2">
+                  {getSourceBadge(selectedLead.source)}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Assigned:</span>
+                <span className="ml-2">
+                  {selectedLead.assignedTo?.name || 'Not assigned'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setActionsModalOpen(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </>
+    )}
+  </DialogContent>
+</Dialog>
+
+{/* Change Stage Modal */}
+<ChangeStageModal
+  open={changeStageModalOpen}
+  onOpenChange={setChangeStageModalOpen}
+  selectedLead={selectedLead}
+  stages={stages}
+  loadingStages={loadingStages}
+  changingStage={changingStage}
+  onSubmit={handleStageSubmit}
+/>
     </div>
   );
 }

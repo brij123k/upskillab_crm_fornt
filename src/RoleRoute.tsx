@@ -13,11 +13,11 @@ const RoleProtectedRoute = ({ allowedRoles, children }: Props) => {
   }
 
   const userRole = user.role?.name;
-  // console.log(userRole,!allowedRoles.includes(userRole))
+  console.log(userRole,!allowedRoles.includes(userRole))
   if (!allowedRoles.includes(userRole)) {
     // 🔥 redirect to THEIR dashboard
     switch (userRole) {
-      case "admin":
+      case "Admin":
         return <Navigate to="/admin" replace />;
       case "hr":
         return <Navigate to="/hr" replace />;

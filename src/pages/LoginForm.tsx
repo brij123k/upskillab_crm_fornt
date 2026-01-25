@@ -29,7 +29,8 @@ export function LoginForm() {
     setAuth(res); // 🔥 save token + user
     navigate("/");     // go to dashboard router
   } catch (err) {
-    setError("Invalid email or password");
+    console.log(err)
+    setError(err.message || "Invalid email or password");
   }
 };
 
