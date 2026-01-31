@@ -17,7 +17,10 @@ import {
   Users,
   ArrowRight,
   MoreHorizontal,
-  Loader2
+  Loader2,
+  Phone,
+  Mail,
+  FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LeadType } from '@/types/lead';
@@ -56,166 +59,238 @@ export function LeadActionsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px]">
-        <DialogHeader>
-          <DialogTitle>Lead Actions</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="sm:max-w-[450px] max-w-[calc(100vw-2rem)] mx-4 sm:mx-0 max-h-[90vh] overflow-hidden">
+        <DialogHeader className="px-1">
+          <DialogTitle className="text-lg sm:text-xl">Lead Actions</DialogTitle>
+          <DialogDescription className="text-sm sm:text-base">
             Available actions for <strong>{selectedLead.name}</strong>
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-3 py-4">
-          {/* Lead Info Summary */}
-          <div className="p-3 bg-muted rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <div className="font-medium">{selectedLead.name}</div>
-              <Badge variant="outline">{selectedLead.leadId}</Badge>
+        <div className="overflow-y-auto px-1 py-2 max-h-[calc(90vh-140px)]">
+          <div className="space-y-3 sm:space-y-4 py-2">
+            {/* Lead Info Summary */}
+            <div className="p-3 sm:p-4 bg-muted rounded-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2 sm:gap-0">
+                <div className="font-medium text-sm sm:text-base truncate">{selectedLead.name}</div>
+                <Badge variant="outline" className="text-xs sm:text-sm w-fit">
+                  ID: {selectedLead.leadId}
+                </Badge>
+              </div>
+              <div className="text-xs sm:text-sm space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-muted-foreground">
+                      <Phone className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                      <span>Phone:</span>
+                    </div>
+                    <div className="font-medium truncate">{selectedLead.phone}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-muted-foreground">
+                      <Mail className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                      <span>Email:</span>
+                    </div>
+                    <div className="font-medium truncate">{selectedLead.email}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <div className="text-muted-foreground">Status:</div>
+                    <div className="font-medium capitalize">
+                      <Badge className={cn(
+                        "text-xs sm:text-sm",
+                        selectedLead.status === 'active' && "bg-green-100 text-green-800",
+                        selectedLead.status === 'lost' && "bg-red-100 text-red-800",
+                        selectedLead.status === 'converted' && "bg-blue-100 text-blue-800"
+                      )}>
+                        {selectedLead.status}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-muted-foreground">Stage:</div>
+                    <div className="font-medium">
+                      <Badge variant="outline" className="text-xs sm:text-sm">
+                        {selectedLead.stageId.name}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-muted-foreground">Assigned To:</div>
+                  <div className="font-medium truncate">
+                    {selectedLead.assignedTo?.name || 'Not assigned'}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="text-sm space-y-1">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Status:</span>
-                <span className="font-medium capitalize">{selectedLead.status}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Stage:</span>
-                <span className="font-medium">{selectedLead.stageId.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Assigned:</span>
-                <span className="font-medium">
-                  {selectedLead.assignedTo?.name || 'Not assigned'}
-                </span>
-              </div>
-            </div>
-          </div>
 
-          {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* View Details */}
-            <Button
-              variant="outline"
-              className="h-auto py-4 flex flex-col items-center gap-2"
-              onClick={() => handleAction('onView')}
-              disabled={loading}
-            >
-              <Eye className="w-5 h-5" />
-              <div className="text-sm">View Details</div>
-            </Button>
-
-            {/* Edit Lead */}
-            <Button
-              variant="outline"
-              className="h-auto py-4 flex flex-col items-center gap-2"
-              onClick={() => handleAction('onEdit')}
-              disabled={loading}
-            >
-              <Edit className="w-5 h-5" />
-              <div className="text-sm">Edit Lead</div>
-            </Button>
-
-            {/* Change Status */}
-            <Button
-              variant="outline"
-              className="h-auto py-4 flex flex-col items-center gap-2"
-              onClick={() => handleAction('onChangeStatus')}
-              disabled={loading}
-            >
-              <CheckCircle className="w-5 h-5" />
-              <div className="text-sm">Change Status</div>
-            </Button>
-
-            {/* Change Stage */}
-            <Button
-              variant="outline"
-              className="h-auto py-4 flex flex-col items-center gap-2"
-              onClick={() => handleAction('onChangeStage')}
-              disabled={loading}
-            >
-              <ArrowRight className="w-5 h-5" />
-              <div className="text-sm">Change Stage</div>
-            </Button>
-
-            {/* Assign Lead */}
-            <Button
-              variant="outline"
-              className="h-auto py-4 flex flex-col items-center gap-2"
-              onClick={() => handleAction('onAssign')}
-              disabled={loading}
-            >
-              <Users className="w-5 h-5" />
-              <div className="text-sm">Assign Lead</div>
-            </Button>
-
-            {/* Convert Lead (only for active leads) */}
-            {selectedLead.status === 'active' && actions.onConvert && (
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+              {/* View Details */}
               <Button
                 variant="outline"
-                className="h-auto py-4 flex flex-col items-center gap-2 bg-green-50 border-green-200 hover:bg-green-100"
-                onClick={() => handleAction('onConvert')}
+                className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px]"
+                onClick={() => handleAction('onView')}
                 disabled={loading}
               >
-                <TrendingUp className="w-5 h-5 text-green-600" />
-                <div className="text-sm text-green-700">Convert Lead</div>
+                <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
+                <div className="text-xs sm:text-sm text-center">View Details</div>
               </Button>
-            )}
 
-            {/* Mark as Lost (only for active leads) */}
-            {selectedLead.status === 'active' && (
+              {/* Edit Lead */}
               <Button
                 variant="outline"
-                className="h-auto py-4 flex flex-col items-center gap-2 bg-red-50 border-red-200 hover:bg-red-100"
+                className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px]"
+                onClick={() => handleAction('onEdit')}
+                disabled={loading}
+              >
+                <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
+                <div className="text-xs sm:text-sm text-center">Edit Lead</div>
+              </Button>
+
+              {/* Change Status */}
+              <Button
+                variant="outline"
+                className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px]"
                 onClick={() => handleAction('onChangeStatus')}
                 disabled={loading}
               >
-                <XCircle className="w-5 h-5 text-red-600" />
-                <div className="text-sm text-red-700">Mark as Lost</div>
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+                <div className="text-xs sm:text-sm text-center">Change Status</div>
               </Button>
-            )}
-          </div>
 
-          {/* Quick Actions */}
-          <div className="pt-4 border-t">
-            <h4 className="text-sm font-medium mb-2">Quick Status Updates</h4>
-            <div className="flex flex-wrap gap-2">
-              {selectedLead.status !== 'active' && (
+              {/* Change Stage */}
+              <Button
+                variant="outline"
+                className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px]"
+                onClick={() => handleAction('onChangeStage')}
+                disabled={loading}
+              >
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                <div className="text-xs sm:text-sm text-center">Change Stage</div>
+              </Button>
+
+              {/* Assign Lead */}
+              <Button
+                variant="outline"
+                className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px]"
+                onClick={() => handleAction('onAssign')}
+                disabled={loading}
+              >
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
+                <div className="text-xs sm:text-sm text-center">Assign Lead</div>
+              </Button>
+
+              {/* Convert Lead (only for active leads) */}
+              {selectedLead.status === 'active' && actions.onConvert && (
                 <Button
-                  size="sm"
-                  variant="secondary"
+                  variant="outline"
+                  className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px] bg-green-50 border-green-200 hover:bg-green-100"
+                  onClick={() => handleAction('onConvert')}
+                  disabled={loading}
+                >
+                  <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+                  <div className="text-xs sm:text-sm text-center text-green-700">Convert Lead</div>
+                </Button>
+              )}
+
+              {/* Mark as Lost (only for active leads) - This will show in place of convert if not active */}
+              {selectedLead.status === 'active' && !actions.onConvert && (
+                <Button
+                  variant="outline"
+                  className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px]"
                   onClick={() => handleAction('onChangeStatus')}
                   disabled={loading}
                 >
-                  Mark as Active
+                  <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
+                  <div className="text-xs sm:text-sm text-center">Mark as Lost</div>
                 </Button>
               )}
-              {selectedLead.status !== 'lost' && (
+
+              {/* If no special button for this position, show empty or general action */}
+              {/* {(selectedLead.status !== 'active' || (selectedLead.status === 'active' && actions.onConvert)) && (
                 <Button
-                  size="sm"
-                  variant="secondary"
-                  className="bg-red-50 text-red-700 hover:bg-red-100"
-                  onClick={() => handleAction('onChangeStatus')}
+                  variant="outline"
+                  className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px]"
+                  onClick={() => handleAction('onView')}
                   disabled={loading}
                 >
-                  Mark as Lost
+                  <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <div className="text-xs sm:text-sm text-center">All Actions</div>
                 </Button>
-              )}
-              {selectedLead.status !== 'converted' && (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="bg-green-50 text-green-700 hover:bg-green-100"
-                  onClick={() => handleAction('onChangeStatus')}
-                  disabled={loading}
-                >
-                  Mark as Converted
-                </Button>
-              )}
+              )} */}
+            </div>
+
+            {/* Quick Actions */}
+            {/* <div className="pt-3 sm:pt-4 border-t">
+              <h4 className="text-xs sm:text-sm font-medium mb-2">Quick Status Updates</h4>
+              <div className="flex flex-wrap gap-1 sm:gap-2">
+                {selectedLead.status !== 'active' && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="text-xs h-7 px-2"
+                    onClick={() => handleAction('onChangeStatus')}
+                    disabled={loading}
+                  >
+                    Mark as Active
+                  </Button>
+                )}
+                {selectedLead.status !== 'lost' && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="text-xs h-7 px-2 bg-red-50 text-red-700 hover:bg-red-100"
+                    onClick={() => handleAction('onChangeStatus')}
+                    disabled={loading}
+                  >
+                    Mark as Lost
+                  </Button>
+                )}
+                {selectedLead.status !== 'converted' && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="text-xs h-7 px-2 bg-green-50 text-green-700 hover:bg-green-100"
+                    onClick={() => handleAction('onChangeStatus')}
+                    disabled={loading}
+                  >
+                    Mark as Converted
+                  </Button>
+                )}
+              </div>
+            </div> */}
+
+            {/* Additional Info */}
+            <div className="pt-3 sm:pt-4 border-t">
+              <h4 className="text-xs sm:text-sm font-medium mb-2">Additional Information</h4>
+              <div className="text-xs sm:text-sm space-y-1 text-muted-foreground">
+                <p>• Source: <span className="font-medium text-foreground">{selectedLead.source}</span></p>
+                {/* <p>• Health Score: <span className="font-medium text-foreground">{selectedLead.healthScore}</span></p> */}
+                <p>• Created: <span className="font-medium text-foreground">
+                  {new Date(selectedLead.createdAt).toLocaleDateString()}
+                </span></p>
+              </div>
             </div>
           </div>
         </div>
         
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 pt-3 sm:pt-4 border-t">
+          <Button 
+            variant="outline" 
+            onClick={() => onOpenChange(false)}
+            className="w-full sm:w-auto order-2 sm:order-1 text-sm sm:text-base"
+          >
             Close
+          </Button>
+          <Button 
+            variant="default" 
+            onClick={() => handleAction('onView')}
+            className="w-full sm:w-auto order-1 sm:order-2 text-sm sm:text-base"
+          >
+            View Full Details
           </Button>
         </DialogFooter>
       </DialogContent>

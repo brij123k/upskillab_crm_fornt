@@ -75,6 +75,7 @@ import { CSVUploadModal } from '@/components/modal/CSVUploadModal';
 import { SearchableSelect } from '@/components/modal/SearchableSelect';
 import { ChangeStageModal } from '@/components/ChangeStageModal';
 import { LeadActionsModal } from '@/components/LeadActionsModal';
+import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 // import { LeadType, StageType, UserType, LeadHistoryType } from '@/types/lead';
 interface LeadType {
   _id: string;
@@ -123,6 +124,7 @@ interface LeadHistoryType {
     email: string;
   };
   changes: any;
+  reason: string;
   createdAt: string;
   updatedAt: string;
   __v: number;
@@ -193,7 +195,7 @@ export function LeadsPage() {
   const [stages, setStages] = useState<StageType[]>([]);
   const [users, setUsers] = useState<UserType[]>([]);
   const [leadHistory, setLeadHistory] = useState<LeadHistoryType[]>([]);
-  
+  const [assignReason, setAssignReason] = useState('');
   // Pagination
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -621,66 +623,72 @@ export function LeadsPage() {
     await handleChangeStage(leadId, stageId);
   };
 
-  // Assign leads to user
-  const handleAssignLeads = async () => {
-    if (selectedLeads.length === 0) {
-      toast({
-        title: "Error",
-        description: "Please select at least one lead",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Prepare data for API
-    const dataToSend: any = {
-      leadIds: selectedLeads
-    };
-    
-    // Add assignedTo if user is selected
-    if (assignUserId && assignUserId !== "") {
-      dataToSend.assignedTo = assignUserId;
-    }
-    
-    // If no user
-    if (!assignUserId) {
-      toast({
-        title: "Error",
-        description: "Please select user",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    try {
-      setAssigningLeads(true);
-      
-      const response = await patchTokenDataHandler("assignLead", dataToSend);
-      
-      toast({
-        title: "Success",
-        description: response?.message || "Leads assigned successfully",
-      });
-      
-      // Reset modal state
-      setAssignModalOpen(false);
-      setAssignUserId('');
-      setSelectedLeads([]);
-      setIsAssignmentMode(false);
-      
-      // Refresh leads
-      fetchLeads();
-    } catch (error: any) {
-      console.error("Assign leads error:", error);
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to assign leads",
-        variant: "destructive",
-      });
-    } finally {
-      setAssigningLeads(false);
-    }
+// Assign leads to user
+const handleAssignLeads = async () => {
+  if (selectedLeads.length === 0) {
+    toast({
+      title: "Error",
+      description: "Please select at least one lead",
+      variant: "destructive",
+    });
+    return;
+  }
+  
+  if (!assignUserId) {
+    toast({
+      title: "Error",
+      description: "Please select a user",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  if (!assignReason.trim()) {
+    toast({
+      title: "Error",
+      description: "Please enter a reason for assignment",
+      variant: "destructive",
+    });
+    return;
+  }
+  
+  // Prepare data for API
+  const dataToSend: any = {
+    leadIds: selectedLeads,
+    assignedTo: assignUserId,
+    reason: assignReason.trim() // Add reason to the request
   };
+  
+  try {
+    setAssigningLeads(true);
+    
+    const response = await patchTokenDataHandler("assignLead", dataToSend);
+    
+    toast({
+      title: "Success",
+      description: response?.message || "Leads assigned successfully",
+    });
+    
+    // Reset modal state
+    setAssignModalOpen(false);
+    setAssignUserId('');
+    setAssignReason('');
+    setSelectedLeads([]);
+    setIsAssignmentMode(false);
+    
+    // Refresh leads
+    fetchLeads();
+  } catch (error: any) {
+    console.error("Assign leads error:", error);
+    toast({
+      title: "Error",
+      description: error.response?.data?.message || "Failed to assign leads",
+      variant: "destructive",
+    });
+  } finally {
+    setAssigningLeads(false);
+  }
+};
 
   // View lead details
   const handleViewLead = (lead: LeadType) => {
@@ -699,40 +707,40 @@ export function LeadsPage() {
       source: lead.source,
       stageId: lead.stageId._id,
       source_campaign: '',
-      assignedTo: lead.assignedTo?._id || ''
+      assignedTo: lead.assignedTo?._id
     });
     setEditLeadOpen(true);
   };
 
-  // Lead actions
-  const leadActions = {
-    onView: (lead: LeadType) => {
-      handleViewLead(lead);
-    },
-    onEdit: (lead: LeadType) => {
-      handleEditLead(lead);
-    },
-    onChangeStatus: (lead: LeadType) => {
-      setSelectedLead(lead);
-      setSelectedStatus(lead.status);
-      setStatusModalOpen(true);
-    },
-    onChangeStage: (lead: LeadType) => {
-      setSelectedLead(lead);
-      setChangeStageModalOpen(true);
-    },
-    onAssign: (lead: LeadType) => {
-      setSelectedLead(lead);
-      setSelectedLeads([lead._id]);
-      setIsAssignmentMode(true);
-      setAssignModalOpen(true);
-    },
-    onConvert: (lead: LeadType) => {
-      setSelectedLead(lead);
-      setSelectedStatus('converted');
-      setStatusModalOpen(true);
-    }
-  };
+// Lead actions
+const leadActions = {
+  onView: (lead: LeadType) => {
+    handleViewLead(lead);
+  },
+  onEdit: (lead: LeadType) => {
+    handleEditLead(lead);
+  },
+  onChangeStatus: (lead: LeadType) => {
+    setSelectedLead(lead);
+    setSelectedStatus(lead.status);
+    setStatusModalOpen(true);
+  },
+  onChangeStage: (lead: LeadType) => {
+    setSelectedLead(lead);
+    setChangeStageModalOpen(true);
+  },
+  onAssign: (lead: LeadType) => {
+    setSelectedLead(lead);
+    setSelectedLeads([lead._id]);
+    setIsAssignmentMode(true);
+    setAssignModalOpen(true);
+  },
+  onConvert: (lead: LeadType) => {
+    setSelectedLead(lead);
+    setSelectedStatus('converted');
+    setStatusModalOpen(true);
+  }
+};
 
   // Toggle lead selection
   const toggleLeadSelection = (leadId: string) => {
@@ -1242,23 +1250,23 @@ export function LeadsPage() {
                         </div>
                         <div className="space-y-2">
                           <Label>Assign To (Optional)</Label>
-                          <Select
-                            value={lead.assignedTo || ''}
-                            onValueChange={(value) => updateBulkLeadRow(index, 'assignedTo', value)}
-                            disabled={addingBulkLeads || loadingUsers}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select user" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value=" ">Not assigned</SelectItem>
-                              {users.map((user) => (
-                                <SelectItem key={user._id} value={user._id}>
-                                  {user.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                           <SearchableDropdown
+    options={[
+      { value: "", label: "Not assigned" },
+      ...users.map(user => ({
+        value: user._id,
+        label: user.name,
+        email: user.email // Additional data
+      }))
+    ]}
+    value={lead.assignedTo || ""}
+    onValueChange={(value) => updateBulkLeadRow(index, 'assignedTo', value)}
+    placeholder="Select user"
+    searchPlaceholder="Search user..."
+    emptyMessage="No users found"
+    disabled={addingBulkLeads || loadingUsers}
+    allowClear
+  />
                         </div>
                       </div>
                     </CardContent>
@@ -1425,25 +1433,29 @@ export function LeadsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="assignedTo">Assign To (Optional)</Label>
-                  <Select
-                    value={leadForm.assignedTo || ''}
-                    onValueChange={(value) => setLeadForm({...leadForm, assignedTo: value})}
-                    disabled={addingLead || loadingUsers}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select user" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value=" ">Not assigned</SelectItem>
-                      {users.map((user) => (
-                        <SelectItem key={user._id} value={user._id}>
-                          {user.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+  <Label htmlFor="assignedTo">Assign To (Optional)</Label>
+  <SearchableDropdown
+    options={[
+      { value: "", label: "Not assigned" },
+      ...users.map((user) => ({
+        value: user._id,
+        label: user.name,
+        email: user.email, // Additional data if needed
+        department: user.profile?.departmentId?.name // Additional data
+      }))
+    ]}
+    value={leadForm.assignedTo || ""}
+    onValueChange={(value) => setLeadForm({...leadForm, assignedTo: value})}
+    placeholder="Select user"
+    searchPlaceholder="Search user by name..."
+    emptyMessage="No users found"
+    disabled={addingLead || loadingUsers}
+    allowClear
+    onClear={() => setLeadForm({...leadForm, assignedTo: ""})}
+    triggerClassName="h-10 sm:h-11 text-sm sm:text-base"
+    contentClassName="w-full sm:max-w-[var(--radix-popover-trigger-width)]"
+  />
+</div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setNewLeadOpen(false)} disabled={addingLead}>
@@ -1575,26 +1587,25 @@ export function LeadsPage() {
                 </Select>
               </div>
               
-              <div className="space-y-2">
-                <Label>Assigned To</Label>
-                <Select
-                  value={filters.assignedTo}
-                  onValueChange={(value) => setFilters({...filters, assignedTo: value})}
-                  disabled={loadingUsers}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="All users" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Users</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user._id} value={user._id}>
-                        {user.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Assigned To Filter */}
+<div className="space-y-2">
+  <Label>Assigned To</Label>
+  <SearchableDropdown
+    options={[
+      { value: "all", label: "All Users" },
+      ...users.map(user => ({
+        value: user._id,
+        label: user.name
+      }))
+    ]}
+    value={filters.assignedTo}
+    onValueChange={(value) => setFilters({...filters, assignedTo: value})}
+    placeholder="All Users"
+    searchPlaceholder="Search user..."
+    emptyMessage="No users found"
+    disabled={loadingUsers}
+  />
+</div>
               
               <div className="space-y-2">
                 <Label>Date Filter</Label>
@@ -1660,305 +1671,104 @@ export function LeadsPage() {
       )}
 
       {/* Leads Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">
-              All Leads ({totalLeads})
-              {loading && (
-                <span className="ml-2 text-sm text-muted-foreground">
-                  <Loader2 className="w-3 h-3 inline animate-spin mr-1" />
-                  Loading...
-                </span>
-              )}
-            </CardTitle>
-            <div className="flex items-center gap-3">
-              {isAssignmentMode && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectAll(!selectAll)}
-                  >
-                    {selectAll ? (
-                      <CheckSquare className="w-4 h-4 mr-2" />
-                    ) : (
-                      <Square className="w-4 h-4 mr-2" />
-                    )}
-                    {selectAll ? 'Deselect All' : 'Select All'}
-                  </Button>
-                  <Badge variant="outline" className="bg-blue-50">
-                    {selectedLeads.length} selected
-                  </Badge>
-                </div>
-              )}
-              <div className="text-sm text-muted-foreground">
-                Page {page} of {totalPages}
-              </div>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setPage(prev => Math.max(1, prev - 1))}
-                disabled={page === 1 || loading}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={page === totalPages || loading}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" disabled={loading || totalLeads === 0}>
-                    {loading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem 
-                    onClick={exportToCSV}
-                    disabled={loading || totalLeads === 0}
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Export All Filtered Data ({totalLeads} leads)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={exportCurrentPageToCSV}
-                    disabled={loading || leads.length === 0}
-                  >
-                    <FileSpreadsheet className="mr-2 h-4 w-4" />
-                    Export Current Page ({leads.length} leads)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+      <Table>
+  <TableHeader>
+    <TableRow>
+      {isAssignmentMode && (
+        <TableHead className="w-12">
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              checked={selectAll}
+              onChange={() => setSelectAll(!selectAll)}
+              className="h-4 w-4"
+            />
+          </div>
+        </TableHead>
+      )}
+      <TableHead>Lead</TableHead>
+      <TableHead>Contact</TableHead>
+      <TableHead>Source</TableHead>
+      <TableHead>Stage</TableHead>
+      <TableHead>Status</TableHead>
+      <TableHead>Assigned To</TableHead>
+      {/* REMOVED: Actions column header */}
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    {leads.map((lead) => (
+      <TableRow 
+        key={lead._id} 
+        className={cn(
+          isAssignmentMode && selectedLeads.includes(lead._id) && "bg-blue-50",
+          "cursor-pointer hover:bg-muted/50" // Add hover effect for clickable rows
+        )}
+        onClick={() => {
+          setSelectedLead(lead);
+          setActionsModalOpen(true);
+        }}
+      >
+        {isAssignmentMode && (
+          <TableCell onClick={(e) => e.stopPropagation()}>
+            <input
+              type="checkbox"
+              checked={selectedLeads.includes(lead._id)}
+              onChange={(e) => {
+                e.stopPropagation();
+                toggleLeadSelection(lead._id);
+              }}
+              className="h-4 w-4"
+            />
+          </TableCell>
+        )}
+        <TableCell>
+          <div className="font-medium">{lead.name}</div>
+          <div className="text-xs text-muted-foreground">
+            ID: {lead.leadId}
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1 text-sm">
+              <Phone className="w-3 h-3" />
+              {lead.phone}
+            </div>
+            <div className="flex items-center gap-1 text-sm">
+              <Mail className="w-3 h-3" />
+              {lead.email}
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-8">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
-              <p className="mt-2 text-muted-foreground">Loading leads...</p>
-            </div>
-          ) : leads.length === 0 ? (
-            <div className="text-center py-8">
-              <FileText className="w-12 h-12 mx-auto text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold">No leads found</h3>
-              <p className="text-muted-foreground">Try adjusting your filters or add a new lead.</p>
-              <Button className="mt-4" onClick={() => setNewLeadOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add New Lead
-              </Button>
+        </TableCell>
+        <TableCell>{getSourceBadge(lead.source)}</TableCell>
+        <TableCell>
+          <Badge variant="outline" className="flex items-center gap-1">
+            <ListTodo className="w-3 h-3" />
+            {lead.stageId.name}
+          </Badge>
+        </TableCell>
+        <TableCell>{getStatusBadge(lead.status)}</TableCell>
+        <TableCell>
+          {lead.assignedTo ? (
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-xs font-medium">
+                  {lead.assignedTo.name.charAt(0)}
+                </span>
+              </div>
+              <div>
+                <div className="text-sm font-medium">{lead.assignedTo.name}</div>
+                <div className="text-xs text-muted-foreground">{lead.assignedTo.email}</div>
+              </div>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {isAssignmentMode && (
-                      <TableHead className="w-12">
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={selectAll}
-                            onChange={() => setSelectAll(!selectAll)}
-                            className="h-4 w-4"
-                          />
-                        </div>
-                      </TableHead>
-                    )}
-                    <TableHead>Lead</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead>Stage</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Assigned To</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {leads.map((lead) => (
-                    <TableRow key={lead._id} className={cn(
-                      isAssignmentMode && selectedLeads.includes(lead._id) && "bg-blue-50"
-                    )}>
-                      {isAssignmentMode && (
-                        <TableCell>
-                          <input
-                            type="checkbox"
-                            checked={selectedLeads.includes(lead._id)}
-                            onChange={() => toggleLeadSelection(lead._id)}
-                            className="h-4 w-4"
-                          />
-                        </TableCell>
-                      )}
-                      <TableCell>
-                        <div className="font-medium">{lead.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          ID: {lead.leadId}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1 text-sm">
-                            <Phone className="w-3 h-3" />
-                            {lead.phone}
-                          </div>
-                          <div className="flex items-center gap-1 text-sm">
-                            <Mail className="w-3 h-3" />
-                            {lead.email}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getSourceBadge(lead.source)}</TableCell>
-                      
-                      <TableCell>
-                        <Badge variant="outline" className="flex items-center gap-1">
-                          <ListTodo className="w-3 h-3" />
-                          {lead.stageId.name}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(lead.status)}</TableCell>
-                      <TableCell>
-                        {lead.assignedTo ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                              <span className="text-xs font-medium">
-                                {lead.assignedTo.name.charAt(0)}
-                              </span>
-                            </div>
-                            <div>
-                              <div className="text-sm font-medium">{lead.assignedTo.name}</div>
-                              <div className="text-xs text-muted-foreground">{lead.assignedTo.email}</div>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">Not assigned</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => {
-                              setSelectedLead(lead);
-                              setActionsModalOpen(true);
-                            }}>
-                              <MoreHorizontal className="mr-2 h-4 w-4" />
-                              View All Actions
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleViewLead(lead)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditLead(lead)}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit Lead
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => {
-                              setSelectedLead(lead);
-                              setChangeStageModalOpen(true);
-                            }}>
-                              <ArrowRight className="mr-2 h-4 w-4" />
-                              Change Stage
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <span className="text-muted-foreground">Not assigned</span>
           )}
-
-          {/* Pagination */}
-          {leads.length > 0 && (
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, totalLeads)} of {totalLeads} leads
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(prev => Math.max(1, prev - 1))}
-                  disabled={page === 1 || loading}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-2" />
-                  Previous
-                </Button>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (page <= 3) {
-                      pageNum = i + 1;
-                    } else if (page >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = page - 2 + i;
-                    }
-                    
-                    return (
-                      <Button
-                        key={pageNum}
-                        variant={page === pageNum ? "default" : "outline"}
-                        size="sm"
-                        className="w-8 h-8 p-0"
-                        onClick={() => setPage(pageNum)}
-                        disabled={loading}
-                      >
-                        {pageNum}
-                      </Button>
-                    );
-                  })}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={page === totalPages || loading}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Show:</span>
-                <Select
-                  value={limit.toString()}
-                  onValueChange={(value) => {
-                    setLimit(parseInt(value));
-                    setPage(1);
-                  }}
-                >
-                  <SelectTrigger className="w-20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="25">25</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        </TableCell>
+        {/* REMOVED: Actions column cell */}
+      </TableRow>
+    ))}
+  </TableBody>
+</Table>
 
       {/* CSV Upload Modal */}
       <CSVUploadModal
@@ -2000,91 +1810,137 @@ export function LeadsPage() {
         onSubmit={handleStageSubmit}
       />
 
-      {/* Assign Leads Modal */}
-      <Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Assign Leads</DialogTitle>
-            <DialogDescription>
-              Assign {selectedLeads.length} selected leads to a user
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-4">
-              {/* User Selection */}
-              <div className="space-y-2">
-                <Label>Select User (Optional)</Label>
-                <SearchableSelect
-                  value={assignUserId}
-                  onValueChange={(value) => {
-                    setAssignUserId(value);
-                  }}
-                  options={users.map(user => ({
-                    value: user._id,
-                    label: user.name,
-                    email: user.email,
-                  }))}
-                  placeholder="Select user (all users)"
-                  searchPlaceholder="Search user by name, email..."
-                  emptyMessage="No users found."
-                  disabled={assigningLeads || loadingUsers}
-                  showAllOption={false}
-                />
-                
-              </div>
-            </div>
-            
-            {/* Validation message */}
-            {!assignUserId && (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                <p className="text-sm text-yellow-800">
-                  Please select a user to assign leads
-                </p>
+{/* Assign Leads Modal */}
+<Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
+  <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-4 sm:mx-0 max-h-[90vh] overflow-hidden">
+    <DialogHeader className="px-1">
+      <DialogTitle className="text-lg sm:text-xl">Assign Leads</DialogTitle>
+      <DialogDescription className="text-sm sm:text-base">
+        Assign {selectedLeads.length} selected leads to a user
+      </DialogDescription>
+    </DialogHeader>
+    
+    <div className="overflow-y-auto px-1 py-2 max-h-[calc(90vh-160px)]">
+      <div className="grid gap-3 sm:gap-4 py-2">
+        <div className="space-y-3 sm:space-y-4">
+          {/* User Selection */}
+          <div className="space-y-2">
+            <Label className="text-sm sm:text-base">Select User *</Label>
+            <SearchableSelect
+              value={assignUserId}
+              onValueChange={(value) => {
+                setAssignUserId(value);
+              }}
+              options={users.map(user => ({
+                value: user._id,
+                label: `${user.name}${user.email ? ` (${user.email})` : ''}`,
+                name: user.name,
+                email: user.email,
+              }))}
+              placeholder="Select user"
+              searchPlaceholder="Search by name or email..."
+              emptyMessage="No users found."
+              disabled={assigningLeads || loadingUsers}
+              showAllOption={false}
+              triggerClassName="h-10 sm:h-11 text-sm sm:text-base"
+              contentClassName="w-full sm:max-w-[var(--radix-popover-trigger-width)] max-h-[60vh] sm:max-h-none"
+            />
+          </div>
+
+          {/* Reason Message */}
+          <div className="space-y-2">
+            <Label htmlFor="assignReason" className="text-sm sm:text-base">
+              Reason for Assignment/Reassignment *
+            </Label>
+            <textarea
+              id="assignReason"
+              value={assignReason}
+              onChange={(e) => setAssignReason(e.target.value)}
+              placeholder="Enter reason for assigning/reassigning these leads..."
+              className="w-full min-h-[80px] sm:min-h-[100px] p-3 border rounded-md text-sm sm:text-base resize-y"
+              disabled={assigningLeads}
+              required
+              rows={4}
+            />
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              This reason will be recorded in the lead history.
+            </p>
+          </div>
+        </div>
+        
+        {/* Validation message */}
+        {(!assignUserId || !assignReason.trim()) && (
+          <div className="p-3 sm:p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+            <p className="text-xs sm:text-sm text-yellow-800">
+              Please select a user and enter a reason for assignment
+            </p>
+          </div>
+        )}
+        
+        <div className="p-3 sm:p-4 bg-muted rounded-md">
+          <p className="text-sm sm:text-base font-medium">
+            Selected Leads ({selectedLeads.length})
+          </p>
+          <div className="mt-2 max-h-32 overflow-y-auto">
+            {leads
+              .filter(lead => selectedLeads.includes(lead._id))
+              .slice(0, 5)
+              .map(lead => (
+                <div key={lead._id} className="text-xs sm:text-sm py-1 sm:py-1.5 border-b last:border-0">
+                  <div className="font-medium truncate">{lead.name}</div>
+                  <div className="text-muted-foreground truncate">{lead.email}</div>
+                </div>
+              ))}
+            {selectedLeads.length > 5 && (
+              <div className="text-xs sm:text-sm py-1 sm:py-1.5 text-muted-foreground">
+                + {selectedLeads.length - 5} more leads
               </div>
             )}
-            
-            <div className="p-3 bg-muted rounded-md">
-              <p className="text-sm font-medium">Selected Leads ({selectedLeads.length})</p>
-              <div className="mt-2 max-h-32 overflow-y-auto">
-                {leads
-                  .filter(lead => selectedLeads.includes(lead._id))
-                  .slice(0, 5)
-                  .map(lead => (
-                    <div key={lead._id} className="text-sm py-1 border-b last:border-0">
-                      {lead.name} - {lead.email}
-                    </div>
-                  ))}
-                {selectedLeads.length > 5 && (
-                  <div className="text-sm py-1 text-muted-foreground">
-                    + {selectedLeads.length - 5} more leads
-                  </div>
-                )}
+          </div>
+          {selectedLeads.length > 0 && (
+            <div className="mt-2 text-xs sm:text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <span>Current stage:</span>
+                <Badge variant="outline" className="text-xs">
+                  {leads.find(l => l._id === selectedLeads[0])?.stageId.name || 'N/A'}
+                </Badge>
               </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setAssignModalOpen(false);
-              setAssignUserId('');
-            }} disabled={assigningLeads}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleAssignLeads} 
-              disabled={selectedLeads.length === 0 || assigningLeads || (!assignUserId)}
-            >
-              {assigningLeads ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Assigning...
-                </>
-              ) : (
-                'Assign Now'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          )}
+        </div>
+      </div>
+    </div>
+    
+    <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 pt-3 sm:pt-4 border-t">
+      <Button 
+        variant="outline" 
+        onClick={() => {
+          setAssignModalOpen(false);
+          setAssignUserId('');
+          setAssignReason('');
+        }} 
+        disabled={assigningLeads}
+        className="w-full sm:w-auto order-2 sm:order-1 text-sm sm:text-base"
+      >
+        Cancel
+      </Button>
+      <Button 
+        onClick={handleAssignLeads} 
+        disabled={selectedLeads.length === 0 || assigningLeads || (!assignUserId) || !assignReason.trim()}
+        className="w-full sm:w-auto order-1 sm:order-2 text-sm sm:text-base"
+      >
+        {assigningLeads ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Assigning...
+          </>
+        ) : (
+          'Assign Now'
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
       {/* View Lead Modal */}
       <Dialog open={viewLeadOpen} onOpenChange={setViewLeadOpen}>
@@ -2197,6 +2053,11 @@ export function LeadsPage() {
                                 <p>Reassigned from {history.fromUser.name} to {history.toUser?.name}</p>
                               ) : (
                                 <p>Assigned to {history.toUser?.name}</p>
+                              )}
+                              {history.reason ? (
+                                <p>Reason : {history.reason}</p>
+                              ):(
+                                <p>Reason not given</p>
                               )}
                             </div>
                           )}

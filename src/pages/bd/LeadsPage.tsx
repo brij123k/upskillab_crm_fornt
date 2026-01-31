@@ -119,6 +119,7 @@ interface LeadHistoryType {
     email: string;
   };
   changes: any;
+  reason: string;
   createdAt: string;
   updatedAt: string;
   __v: number;
@@ -686,7 +687,7 @@ const [changingStage, setChangingStage] = useState(false);
       source: lead.source,
       stageId: lead.stageId._id,
       source_campaign: '',
-      assignedTo: lead.assignedTo?._id || ''
+      assignedTo: lead.assignedTo?._id
     });
     setEditLeadOpen(true);
   };
@@ -1721,7 +1722,7 @@ const [changingStage, setChangingStage] = useState(false);
       <TableHead>Source</TableHead>
       <TableHead>Stage</TableHead>
       <TableHead>Status</TableHead>
-      <TableHead>Assigned To</TableHead>
+      {/* <TableHead>Assigned To</TableHead> */}
     </TableRow>
   </TableHeader>
   <TableBody>
@@ -1775,7 +1776,7 @@ const [changingStage, setChangingStage] = useState(false);
           </Badge>
         </TableCell>
         <TableCell>{getStatusBadge(lead.status)}</TableCell>
-        <TableCell>
+        {/* <TableCell>
           {lead.assignedTo ? (
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1791,7 +1792,7 @@ const [changingStage, setChangingStage] = useState(false);
           ) : (
             <span className="text-muted-foreground">Not assigned</span>
           )}
-        </TableCell>
+        </TableCell> */}
       </TableRow>
     ))}
   </TableBody>
@@ -2094,6 +2095,11 @@ const [changingStage, setChangingStage] = useState(false);
                                 <p>Reassigned from {history.fromUser.name} to {history.toUser?.name}</p>
                               ) : (
                                 <p>Assigned to {history.toUser?.name}</p>
+                              )}
+                              {history.reason ? (
+                                <p>Reason : {history.reason}</p>
+                              ):(
+                                <p>Reason not given</p>
                               )}
                             </div>
                           )}

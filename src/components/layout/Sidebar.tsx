@@ -30,7 +30,6 @@ interface SidebarProps {
 const adminNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
   { icon: Users, label: 'Users & Roles', path: '/admin/users' },
-  { icon: Building2, label: 'Departments', path: '/admin/departments' },
   { icon: FileText, label: 'Leads & Data', path: '/admin/leads' },
   { icon: DollarSign, label: 'Finance', path: '/admin/finance' },
   { icon: BarChart3, label: 'Reports', path: '/admin/reports' },

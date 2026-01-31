@@ -63,6 +63,7 @@ export interface LeadHistoryType {
     email: string;
   };
   changes: any;
+  reason:string;
   createdAt: string;
   updatedAt: string;
   __v: number;

@@ -10,7 +10,7 @@ import NotFound from "@/pages/NotFound";
 // Admin Pages
 import { AdminDashboard } from "@/pages/admin/AdminDashboard";
 import { UsersPage } from "@/pages/admin/UsersPage";
-import { DepartmentsPage } from "@/pages/admin/DepartmentsPage";
+// import { DepartmentsPage } from "@/pages/admin/DepartmentsPage";
 import {LeadsPage} from "@/pages/admin/LeadsPage"
 // HR Pages
 import { HRDashboard } from "@/pages/hr/HRDashboard";
@@ -19,6 +19,7 @@ import { EmployeesPage } from "@/pages/hr/EmployeesPage";
 // BD Pages
 import { BDDashboard } from "@/pages/bd/BDDashboard";
 import { BDLeadsPage } from "@/pages/bd/LeadsPage";
+import { CallLogsPage } from "@/pages/bd/CallLogsPage";
 import ProtectedRoute from "@/ProtectedRoute";
 import DashboardRedirect from "@/DashboardRedirect";
 import { VerifyOTP } from "@/pages/VerifyOTP";
@@ -62,7 +63,6 @@ const AppRoutes = () => {
                 </ProtectedRoute>}>
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<UsersPage />} />
-          <Route path="departments" element={<DepartmentsPage />} />
           <Route path="leads" element={<LeadsPage />} />
           <Route path="finance" element={<PlaceholderPage title="Finance" />} />
           <Route path="reports" element={<PlaceholderPage title="Reports & Analytics" />} />
@@ -99,7 +99,7 @@ const AppRoutes = () => {
           <Route index element={<BDDashboard />} />
           <Route path="leads" element={<BDLeadsPage />} />
           <Route path="tasks" element={<PlaceholderPage title="Tasks & Follow-ups" />} />
-          <Route path="calls" element={<PlaceholderPage title="Calls" />} />
+          <Route path="calls" element={<CallLogsPage/>} />
           <Route path="meetings" element={<PlaceholderPage title="Meetings" />} />
           <Route path="payments" element={<PlaceholderPage title="Payments" />} />
           <Route path="reports" element={<PlaceholderPage title="BD Reports" />} />

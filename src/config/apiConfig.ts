@@ -1,5 +1,5 @@
 // const url = "http://localhost:3000"
-const url = "https://crm-backend-1i7j.onrender.com"
+const url = "https://crm.upskillab.in"
 const ApiConfig = {
   url,
   login:`${url}/users/login`,
@@ -7,7 +7,6 @@ const ApiConfig = {
   varify_otp:`${url}/users/verify-otp`,
   reset_password:`${url}/users/reset-password`,
 
-  // admin
   getAllUser:`${url}/users`,
   getUserByDepartmentId:(departmentId:string)=>`${url}/profiles/department/${departmentId}`,
   getAllRoles:`${url}/roles`,
@@ -31,8 +30,10 @@ const ApiConfig = {
   assignLead:`${url}/leads/lead/assign`,
   assignLeadToDepartment:`${url}/leads/lead/assign-department`,
 
-  uploadFiles: `${url}/file`,
-  categoryByCode: (code:string) => `${url}/category/code/${code}`,
+  CallLog:`${url}/call-logs`,
+
+  // uploadFiles: `${url}/file`,
+  // categoryByCode: (code:string) => `${url}/category/code/${code}`,
 };
 
 export default ApiConfig;
