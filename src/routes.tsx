@@ -19,11 +19,13 @@ import { EmployeesPage } from "@/pages/hr/EmployeesPage";
 // BD Pages
 import { BDDashboard } from "@/pages/bd/BDDashboard";
 import { BDLeadsPage } from "@/pages/bd/LeadsPage";
+import { BDUsersPage } from "@/pages/bd/UsersPage";
 import { CallLogsPage } from "@/pages/bd/CallLogsPage";
 import ProtectedRoute from "@/ProtectedRoute";
 import DashboardRedirect from "@/DashboardRedirect";
 import { VerifyOTP } from "@/pages/VerifyOTP";
 import { ResetPassword } from "@/pages/ResetPassword";
+import { MeetingLogsPage } from "./pages/bd/MeetingLogsPage";
 
 // Placeholder
 const PlaceholderPage = ({ title }: { title: string }) => (
@@ -96,11 +98,13 @@ const AppRoutes = () => {
                 </RoleProtectedRoute>
                 </ProtectedRoute>}>
 
-          <Route index element={<BDDashboard />} />
+          {/* <Route index element={<BDDashboard />} /> */}
+          <Route index element={<PlaceholderPage title="Dashboard" />} />
+          <Route path="users" element={<BDUsersPage />} />
           <Route path="leads" element={<BDLeadsPage />} />
           <Route path="tasks" element={<PlaceholderPage title="Tasks & Follow-ups" />} />
           <Route path="calls" element={<CallLogsPage/>} />
-          <Route path="meetings" element={<PlaceholderPage title="Meetings" />} />
+          <Route path="meetings" element={<MeetingLogsPage />} />
           <Route path="payments" element={<PlaceholderPage title="Payments" />} />
           <Route path="reports" element={<PlaceholderPage title="BD Reports" />} />
           <Route path="settings" element={<PlaceholderPage title="BD Settings" />} />

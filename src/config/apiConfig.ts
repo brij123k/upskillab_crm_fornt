@@ -3,11 +3,13 @@ const url = "https://crm.upskillab.in"
 const ApiConfig = {
   url,
   login:`${url}/users/login`,
+  logout:`${url}/users/Logout`,
   forgetPassword:`${url}/users/forget-password`,
   varify_otp:`${url}/users/verify-otp`,
   reset_password:`${url}/users/reset-password`,
 
   getAllUser:`${url}/users`,
+  getAllProfile:`${url}/users/profile`,
   getUserByDepartmentId:(departmentId:string)=>`${url}/profiles/department/${departmentId}`,
   getAllRoles:`${url}/roles`,
   getAllDepartments:`${url}/departments`,
@@ -29,8 +31,20 @@ const ApiConfig = {
   leadHistory:(leadid:string)=>`${url}/lead-history/${leadid}`,
   assignLead:`${url}/leads/lead/assign`,
   assignLeadToDepartment:`${url}/leads/lead/assign-department`,
+  leaddoublicateFinder:`${url}/leads/leaddoublicate/duplicates`,
+  leadmerge:`${url}/leads/leaddoublicate/merge`,
 
-  CallLog:`${url}/call-logs`,
+  CallLog:`${url}/call-logs/users`,
+
+  MeetingLog:`${url}/meeting-logs`,
+  getMeetingLog:`${url}/meeting-logs/with-feedbacks`,
+
+  // notifications
+
+  notification:`${url}/notifications`,
+  notificationUnreadCount:`${url}/notifications/unread-count`,
+  readNotification:(id)=>`${url}/notifications/${id}/read`,
+  readAllNotification:`${url}/notifications/read-all`
 
   // uploadFiles: `${url}/file`,
   // categoryByCode: (code:string) => `${url}/category/code/${code}`,

@@ -62,7 +62,15 @@ export const postDataHandler = async (endPoint:any, data:any, isUrl=false) => {
 
 export const postDataHandlerWithToken = async (endPoint:any, data:any,isUrl=false) => {
   const storedAuth = localStorage.getItem("access_token");
-  
+  if(data==null){
+    if (!storedAuth) {
+    throw new Error('No authentication token found');
+  }
+  return makeRequest("POST", endPoint, { 
+    isUrl,
+    ...getAuthHeaders(storedAuth) 
+  });
+  }
   if (!storedAuth) {
     throw new Error('No authentication token found');
   }
@@ -142,6 +150,12 @@ export const patchTokenDataHandler = async (endPoint:any, data:any ,isUrl=false)
   
   if (!storedAuth) {
     throw new Error('No authentication token found');
+  }
+  if(data==null){
+    return makeRequest("PATCH", endPoint, { 
+    isUrl,
+    ...getAuthHeaders(storedAuth) 
+  });
   }
   return makeRequest("PATCH", endPoint, { 
     data, 

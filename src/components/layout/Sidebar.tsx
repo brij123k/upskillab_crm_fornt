@@ -20,61 +20,222 @@ import {
   Phone,
   Video,
   CreditCard,
+  PhoneCall,
+  User,
 } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import { getUser } from "@/auth";
+import { hasModulePermission } from '@/utils/modulePermissions';
+
 interface SidebarProps {
   panel: 'admin' | 'hr' | 'bd';
 }
 
 const adminNavItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
-  { icon: Users, label: 'Users & Roles', path: '/admin/users' },
-  { icon: FileText, label: 'Leads & Data', path: '/admin/leads' },
-  { icon: DollarSign, label: 'Finance', path: '/admin/finance' },
-  { icon: BarChart3, label: 'Reports', path: '/admin/reports' },
-  { icon: Shield, label: 'Security', path: '/admin/security' },
-  { icon: Settings, label: 'Settings', path: '/admin/settings' },
+  { 
+    icon: LayoutDashboard, 
+    label: 'Dashboard', 
+    path: '/admin', 
+    module: 'admin_dashboard' 
+  },
+  { 
+    icon: Users, 
+    label: 'Users & Roles', 
+    path: '/admin/users', 
+    module: 'users' 
+  },
+  { 
+    icon: FileText, 
+    label: 'Leads & Data', 
+    path: '/admin/leads', 
+    module: 'leads' 
+  },
+  { 
+    icon: DollarSign, 
+    label: 'Finance', 
+    path: '/admin/finance', 
+    module: 'finance' 
+  },
+  { 
+    icon: BarChart3, 
+    label: 'Reports', 
+    path: '/admin/reports', 
+    module: 'reports' 
+  },
+  { 
+    icon: Shield, 
+    label: 'Security', 
+    path: '/admin/security', 
+    module: 'security' 
+  },
+  { 
+    icon: Settings, 
+    label: 'Settings', 
+    path: '/admin/settings', 
+    module: 'settings' 
+  },
 ];
 
 const hrNavItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/hr' },
-  { icon: UserCircle, label: 'Employees', path: '/hr/employees' },
-  { icon: Clock, label: 'Attendance', path: '/hr/attendance' },
-  { icon: TrendingUp, label: 'Performance', path: '/hr/performance' },
-  { icon: AlertTriangle, label: 'Warnings & PIP', path: '/hr/warnings' },
-  { icon: Megaphone, label: 'Announcements', path: '/hr/announcements' },
-  { icon: BarChart3, label: 'Reports', path: '/hr/reports' },
-  { icon: UserMinus, label: 'Exit Management', path: '/hr/exit' },
+  { 
+    icon: LayoutDashboard, 
+    label: 'Dashboard', 
+    path: '/hr', 
+    module: 'hr_dashboard' 
+  },
+  { 
+    icon: UserCircle, 
+    label: 'Employees', 
+    path: '/hr/employees', 
+    module: 'employees' 
+  },
+  { 
+    icon: Clock, 
+    label: 'Attendance', 
+    path: '/hr/attendance', 
+    module: 'attendance' 
+  },
+  { 
+    icon: TrendingUp, 
+    label: 'Performance', 
+    path: '/hr/performance', 
+    module: 'performance' 
+  },
+  { 
+    icon: AlertTriangle, 
+    label: 'Warnings & PIP', 
+    path: '/hr/warnings', 
+    module: 'warnings' 
+  },
+  { 
+    icon: Megaphone, 
+    label: 'Announcements', 
+    path: '/hr/announcements', 
+    module: 'announcements' 
+  },
+  { 
+    icon: BarChart3, 
+    label: 'Reports', 
+    path: '/hr/reports', 
+    module: 'reports' 
+  },
+  { 
+    icon: UserMinus, 
+    label: 'Exit Management', 
+    path: '/hr/exit', 
+    module: 'exit_management' 
+  },
 ];
 
 const bdNavItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/bd' },
-  { icon: Target, label: 'Leads', path: '/bd/leads' },
-  { icon: CheckSquare, label: 'Tasks', path: '/bd/tasks' },
-  { icon: Phone, label: 'Calls', path: '/bd/calls' },
-  { icon: Video, label: 'Meetings', path: '/bd/meetings' },
-  { icon: CreditCard, label: 'Payments', path: '/bd/payments' },
-  { icon: BarChart3, label: 'Reports', path: '/bd/reports' },
-  { icon: Settings, label: 'Settings', path: '/bd/settings' },
+  { 
+    icon: LayoutDashboard, 
+    label: 'Dashboard', 
+    path: '/bd', 
+    // BD Dashboard is always visible for BD panel users
+    module: 'bd_dashboard' 
+  },
+  //  { 
+  //   icon: User, 
+  //   label: 'Users', 
+  //   path: '/bd/users', 
+  //   module: 'user' 
+  // },
+  { 
+    icon: Target, 
+    label: 'Leads', 
+    path: '/bd/leads', 
+    module: 'leads' 
+  },
+  { 
+    icon: CheckSquare, 
+    label: 'Tasks', 
+    path: '/bd/tasks', 
+    module: 'tasks' 
+  },
+ 
+  { 
+    icon: PhoneCall, 
+    label: 'Call Logs', 
+    path: '/bd/calls', 
+    module: 'call_logs' 
+  },
+  { 
+    icon: Video, 
+    label: 'Meeting Logs', 
+    path: '/bd/meetings', 
+    module: 'meeting_logs' 
+  },
+  { 
+    icon: CreditCard, 
+    label: 'Payments', 
+    path: '/bd/payments', 
+    module: 'payments' 
+  },
+  { 
+    icon: BarChart3, 
+    label: 'Reports', 
+    path: '/bd/reports', 
+    module: 'reports' 
+  },
+  { 
+    icon: Settings, 
+    label: 'Settings', 
+    path: '/bd/settings', 
+    module: 'bd_settings' 
+  },
 ];
 
 export function Sidebar({ panel }: SidebarProps) {
   const location = useLocation();
   
-  const navItems = panel === 'admin' 
-    ? adminNavItems 
-    : panel === 'hr' 
-    ? hrNavItems 
-    : bdNavItems;
+  // Get permissions from localStorage
+  const permissions = JSON.parse(
+    localStorage.getItem("permissions") || "[]"
+  );
 
+  const user = getUser();
+  
+  // Get nav items based on panel
+  const getNavItems = () => {
+    switch(panel) {
+      case 'admin':
+        return adminNavItems;
+      case 'hr':
+        return hrNavItems;
+      case 'bd':
+        return bdNavItems;
+      default:
+        return [];
+    }
+  };
+  
+  const navItems = getNavItems();
+  
   const panelConfig = {
     admin: { label: 'Admin Panel' },
     hr: { label: 'HR Panel' },
     bd: { label: 'BD Panel' },
   };
 
-  const user = getUser()
+  // Function to check if a nav item should be visible
+  const shouldShowNavItem = (module: string): boolean => {
+    // Always show BD dashboard for BD panel
+    if (panel === 'bd' && module === 'bd_dashboard') {
+      return true;
+    }
+    if (panel === 'bd' && module === 'bd_settings') {
+      return true;
+    }
+    
+    // Check module permission
+    if (module) {
+      return hasModulePermission(permissions, module);
+    }
+    
+    return true;
+  };
+
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 sidebar-gradient border-r border-sidebar-border">
       <div className="flex h-full flex-col">
@@ -94,6 +255,11 @@ export function Sidebar({ panel }: SidebarProps) {
               const isActive = location.pathname === item.path || 
                 (item.path !== `/${panel}` && location.pathname.startsWith(item.path));
               
+              // Check if item should be visible
+              if (!shouldShowNavItem(item.module)) {
+                return null;
+              }
+              
               return (
                 <li key={item.path}>
                   <NavLink
@@ -110,7 +276,7 @@ export function Sidebar({ panel }: SidebarProps) {
                   </NavLink>
                 </li>
               );
-            })}
+            }).filter(Boolean)} {/* Remove null items */}
           </ul>
         </nav>
 
@@ -118,10 +284,12 @@ export function Sidebar({ panel }: SidebarProps) {
         <div className="p-4 border-t border-sidebar-border">
           <div className="flex items-center gap-3 px-2">
             <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center">
-              <span className="text-xs font-medium text-sidebar-foreground">JD</span>
+              <span className="text-xs font-medium text-sidebar-foreground">
+                {user.name?.charAt(0)?.toUpperCase() || 'U'}
+              </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">John Doe</p>
+              <p className="text-sm font-medium text-sidebar-foreground truncate">{user.name}</p>
               <p className="text-xs text-sidebar-foreground/60 truncate capitalize">{panel}</p>
             </div>
           </div>

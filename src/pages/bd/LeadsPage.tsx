@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DuplicateLeadsModal } from '@/components/modal/DuplicateLeadsModal';
+import { CopyCheck } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -18,12 +20,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ChangeStageModal } from '@/components/ChangeStageModal';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Search, 
-  Plus, 
-  MoreHorizontal, 
-  Edit, 
-  Eye, 
+import {
+  Search,
+  Plus,
+  MoreHorizontal,
+  Edit,
+  Eye,
   Download,
   RefreshCw,
   Loader2,
@@ -45,7 +47,8 @@ import {
   Square,
   Filter,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  AlertTriangle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -72,6 +75,8 @@ import { ProgressModal } from '@/components/modal/ProgressModal';
 import { CSVUploadModal } from '@/components/modal/CSVUploadModal';
 import { SearchableSelect } from '@/components/modal/SearchableSelect';
 import { hasPermission } from '@/utils/permissions';
+import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
+
 interface LeadType {
   _id: string;
   leadId: number;
@@ -96,7 +101,9 @@ interface LeadType {
     _id: string;
     name: string;
     email: string;
+    employeeId:number;
   };
+  reason: string;
 }
 
 interface LeadHistoryType {
@@ -135,6 +142,11 @@ interface UserType {
   _id: string;
   name: string;
   email: string;
+  role?: {
+    _id: string;
+    name: string;
+  }
+  employeeId: number;
   profile?: {
   };
 }
@@ -147,6 +159,7 @@ interface LeadForm {
   stageId: string;
   source_campaign?: string;
   assignedTo?: string;
+  reason?: string;
 }
 
 interface BulkLead {
@@ -157,6 +170,7 @@ interface BulkLead {
   stageId: string;
   source_campaign?: string;
   assignedTo?: string;
+  reason?: string;
 }
 
 interface Filters {
@@ -187,15 +201,15 @@ export function BDLeadsPage() {
   const [users, setUsers] = useState<UserType[]>([]);
   const [leadHistory, setLeadHistory] = useState<LeadHistoryType[]>([]);
   const [changeStageModalOpen, setChangeStageModalOpen] = useState(false);
-const [actionsModalOpen, setActionsModalOpen] = useState(false);
-const [changingStage, setChangingStage] = useState(false);
-  
+  const [actionsModalOpen, setActionsModalOpen] = useState(false);
+  const [changingStage, setChangingStage] = useState(false);
+  const [assignReason, setAssignReason] = useState('');
   // Pagination
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalLeads, setTotalLeads] = useState(0);
-  
+const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
 
   // Filters
   const [filters, setFilters] = useState<Filters>({
@@ -211,7 +225,7 @@ const [changingStage, setChangingStage] = useState(false);
     fromDate: '',
     toDate: ''
   });
-  
+
   // Modal states
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [bulkLeadOpen, setBulkLeadOpen] = useState(false);
@@ -224,15 +238,16 @@ const [changingStage, setChangingStage] = useState(false);
   const [selectedLead, setSelectedLead] = useState<LeadType | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<'active' | 'lost' | 'converted'>('active');
   const [selectedUser, setSelectedUser] = useState<string>('');
-  
+
   // Selection states
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [isAssignmentMode, setIsAssignmentMode] = useState(false);
-  
+
   const permissions = JSON.parse(
-  localStorage.getItem("permissions") || "[]"
-);
+    localStorage.getItem("permissions") || "[]"
+  );
+  const user =JSON.parse(localStorage.getItem("user"));
   // Form states
   const [leadForm, setLeadForm] = useState<LeadForm>({
     name: '',
@@ -241,16 +256,17 @@ const [changingStage, setChangingStage] = useState(false);
     source: 'manual',
     stageId: '696cadcadcbcf508621922e6',
     source_campaign: '',
-    assignedTo: ''
+    assignedTo: user.id,
+    reason: 'New Lead Assigned'
   });
-  
+
   const [bulkLeads, setBulkLeads] = useState<BulkLead[]>([
-    { name: '', phone: '', email: '', source: 'manual', stageId: '696cadcadcbcf508621922e6', assignedTo: '' }
+    { name: '', phone: '', email: '', source: 'manual', stageId: '696cadcadcbcf508621922e6', assignedTo: '', reason: '' }
   ]);
-  
+
   // Progress tracking
   const [progressItems, setProgressItems] = useState<ProgressItem[]>([]);
-  
+
   // Loading states
   const [addingLead, setAddingLead] = useState(false);
   const [addingBulkLeads, setAddingBulkLeads] = useState(false);
@@ -260,10 +276,10 @@ const [changingStage, setChangingStage] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingStages, setLoadingStages] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  
+
   // Filter visibility
   const [showFilters, setShowFilters] = useState(false);
-  
+
   const [assignUserId, setAssignUserId] = useState<string>('');
 
   // Build query params
@@ -281,18 +297,18 @@ const [changingStage, setChangingStage] = useState(false);
     if (filters.stageId && filters.stageId !== "all") params.stageId = filters.stageId;
     if (filters.assignedTo && filters.assignedTo !== "all") params.assignedTo = filters.assignedTo;
     if (filters.modifiedBy && filters.modifiedBy !== "all") params.modifiedBy = filters.modifiedBy;
-    
+
     if (filters.isActive && filters.isActive !== "all") {
-      params.isActive = filters.isActive === "true" ? true : 
-                       filters.isActive === "false" ? false : filters.isActive;
+      params.isActive = filters.isActive === "true" ? true :
+        filters.isActive === "false" ? false : filters.isActive;
     }
-    
+
     if (filters.sort && filters.sort !== "all") params.sort = filters.sort;
-    
+
     if (filters.dateFilter && filters.dateFilter !== "all") {
       params.dateFilter = filters.dateFilter;
     }
-    
+
     if (filters.fromDate && filters.fromDate !== "all") params.fromDate = filters.fromDate;
     if (filters.toDate && filters.toDate !== "all") params.toDate = filters.toDate;
 
@@ -305,7 +321,7 @@ const [changingStage, setChangingStage] = useState(false);
       setLoading(true);
       const queryParams = buildQueryParams();
       const response = await getDataHandlerWithToken("getAllLeads", queryParams, null);
-      
+
       if (response?.data) {
         setLeads(response.data);
         setTotalLeads(response.meta.total);
@@ -350,11 +366,11 @@ const [changingStage, setChangingStage] = useState(false);
         setUsers(response);
       }
     } catch (error) {
-      // toast({
-      //   title: "Error",
-      //   description: "Failed to fetch users",
-      //   variant: "destructive",
-      // });
+      toast({
+        title: "Error",
+        description: "Failed to fetch users",
+        variant: "destructive",
+      });
     } finally {
       setLoadingUsers(false);
     }
@@ -380,32 +396,32 @@ const [changingStage, setChangingStage] = useState(false);
     }
   };
 
-  const handleStageSubmit = async (leadId:string,stageId: string) => {
-  if (!selectedLead) return;
-  
-  try {
-    setChangingStage(true);
-    const endpoint = ApiConfig.changeStageLead(leadId);
-    const response = await patchTokenDataHandler(endpoint, { stageId }, true);
-    
-    toast({
-      title: "Success",
-      description: response?.message || "Lead stage updated successfully",
-    });
-    
-    setChangeStageModalOpen(false);
-    setActionsModalOpen(false);
-    fetchLeads();
-  } catch (error: any) {
-    toast({
-      title: "Error",
-      description: error.response?.data?.message || "Failed to update lead stage",
-      variant: "destructive",
-    });
-  } finally {
-    setChangingStage(false);
-  }
-};
+  const handleStageSubmit = async (leadId: string, stageId: string) => {
+    if (!selectedLead) return;
+
+    try {
+      setChangingStage(true);
+      const endpoint = ApiConfig.changeStageLead(leadId);
+      const response = await patchTokenDataHandler(endpoint, { stageId }, true);
+
+      toast({
+        title: "Success",
+        description: response?.message || "Lead stage updated successfully",
+      });
+
+      setChangeStageModalOpen(false);
+      setActionsModalOpen(false);
+      fetchLeads();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to update lead stage",
+        variant: "destructive",
+      });
+    } finally {
+      setChangingStage(false);
+    }
+  };
 
   // Initialize data
   useEffect(() => {
@@ -435,18 +451,19 @@ const [changingStage, setChangingStage] = useState(false);
     try {
       setAddingLead(true);
       const dataToSend = { ...leadForm };
+      console.log(dataToSend)
       // Remove assignedTo if empty
-      if (!dataToSend.assignedTo) {
-        delete dataToSend.assignedTo;
-      }
-      
+      // if (!dataToSend.assignedTo) {
+      //   delete dataToSend.assignedTo;
+      // }
+
       const response = await postDataHandlerWithToken("createNewLead", dataToSend);
-      
+
       toast({
         title: "Success",
         description: response?.message || "Lead created successfully",
       });
-      
+
       setLeadForm({
         name: '',
         phone: '',
@@ -469,20 +486,54 @@ const [changingStage, setChangingStage] = useState(false);
     }
   };
 
-  // Add bulk leads with progress tracking
+  const isBulkLeadFormValid = () => {
+    // Check if there's at least one valid lead
+    const validLeads = bulkLeads.filter(lead =>
+      lead.name && lead.phone && lead.email && lead.stageId
+    );
+
+    if (validLeads.length === 0) return false;
+
+    // Check if all leads with assigned users have reasons
+    for (const lead of validLeads) {
+      const hasAssignedUser = lead.assignedTo && lead.assignedTo.trim() !== "" && lead.assignedTo !== " ";
+      if (hasAssignedUser && (!lead.reason || !lead.reason.trim())) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  // Update the handleAddBulkLeads function
   const handleAddBulkLeads = async () => {
     try {
       setAddingBulkLeads(true);
       setProgressModalOpen(true);
-      
-      const validLeads = bulkLeads.filter(lead => 
+
+      const validLeads = bulkLeads.filter(lead =>
         lead.name && lead.phone && lead.email && lead.stageId
       );
-      
+
       if (validLeads.length === 0) {
         toast({
           title: "Error",
           description: "Please add at least one valid lead",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate that assigned leads have reasons
+      const leadsWithoutReason = validLeads.filter(lead => {
+        const hasAssignedUser = lead.assignedTo && lead.assignedTo.trim() !== "" && lead.assignedTo !== " ";
+        return hasAssignedUser && (!lead.reason || !lead.reason.trim());
+      });
+
+      if (leadsWithoutReason.length > 0) {
+        toast({
+          title: "Error",
+          description: "Please provide a reason for assigned leads",
           variant: "destructive",
         });
         return;
@@ -499,30 +550,35 @@ const [changingStage, setChangingStage] = useState(false);
       // Process leads one by one
       for (let i = 0; i < validLeads.length; i++) {
         const lead = validLeads[i];
-        
+
         // Update progress to processing
-        setProgressItems(prev => prev.map((item, idx) => 
+        setProgressItems(prev => prev.map((item, idx) =>
           idx === i ? { ...item, status: 'processing' } : item
         ));
 
         try {
-          const dataToSend = { ...lead };
+          const dataToSend: any = { ...lead };
+
           // Remove assignedTo if empty
-          if (!dataToSend.assignedTo) {
+          if (!dataToSend.assignedTo || dataToSend.assignedTo === "" || dataToSend.assignedTo === " ") {
             delete dataToSend.assignedTo;
+            delete dataToSend.reason;
+          } else {
+            // Include reason when user is assigned
+            dataToSend.reason = dataToSend.reason || "Bulk lead creation assignment";
           }
-          
+
           await postDataHandlerWithToken("createNewLead", dataToSend);
-          
+
           // Update progress to success
-          setProgressItems(prev => prev.map((item, idx) => 
+          setProgressItems(prev => prev.map((item, idx) =>
             idx === i ? { ...item, status: 'success' } : item
           ));
         } catch (error: any) {
           // Update progress to error
-          setProgressItems(prev => prev.map((item, idx) => 
-            idx === i ? { 
-              ...item, 
+          setProgressItems(prev => prev.map((item, idx) =>
+            idx === i ? {
+              ...item,
               status: 'error',
               message: error.response?.data?.message || "Failed to create lead"
             } : item
@@ -534,15 +590,15 @@ const [changingStage, setChangingStage] = useState(false);
         title: "Bulk Upload Complete",
         description: `${validLeads.length} leads processed`,
       });
-      
+
       // Reset form after delay
       setTimeout(() => {
-        setBulkLeads([{ name: '', phone: '', email: '', source: 'manual', stageId: '', assignedTo: '' }]);
+        setBulkLeads([{ name: '', phone: '', email: '', source: 'manual', stageId: '696cadcadcbcf508621922e6', assignedTo: '', reason: '' }]);
         setBulkLeadOpen(false);
         setProgressModalOpen(false);
         fetchLeads();
       }, 2000);
-      
+
     } catch (error: any) {
       toast({
         title: "Error",
@@ -557,17 +613,17 @@ const [changingStage, setChangingStage] = useState(false);
   // Update lead
   const handleUpdateLead = async () => {
     if (!selectedLead) return;
-    
+
     try {
       setUpdatingLead(true);
       const endpoint = ApiConfig.updateLead(selectedLead._id);
       const response = await patchTokenDataHandler(endpoint, leadForm, true);
-      
+
       toast({
         title: "Success",
         description: response?.message || "Lead updated successfully",
       });
-      
+
       setEditLeadOpen(false);
       setSelectedLead(null);
       fetchLeads();
@@ -585,17 +641,17 @@ const [changingStage, setChangingStage] = useState(false);
   // Update lead status
   const handleUpdateStatus = async () => {
     if (!selectedLead) return;
-    
+
     try {
       setUpdatingStatus(true);
       const endpoint = ApiConfig.changeStatusLead(selectedLead._id);
       const response = await patchTokenDataHandler(endpoint, { status: selectedStatus }, true);
-      
+
       toast({
         title: "Success",
         description: response?.message || "Lead status updated successfully",
       });
-      
+
       setStatusModalOpen(false);
       setSelectedLead(null);
       fetchLeads();
@@ -620,18 +676,20 @@ const [changingStage, setChangingStage] = useState(false);
       });
       return;
     }
-    
+
     // Prepare data for API
     const dataToSend: any = {
-      leadIds: selectedLeads
+      leadIds: selectedLeads,
+      reason: assignReason.trim()
     };
-    
+
     // Add assignedTo if user is selected
     if (assignUserId && assignUserId !== "") {
       dataToSend.assignedTo = assignUserId;
+
     }
-    
-    
+
+
     // If no user
     if (!assignUserId) {
       toast({
@@ -641,21 +699,21 @@ const [changingStage, setChangingStage] = useState(false);
       });
       return;
     }
-    
+
     try {
       setAssigningLeads(true);
-      
+
       const response = await patchTokenDataHandler("assignLead", dataToSend);
-      
+
       toast({
         title: "Success",
         description: response?.message || "Leads assigned successfully",
       });
-      
+
       // Reset modal state
       setAssignModalOpen(false);
       setAssignUserId('');
-      
+
       // Refresh leads
       fetchLeads();
     } catch (error: any) {
@@ -674,7 +732,7 @@ const [changingStage, setChangingStage] = useState(false);
   const handleViewLead = (lead: LeadType) => {
     setSelectedLead(lead);
     setViewLeadOpen(true);
-    fetchLeadHistory(lead._id);
+    fetchLeadHistory(lead.leadId.toString());
   };
 
   // Edit lead
@@ -694,8 +752,8 @@ const [changingStage, setChangingStage] = useState(false);
 
   // Toggle lead selection
   const toggleLeadSelection = (leadId: string) => {
-    setSelectedLeads(prev => 
-      prev.includes(leadId) 
+    setSelectedLeads(prev =>
+      prev.includes(leadId)
         ? prev.filter(id => id !== leadId)
         : [...prev, leadId]
     );
@@ -703,7 +761,7 @@ const [changingStage, setChangingStage] = useState(false);
 
   // Add bulk lead row
   const addBulkLeadRow = () => {
-    setBulkLeads([...bulkLeads, { name: '', phone: '', email: '', source: 'manual', stageId: '696cadcadcbcf508621922e6', assignedTo: '' }]);
+    setBulkLeads([...bulkLeads, { name: '', phone: '', email: '', source: 'manual', stageId: '696cadcadcbcf508621922e6', assignedTo: '', reason: '' }]);
   };
 
   // Remove bulk lead row
@@ -878,6 +936,8 @@ const [changingStage, setChangingStage] = useState(false);
         lead.healthScore,
         lead.assignedTo?.name || "",
         lead.assignedTo?.email || "",
+        lead.assignedTo?.employeeId || "",
+        lead.reason || "",
         new Date(lead.createdAt).toLocaleString(),
         new Date(lead.modifiedAt).toLocaleString(),
         lead.isActive ? "Yes" : "No"
@@ -894,11 +954,11 @@ const [changingStage, setChangingStage] = useState(false);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      
+
       // Generate filename
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
       const filename = `leads_page_${page}_${timestamp}.csv`;
-      
+
       link.setAttribute("download", filename);
       document.body.appendChild(link);
       link.click();
@@ -933,18 +993,18 @@ const [changingStage, setChangingStage] = useState(false);
       if (filters.stageId && filters.stageId !== "all") queryParams.stageId = filters.stageId;
       if (filters.assignedTo && filters.assignedTo !== "all") queryParams.assignedTo = filters.assignedTo;
       if (filters.modifiedBy && filters.modifiedBy !== "all") queryParams.modifiedBy = filters.modifiedBy;
-      
+
       if (filters.isActive && filters.isActive !== "all") {
-        queryParams.isActive = filters.isActive === "true" ? true : 
-                             filters.isActive === "false" ? false : filters.isActive;
+        queryParams.isActive = filters.isActive === "true" ? true :
+          filters.isActive === "false" ? false : filters.isActive;
       }
-      
+
       if (filters.sort && filters.sort !== "all") queryParams.sort = filters.sort;
-      
+
       if (filters.dateFilter && filters.dateFilter !== "all") {
         queryParams.dateFilter = filters.dateFilter;
       }
-      
+
       if (filters.fromDate && filters.fromDate !== "all") queryParams.fromDate = filters.fromDate;
       if (filters.toDate && filters.toDate !== "all") queryParams.toDate = filters.toDate;
 
@@ -959,13 +1019,13 @@ const [changingStage, setChangingStage] = useState(false);
       });
 
       const response = await getDataHandlerWithToken("getAllLeads", queryParams, null);
-      
+
       if (!response?.data) {
         throw new Error("No data to export");
       }
 
       const leadsData = response.data;
-      
+
       // Define CSV headers
       const headers = [
         "ID",
@@ -995,6 +1055,7 @@ const [changingStage, setChangingStage] = useState(false);
         lead.healthScore,
         lead.assignedTo?.name || "",
         lead.assignedTo?.email || "",
+        lead.assignedTo?.employeeId || "",
         new Date(lead.createdAt).toLocaleString(),
         new Date(lead.modifiedAt).toLocaleString(),
         lead.isActive ? "Yes" : "No"
@@ -1011,16 +1072,16 @@ const [changingStage, setChangingStage] = useState(false);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      
+
       // Generate filename with timestamp
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
       const filterInfo = [];
       if (filters.search) filterInfo.push(`search-${filters.search}`);
       if (filters.status !== "all") filterInfo.push(`status-${filters.status}`);
       if (filters.source !== "all") filterInfo.push(`source-${filters.source}`);
-      
+
       const filename = `leads_export_${timestamp}${filterInfo.length > 0 ? `_${filterInfo.join('_')}` : ''}.csv`;
-      
+
       link.setAttribute("download", filename);
       document.body.appendChild(link);
       link.click();
@@ -1050,358 +1111,355 @@ const [changingStage, setChangingStage] = useState(false);
           <h1 className="text-2xl font-bold text-foreground">Lead Management</h1>
           <p className="text-muted-foreground">Manage and track all leads in your pipeline</p>
         </div>
-        <div className="flex items-center gap-2">    
+        <div className="flex items-center gap-2">
           {hasPermission(permissions, 'leads', 'assign') && (
-          isAssignmentMode ? (
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="bg-blue-50">
-                {selectedLeads.length} leads selected
-              </Badge>
-              <Button
-                variant="outline"
-                onClick={toggleAssignmentMode}
-                disabled={assigningLeads}
-              >
-                <X className="w-4 h-4 mr-2" />
-                Cancel Selection
-              </Button>
-              <Button
-                onClick={() => setAssignModalOpen(true)}
-                disabled={selectedLeads.length === 0 || assigningLeads}
-              >
-                {assigningLeads ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Users className="w-4 h-4 mr-2" />
-                )}
-                Assign Selected ({selectedLeads.length})
-              </Button>
-            </div>
-          ) : (
-            
-            <Button onClick={toggleAssignmentMode}>
-              <Users className="w-4 h-4 mr-2" />
-              Lead Assignments
-            </Button>
-          )
-          )}
-          
-          {hasPermission(permissions, 'leads', 'create') && (
-          <>
-          <Dialog open={bulkLeadOpen} onOpenChange={setBulkLeadOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <FileUp className="w-4 h-4 mr-2" />
-                Bulk Lead
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Add Bulk Leads</DialogTitle>
-                <DialogDescription>
-                  Add multiple leads at once. Fill in the details for each lead.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                {bulkLeads.map((lead, index) => (
-                  <Card key={index} className="relative">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm">Lead #{index + 1}</CardTitle>
-                        {bulkLeads.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeBulkLeadRow(index)}
-                            className="h-6 w-6 p-0"
-                          >
-                            ×
-                          </Button>
-                        )}
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Name *</Label>
-                          <Input
-                            value={lead.name}
-                            onChange={(e) => updateBulkLeadRow(index, 'name', e.target.value)}
-                            placeholder="John Doe"
-                            disabled={addingBulkLeads}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Phone *</Label>
-                          <Input
-                            value={lead.phone}
-                            onChange={(e) => updateBulkLeadRow(index, 'phone', e.target.value)}
-                            placeholder="1234567890"
-                            disabled={addingBulkLeads}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Email *</Label>
-                          <Input
-                            type="email"
-                            value={lead.email}
-                            onChange={(e) => updateBulkLeadRow(index, 'email', e.target.value)}
-                            placeholder="john@company.com"
-                            disabled={addingBulkLeads}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Source *</Label>
-                          <Select
-                            value={lead.source}
-                            onValueChange={(value) => updateBulkLeadRow(index, 'source', value)}
-                            disabled={addingBulkLeads}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select source" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="manual">Manual</SelectItem>
-                              <SelectItem value="facebook">Facebook</SelectItem>
-                              <SelectItem value="google">Google</SelectItem>
-                              <SelectItem value="api">API</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Stage *</Label>
-                          <Select
-                            value={lead.stageId}
-                            onValueChange={(value) => updateBulkLeadRow(index, 'stageId', value)}
-                            disabled={addingBulkLeads || loadingStages}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select stage" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {loadingStages ? (
-                                <div className="py-2 text-center">
-                                  <Loader2 className="w-4 h-4 mx-auto animate-spin" />
-                                </div>
-                              ) : (
-                                stages.map((stage) => (
-                                  <SelectItem key={stage._id} value={stage._id}>
-                                    {stage.name}
-                                  </SelectItem>
-                                ))
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Campaign (Optional)</Label>
-                          <Input
-                            value={lead.source_campaign || ''}
-                            onChange={(e) => updateBulkLeadRow(index, 'source_campaign', e.target.value)}
-                            placeholder="Campaign name"
-                            disabled={addingBulkLeads}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Assign To (Optional)</Label>
-                          <Select
-                            value={lead.assignedTo || ''}
-                            onValueChange={(value) => updateBulkLeadRow(index, 'assignedTo', value)}
-                            disabled={addingBulkLeads || loadingUsers}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select user" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value=" ">Not assigned</SelectItem>
-                              {users.map((user) => (
-                                <SelectItem key={user._id} value={user._id}>
-                                  {user.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-                
+            isAssignmentMode ? (
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="bg-blue-50">
+                  {selectedLeads.length} leads selected
+                </Badge>
                 <Button
-                  type="button"
                   variant="outline"
-                  onClick={addBulkLeadRow}
-                  disabled={addingBulkLeads}
-                  className="w-full"
+                  onClick={toggleAssignmentMode}
+                  disabled={assigningLeads}
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Another Lead
+                  <X className="w-4 h-4 mr-2" />
+                  Cancel Selection
                 </Button>
+                <Button
+                  onClick={() => setAssignModalOpen(true)}
+                  disabled={selectedLeads.length === 0 || assigningLeads}
+                >
+                  {assigningLeads ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Users className="w-4 h-4 mr-2" />
+                  )}
+                  Assign Selected ({selectedLeads.length})
+                </Button>
+              </div>
+            ) : (
 
-                <div className="pt-4 border-t">
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => setCsvUploadOpen(true)}
-                      disabled={addingBulkLeads}
-                      className="flex-1"
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      Upload CSV File
-                    </Button>
+              <Button onClick={toggleAssignmentMode}>
+                <Users className="w-4 h-4 mr-2" />
+                Lead Assignments
+              </Button>
+            )
+          )}
+
+           {hasPermission(permissions, 'leads', 'update') && (
+    <Button
+      variant="outline"
+      onClick={() => setDuplicateModalOpen(true)}
+    >
+      <CopyCheck className="w-4 h-4 mr-2" />
+      Find Duplicates
+    </Button>
+  )}
+
+          {hasPermission(permissions, 'leads', 'create') && (
+            <>
+              <Dialog open={bulkLeadOpen} onOpenChange={setBulkLeadOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <FileUp className="w-4 h-4 mr-2" />
+                    Bulk Lead
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Add Bulk Leads</DialogTitle>
+                    <DialogDescription>
+                      Add multiple leads at once. Fill in the details for each lead.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    {bulkLeads.map((lead, index) => {
+                      const hasAssignedUser = lead.assignedTo && lead.assignedTo.trim() !== "" && lead.assignedTo !== " ";
+                      return (
+                        <Card key={index} className="relative">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-sm">Lead #{index + 1}</CardTitle>
+                              {bulkLeads.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeBulkLeadRow(index)}
+                                  className="h-6 w-6 p-0"
+                                >
+                                  ×
+                                </Button>
+                              )}
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Name *</Label>
+                                <Input
+                                  value={lead.name}
+                                  onChange={(e) => updateBulkLeadRow(index, 'name', e.target.value)}
+                                  placeholder="John Doe"
+                                  disabled={addingBulkLeads}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Phone *</Label>
+                                <Input
+                                  value={lead.phone}
+                                  onChange={(e) => updateBulkLeadRow(index, 'phone', e.target.value)}
+                                  placeholder="1234567890"
+                                  disabled={addingBulkLeads}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Email *</Label>
+                                <Input
+                                  type="email"
+                                  value={lead.email}
+                                  onChange={(e) => updateBulkLeadRow(index, 'email', e.target.value)}
+                                  placeholder="john@company.com"
+                                  disabled={addingBulkLeads}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Source *</Label>
+                                <Select
+                                  value={lead.source}
+                                  onValueChange={(value) => updateBulkLeadRow(index, 'source', value)}
+                                  disabled={addingBulkLeads}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select source" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="manual">Manual</SelectItem>
+                                    <SelectItem value="facebook">Facebook</SelectItem>
+                                    <SelectItem value="google">Google</SelectItem>
+                                    <SelectItem value="api">API</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Stage *</Label>
+                                <Select
+                                  value={lead.stageId}
+                                  onValueChange={(value) => updateBulkLeadRow(index, 'stageId', value)}
+                                  disabled={addingBulkLeads || loadingStages}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select stage" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {loadingStages ? (
+                                      <div className="py-2 text-center">
+                                        <Loader2 className="w-4 h-4 mx-auto animate-spin" />
+                                      </div>
+                                    ) : (
+                                      stages.map((stage) => (
+                                        <SelectItem key={stage._id} value={stage._id}>
+                                          {stage.name}
+                                        </SelectItem>
+                                      ))
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Campaign (Optional)</Label>
+                                <Input
+                                  value={lead.source_campaign || ''}
+                                  onChange={(e) => updateBulkLeadRow(index, 'source_campaign', e.target.value)}
+                                  placeholder="Campaign name"
+                                  disabled={addingBulkLeads}
+                                />
+                              </div>
+
+                              {/* Reason field - only shown when user is assigned */}
+                              {hasAssignedUser && (
+                                <div className="space-y-2 col-span-2">
+                                  <Label htmlFor={`reason-${index}`}>
+                                    Reason for Assignment *
+                                    <span className="text-xs text-muted-foreground ml-1">
+                                      (Required when assigning a user)
+                                    </span>
+                                  </Label>
+                                  <textarea
+                                    id={`reason-${index}`}
+                                    value={lead.reason || ''}
+                                    onChange={(e) => updateBulkLeadRow(index, 'reason', e.target.value)}
+                                    placeholder="Enter reason for assigning this lead..."
+                                    className="w-full min-h-[60px] p-2 border rounded-md text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                                    disabled={addingBulkLeads}
+                                    rows={2}
+                                  />
+                                  <p className="text-xs text-muted-foreground">
+                                    This reason will be recorded in the lead history.
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={downloadCSVTemplate}
-                      className="flex-1"
+                      onClick={addBulkLeadRow}
+                      disabled={addingBulkLeads}
+                      className="w-full"
                     >
-                      <FileDown className="w-4 h-4 mr-2" />
-                      Download Template
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Another Lead
                     </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground text-center mt-2">
-                    * Required fields
-                  </p>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setBulkLeadOpen(false)} disabled={addingBulkLeads}>
-                  Cancel
-                </Button>
-                <Button onClick={handleAddBulkLeads} disabled={addingBulkLeads}>
-                  {addingBulkLeads ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    'Create Leads'
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
 
-          <Dialog open={newLeadOpen} onOpenChange={setNewLeadOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Add New Lead
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Add New Lead</DialogTitle>
-                <DialogDescription>
-                  Fill in the details to create a new lead.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Name *</Label>
-                    <Input
-                      id="name"
-                      value={leadForm.name}
-                      onChange={(e) => setLeadForm({...leadForm, name: e.target.value})}
-                      placeholder="John Doe"
-                      disabled={addingLead}
-                    />
+                    <div className="pt-4 border-t">
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => setCsvUploadOpen(true)}
+                          disabled={addingBulkLeads}
+                          className="flex-1"
+                        >
+                          <Upload className="w-4 h-4 mr-2" />
+                          Upload CSV File
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={downloadCSVTemplate}
+                          className="flex-1"
+                        >
+                          <FileDown className="w-4 h-4 mr-2" />
+                          Download Template
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground text-center mt-2">
+                        * Required fields
+                      </p>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone *</Label>
-                    <Input
-                      id="phone"
-                      value={leadForm.phone}
-                      onChange={(e) => setLeadForm({...leadForm, phone: e.target.value})}
-                      placeholder="1234567890"
-                      disabled={addingLead}
-                    />
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setBulkLeadOpen(false)} disabled={addingBulkLeads}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleAddBulkLeads} disabled={addingBulkLeads || !isBulkLeadFormValid()}>
+                      {addingBulkLeads ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        'Create Leads'
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={newLeadOpen} onOpenChange={setNewLeadOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add New Lead
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[500px]">
+                  <DialogHeader>
+                    <DialogTitle>Add New Lead</DialogTitle>
+                    <DialogDescription>
+                      Fill in the details to create a new lead.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Name *</Label>
+                        <Input
+                          id="name"
+                          value={leadForm.name}
+                          onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })}
+                          placeholder="John Doe"
+                          disabled={addingLead}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">Phone *</Label>
+                        <Input
+                          id="phone"
+                          value={leadForm.phone}
+                          onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })}
+                          placeholder="1234567890"
+                          disabled={addingLead}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email *</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={leadForm.email}
+                        onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })}
+                        placeholder="john@company.com"
+                        disabled={addingLead}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="source">Source *</Label>
+                        <Select
+                          value={leadForm.source}
+                          onValueChange={(value) => setLeadForm({ ...leadForm, source: value })}
+                          disabled={addingLead}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select source" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="manual">Manual</SelectItem>
+                            <SelectItem value="facebook">Facebook</SelectItem>
+                            <SelectItem value="google">Google</SelectItem>
+                            <SelectItem value="api">API</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="source_campaign">Campaign (Optional)</Label>
+                        <Input
+                          id="source_campaign"
+                          value={leadForm.source_campaign || ''}
+                          onChange={(e) => setLeadForm({ ...leadForm, source_campaign: e.target.value })}
+                          placeholder="Campaign name"
+                          disabled={addingLead}
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={leadForm.email}
-                    onChange={(e) => setLeadForm({...leadForm, email: e.target.value})}
-                    placeholder="john@company.com"
-                    disabled={addingLead}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="source">Source *</Label>
-                    <Select
-                      value={leadForm.source}
-                      onValueChange={(value) => setLeadForm({...leadForm, source: value})}
-                      disabled={addingLead}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select source" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="manual">Manual</SelectItem>
-                        <SelectItem value="facebook">Facebook</SelectItem>
-                        <SelectItem value="google">Google</SelectItem>
-                        <SelectItem value="api">API</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="source_campaign">Campaign (Optional)</Label>
-                    <Input
-                      id="source_campaign"
-                      value={leadForm.source_campaign || ''}
-                      onChange={(e) => setLeadForm({...leadForm, source_campaign: e.target.value})}
-                      placeholder="Campaign name"
-                      disabled={addingLead}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="assignedTo">Assign To (Optional)</Label>
-                  <Select
-                    value={leadForm.assignedTo || ''}
-                    onValueChange={(value) => setLeadForm({...leadForm, assignedTo: value})}
-                    disabled={addingLead || loadingUsers}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select user" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value=" ">Not assigned</SelectItem>
-                      {users.map((user) => (
-                        <SelectItem key={user._id} value={user._id}>
-                          {user.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setNewLeadOpen(false)} disabled={addingLead}>
-                  Cancel
-                </Button>
-                <Button onClick={handleAddLead} disabled={addingLead}>
-                  {addingLead ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    'Create Lead'
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          </>
-           )}
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setNewLeadOpen(false)} disabled={addingLead}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleAddLead} disabled={addingLead}>
+                      {addingLead ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        'Create Lead'
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
         </div>
       </div>
 
@@ -1426,7 +1484,7 @@ const [changingStage, setChangingStage] = useState(false);
             </>
           )}
         </Button>
-        
+
         {showFilters && (
           <Button
             variant="outline"
@@ -1451,17 +1509,17 @@ const [changingStage, setChangingStage] = useState(false);
                   <Input
                     placeholder="Search leads..."
                     value={filters.search}
-                    onChange={(e) => setFilters({...filters, search: e.target.value})}
+                    onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                     className="pl-10"
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Status</Label>
                 <Select
                   value={filters.status}
-                  onValueChange={(value) => setFilters({...filters, status: value})}
+                  onValueChange={(value) => setFilters({ ...filters, status: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="All statuses" />
@@ -1474,12 +1532,12 @@ const [changingStage, setChangingStage] = useState(false);
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Source</Label>
                 <Select
                   value={filters.source}
-                  onValueChange={(value) => setFilters({...filters, source: value})}
+                  onValueChange={(value) => setFilters({ ...filters, source: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="All sources" />
@@ -1493,55 +1551,55 @@ const [changingStage, setChangingStage] = useState(false);
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
-                <Label>Stage</Label>
-                <Select
-                  value={filters.stageId}
-                  onValueChange={(value) => setFilters({...filters, stageId: value})}
-                  disabled={loadingStages}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="All stages" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Stages</SelectItem>
-                    {stages.map((stage) => (
-                      <SelectItem key={stage._id} value={stage._id}>
-                        {stage.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+  <Label>Stage</Label>
+  <Select
+    value={filters.stageId}
+    onValueChange={(value) => setFilters({ ...filters, stageId: value })}
+    disabled={loadingStages}
+  >
+    <SelectTrigger>
+      <SelectValue placeholder="All stages" />
+    </SelectTrigger>
+    <SelectContent position="popper" className="max-h-60 overflow-y-auto">
+      <SelectItem value="all">All Stages</SelectItem>
+      {stages.map((stage) => (
+        <SelectItem key={stage._id} value={stage._id}>
+          {stage.name}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
               {hasPermission(permissions, 'user', 'read') && (
-              <div className="space-y-2">
-                <Label>Assigned To</Label>
-                <Select
+                <div className="space-y-2">
+                  <Label>Assigned To</Label>
+                  <SearchableDropdown
+                  options={[
+                    { value: "all", label: "All Users" },
+                    ...users.map(user => ({
+                      value: user._id,
+                      label: user.name,
+                      role: user.role.name,
+                      empId: user.employeeId
+                    }))
+                  ]}
                   value={filters.assignedTo}
-                  onValueChange={(value) => setFilters({...filters, assignedTo: value})}
+                  onValueChange={(value) => setFilters({ ...filters, assignedTo: value })}
+                  placeholder="All Users"
+                  searchPlaceholder="Search user..."
+                  emptyMessage="No users found"
                   disabled={loadingUsers}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="All users" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Users</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user._id} value={user._id}>
-                        {user.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                />
+                </div>
               )}
-              
+
               <div className="space-y-2">
                 <Label>Date Filter</Label>
                 <Select
                   value={filters.dateFilter}
-                  onValueChange={(value) => setFilters({...filters, dateFilter: value})}
+                  onValueChange={(value) => setFilters({ ...filters, dateFilter: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select period" />
@@ -1556,12 +1614,12 @@ const [changingStage, setChangingStage] = useState(false);
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Sort By</Label>
                 <Select
                   value={filters.sort}
-                  onValueChange={(value) => setFilters({...filters, sort: value})}
+                  onValueChange={(value) => setFilters({ ...filters, sort: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -1574,7 +1632,7 @@ const [changingStage, setChangingStage] = useState(false);
                   </SelectContent>
                 </Select>
               </div>
-              
+
               {filters.dateFilter === 'custom' && (
                 <>
                   <div className="space-y-2">
@@ -1582,7 +1640,7 @@ const [changingStage, setChangingStage] = useState(false);
                     <Input
                       type="date"
                       value={filters.fromDate}
-                      onChange={(e) => setFilters({...filters, fromDate: e.target.value})}
+                      onChange={(e) => setFilters({ ...filters, fromDate: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -1590,7 +1648,7 @@ const [changingStage, setChangingStage] = useState(false);
                     <Input
                       type="date"
                       value={filters.toDate}
-                      onChange={(e) => setFilters({...filters, toDate: e.target.value})}
+                      onChange={(e) => setFilters({ ...filters, toDate: e.target.value })}
                     />
                   </div>
                 </>
@@ -1653,33 +1711,33 @@ const [changingStage, setChangingStage] = useState(false);
                 <ChevronRight className="h-4 w-4" />
               </Button>
               {hasPermission(permissions, 'leads', 'export') && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" disabled={loading || totalLeads === 0}>
-                    {loading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem 
-                    onClick={exportToCSV}
-                    disabled={loading || totalLeads === 0}
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Export All Filtered Data ({totalLeads} leads)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={exportCurrentPageToCSV}
-                    disabled={loading || leads.length === 0}
-                  >
-                    <FileSpreadsheet className="mr-2 h-4 w-4" />
-                    Export Current Page ({leads.length} leads)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" disabled={loading || totalLeads === 0}>
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={exportToCSV}
+                      disabled={loading || totalLeads === 0}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Export All Filtered Data ({totalLeads} leads)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={exportCurrentPageToCSV}
+                      disabled={loading || leads.length === 0}
+                    >
+                      <FileSpreadsheet className="mr-2 h-4 w-4" />
+                      Export Current Page ({leads.length} leads)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
           </div>
@@ -1702,101 +1760,101 @@ const [changingStage, setChangingStage] = useState(false);
             </div>
           ) : (
             <div className="overflow-x-auto">
-           <Table>
-  <TableHeader>
-    <TableRow>
-      {isAssignmentMode && (
-        <TableHead className="w-12">
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              checked={selectAll}
-              onChange={() => setSelectAll(!selectAll)}
-              className="h-4 w-4"
-            />
-          </div>
-        </TableHead>
-      )}
-      <TableHead>Lead</TableHead>
-      <TableHead>Contact</TableHead>
-      <TableHead>Source</TableHead>
-      <TableHead>Stage</TableHead>
-      <TableHead>Status</TableHead>
-      {/* <TableHead>Assigned To</TableHead> */}
-    </TableRow>
-  </TableHeader>
-  <TableBody>
-    {leads.map((lead) => (
-      <TableRow 
-        key={lead._id} 
-        className={cn(
-          isAssignmentMode && selectedLeads.includes(lead._id) && "bg-blue-50",
-          "cursor-pointer hover:bg-muted/50" // Add hover effect
-        )}
-        onClick={() => {
-          setSelectedLead(lead);
-          setActionsModalOpen(true);
-        }}
-      >
-        {isAssignmentMode && (
-          <TableCell onClick={(e) => e.stopPropagation()}>
-            <input
-              type="checkbox"
-              checked={selectedLeads.includes(lead._id)}
-              onChange={(e) => {
-                e.stopPropagation();
-                toggleLeadSelection(lead._id);
-              }}
-              className="h-4 w-4"
-            />
-          </TableCell>
-        )}
-        <TableCell>
-          <div className="font-medium">{lead.name}</div>
-          <div className="text-xs text-muted-foreground">
-            ID: {lead.leadId}
-          </div>
-        </TableCell>
-        <TableCell>
-          <div className="space-y-1">
-            <div className="flex items-center gap-1 text-sm">
-              <Phone className="w-3 h-3" />
-              {lead.phone}
-            </div>
-            <div className="flex items-center gap-1 text-sm">
-              <Mail className="w-3 h-3" />
-              {lead.email}
-            </div>
-          </div>
-        </TableCell>
-        <TableCell>{getSourceBadge(lead.source)}</TableCell>
-        <TableCell>
-          <Badge variant="outline">
-            {lead.stageId.name}
-          </Badge>
-        </TableCell>
-        <TableCell>{getStatusBadge(lead.status)}</TableCell>
-        {/* <TableCell>
-          {lead.assignedTo ? (
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-xs font-medium">
-                  {lead.assignedTo.name.charAt(0)}
-                </span>
-              </div>
-              <div>
-                <div className="text-sm font-medium">{lead.assignedTo.name}</div>
-                <div className="text-xs text-muted-foreground">{lead.assignedTo.email}</div>
-              </div>
-            </div>
-          ) : (
-            <span className="text-muted-foreground">Not assigned</span>
-          )}
-        </TableCell> */}
-      </TableRow>
-    ))}
-  </TableBody>
-</Table>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {isAssignmentMode && (
+                      <TableHead className="w-12">
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={selectAll}
+                            onChange={() => setSelectAll(!selectAll)}
+                            className="h-4 w-4"
+                          />
+                        </div>
+                      </TableHead>
+                    )}
+                    <TableHead>Lead</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Stage</TableHead>
+                    <TableHead>Status</TableHead>
+                    {/* <TableHead>Assigned To</TableHead> */}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {leads.map((lead) => (
+                    <TableRow
+                      key={lead._id}
+                      className={cn(
+                        isAssignmentMode && selectedLeads.includes(lead._id) && "bg-blue-50",
+                        "cursor-pointer hover:bg-muted/50" // Add hover effect
+                      )}
+                      onClick={() => {
+                        setSelectedLead(lead);
+                        setActionsModalOpen(true);
+                      }}
+                    >
+                      {isAssignmentMode && (
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedLeads.includes(lead._id)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              toggleLeadSelection(lead._id);
+                            }}
+                            className="h-4 w-4"
+                          />
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <div className="font-medium">{lead.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          ID: {lead.leadId}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1 text-sm">
+                            <Phone className="w-3 h-3" />
+                            {lead.phone}
+                          </div>
+                          <div className="flex items-center gap-1 text-sm">
+                            <Mail className="w-3 h-3" />
+                            {lead.email}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{getSourceBadge(lead.source)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {lead.stageId.name}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(lead.status)}</TableCell>
+                      <TableCell>
+                        {lead.assignedTo ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                              <span className="text-xs font-medium">
+                                {lead.assignedTo.name.charAt(0)}
+                              </span>
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium">{lead.assignedTo.name}</div>
+                              <div className="text-xs text-muted-foreground">{lead.assignedTo.employeeId}</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Not assigned</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           )}
 
@@ -1828,7 +1886,7 @@ const [changingStage, setChangingStage] = useState(false);
                     } else {
                       pageNum = page - 2 + i;
                     }
-                    
+
                     return (
                       <Button
                         key={pageNum}
@@ -1900,86 +1958,214 @@ const [changingStage, setChangingStage] = useState(false);
 
       {/* Assign Leads Modal */}
       <Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Assign Leads</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] h-auto overflow-hidden flex flex-col">
+          {/* Fixed Header */}
+          <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+            <DialogTitle className="text-lg sm:text-xl">Assign Leads</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base">
               Assign {selectedLeads.length} selected leads to a user
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-4">
+
+          {/* Scrollable Content Area */}
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="grid gap-4 sm:gap-5">
               {/* User Selection */}
               <div className="space-y-2">
-                <Label>Select User (Optional)</Label>
-                <SearchableSelect
+                <Label className="text-sm sm:text-base">Select User *</Label>
+                <SearchableDropdown
+                  options={[
+                    { value: "", label: "Select user..." },
+                    ...users.map(user => ({
+                      value: user._id,
+                      label: user.name,
+                      role: user.role?.name || user.role,
+                      empId: user.employeeId,
+                      email: user.email,
+                    }))
+                  ]}
                   value={assignUserId}
-                  onValueChange={(value) => {
-                    setAssignUserId(value);
-                  }}
-                  options={users.map(user => ({
-                    value: user._id,
-                    label: user.name,
-                    email: user.email,
-                  }))}
-                  placeholder="Select user (all users)"
-                  searchPlaceholder="Search user by name, email..."
-                  emptyMessage="No users found."
+                  onValueChange={setAssignUserId}
+                  placeholder="Select user"
+                  searchPlaceholder="Search by name, email, or role..."
+                  emptyMessage="No users found"
                   disabled={assigningLeads || loadingUsers}
-                  showAllOption={false}
+                  allowClear
+                  onClear={() => setAssignUserId("")}
+                  triggerClassName="h-10 sm:h-11 text-sm sm:text-base"
+                  contentClassName="w-full sm:max-w-[var(--radix-popover-trigger-width)]"
                 />
-                
               </div>
-            </div>
-            
-            {/* Validation message */}
-            {!assignUserId && (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                <p className="text-sm text-yellow-800">
-                  Please select a user to assign leads
+
+              {/* Reason Message */}
+              <div className="space-y-2">
+                <Label htmlFor="assignReason" className="text-sm sm:text-base">
+                  Reason for Assignment/Reassignment *
+                </Label>
+                <textarea
+                  id="assignReason"
+                  value={assignReason}
+                  onChange={(e) => setAssignReason(e.target.value)}
+                  placeholder="Enter reason for assigning/reassigning these leads..."
+                  className="w-full min-h-[80px] sm:min-h-[100px] p-3 border rounded-md text-sm sm:text-base resize-y focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={assigningLeads}
+                  required
+                  rows={4}
+                />
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  This reason will be recorded in the lead history.
                 </p>
               </div>
-            )}
-            
-            <div className="p-3 bg-muted rounded-md">
-              <p className="text-sm font-medium">Selected Leads ({selectedLeads.length})</p>
-              <div className="mt-2 max-h-32 overflow-y-auto">
-                {leads
-                  .filter(lead => selectedLeads.includes(lead._id))
-                  .slice(0, 5)
-                  .map(lead => (
-                    <div key={lead._id} className="text-sm py-1 border-b last:border-0">
-                      {lead.name} - {lead.email}
+
+              {/* Validation message */}
+              {(!assignUserId || !assignReason.trim()) && (
+                <div className="p-3 sm:p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs sm:text-sm text-yellow-800">
+                      Please select a user and enter a reason for assignment
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Selected Leads Preview */}
+              <div className="p-3 sm:p-4 bg-muted/50 rounded-lg border">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm sm:text-base font-medium">
+                    Selected Leads ({selectedLeads.length})
+                  </p>
+                  <Badge variant="outline" className="text-xs">
+                    {selectedLeads.length} selected
+                  </Badge>
+                </div>
+
+                <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                  {leads
+                    .filter(lead => selectedLeads.includes(lead._id))
+                    .slice(0, 6)
+                    .map((lead, index) => (
+                      <div
+                        key={lead._id}
+                        className="flex items-center justify-between p-2 bg-background rounded border text-sm"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{lead.name || "Unnamed Lead"}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {lead.email || "No email"} • {lead.phone || "No phone"}
+                          </div>
+                        </div>
+                        <Badge variant="secondary" className="text-xs ml-2 flex-shrink-0">
+                          {lead.stageId?.name || "No stage"}
+                        </Badge>
+                      </div>
+                    ))}
+
+                  {selectedLeads.length > 6 && (
+                    <div className="text-center py-2">
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        + {selectedLeads.length - 6} more lead{selectedLeads.length - 6 > 1 ? 's' : ''}
+                      </p>
                     </div>
-                  ))}
-                {selectedLeads.length > 5 && (
-                  <div className="text-sm py-1 text-muted-foreground">
-                    + {selectedLeads.length - 5} more leads
+                  )}
+
+                  {selectedLeads.length === 0 && (
+                    <div className="text-center py-4">
+                      <p className="text-sm text-muted-foreground">
+                        No leads selected
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {selectedLeads.length > 0 && (
+                  <div className="mt-4 pt-3 border-t">
+                    <div className="grid grid-cols-2 gap-4 text-xs sm:text-sm">
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">Stages:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {Array.from(new Set(
+                            leads
+                              .filter(lead => selectedLeads.includes(lead._id))
+                              .map(lead => lead.stageId?.name)
+                              .filter(Boolean)
+                          )).slice(0, 3).map((stageName, idx) => (
+                            <Badge key={idx} variant="outline" className="text-xs">
+                              {stageName}
+                            </Badge>
+                          ))}
+                          {Array.from(new Set(
+                            leads
+                              .filter(lead => selectedLeads.includes(lead._id))
+                              .map(lead => lead.stageId?.name)
+                              .filter(Boolean)
+                          )).length > 3 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{Array.from(new Set(
+                                  leads
+                                    .filter(lead => selectedLeads.includes(lead._id))
+                                    .map(lead => lead.stageId?.name)
+                                    .filter(Boolean)
+                                )).length - 3} more
+                              </Badge>
+                            )}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">Sources:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {Array.from(new Set(
+                            leads
+                              .filter(lead => selectedLeads.includes(lead._id))
+                              .map(lead => lead.source)
+                              .filter(Boolean)
+                          )).slice(0, 3).map((source, idx) => (
+                            <Badge key={idx} variant="secondary" className="text-xs">
+                              {source}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setAssignModalOpen(false);
-              setAssignUserId('');
-            }} disabled={assigningLeads}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleAssignLeads} 
-              disabled={selectedLeads.length === 0 || assigningLeads || (!assignUserId)}
-            >
-              {assigningLeads ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Assigning...
-                </>
-              ) : (
-                'Assign Now'
-              )}
-            </Button>
+
+          {/* Fixed Footer */}
+          <DialogFooter className="px-6 py-4 border-t shrink-0 bg-background">
+            <div className="flex flex-col relative justify-around sm:flex-row gap-2 w-full">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAssignModalOpen(false);
+                  setAssignUserId('');
+                  setAssignReason('');
+                }}
+                disabled={assigningLeads}
+                className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base px-4 sm:px-6"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAssignLeads}
+                disabled={selectedLeads.length === 0 || assigningLeads || !assignUserId || !assignReason.trim()}
+                className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base px-4 sm:px-6"
+              >
+                {assigningLeads ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Assigning...
+                  </>
+                ) : (
+                  <>
+                    <Users className="mr-2 h-4 w-4" />
+                    Assign Now
+                  </>
+                )}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2053,7 +2239,7 @@ const [changingStage, setChangingStage] = useState(false);
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => fetchLeadHistory(selectedLead._id)}
+                      onClick={() => fetchLeadHistory(selectedLead.leadId.toString())}
                       disabled={loadingHistory}
                     >
                       {loadingHistory ? (
@@ -2063,7 +2249,7 @@ const [changingStage, setChangingStage] = useState(false);
                       )}
                     </Button>
                   </div>
-                  
+
                   {loadingHistory ? (
                     <div className="text-center py-4">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto" />
@@ -2088,7 +2274,7 @@ const [changingStage, setChangingStage] = useState(false);
                               {formatDate(history.createdAt)}
                             </span>
                           </div>
-                          
+
                           {history.actionType === 'assigned' && (
                             <div className="text-sm">
                               {history.fromUser ? (
@@ -2098,12 +2284,12 @@ const [changingStage, setChangingStage] = useState(false);
                               )}
                               {history.reason ? (
                                 <p>Reason : {history.reason}</p>
-                              ):(
+                              ) : (
                                 <p>Reason not given</p>
                               )}
                             </div>
                           )}
-                          
+
                           {history.actionType === 'status_changed' && (
                             <div className="text-sm">
                               Status changed from{' '}
@@ -2116,7 +2302,7 @@ const [changingStage, setChangingStage] = useState(false);
                               </Badge>
                             </div>
                           )}
-                          
+
                           {history.actionType === 'updated' && history.changes.from && history.changes.to && (
                             <div className="text-sm space-y-1">
                               {Object.keys(history.changes.from).map((key) => {
@@ -2171,7 +2357,7 @@ const [changingStage, setChangingStage] = useState(false);
                 <Input
                   id="edit-name"
                   value={leadForm.name}
-                  onChange={(e) => setLeadForm({...leadForm, name: e.target.value})}
+                  onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })}
                   placeholder="John Doe"
                   disabled={updatingLead}
                 />
@@ -2181,7 +2367,7 @@ const [changingStage, setChangingStage] = useState(false);
                 <Input
                   id="edit-phone"
                   value={leadForm.phone}
-                  onChange={(e) => setLeadForm({...leadForm, phone: e.target.value})}
+                  onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })}
                   placeholder="1234567890"
                   disabled={updatingLead}
                 />
@@ -2193,7 +2379,7 @@ const [changingStage, setChangingStage] = useState(false);
                 id="edit-email"
                 type="email"
                 value={leadForm.email}
-                onChange={(e) => setLeadForm({...leadForm, email: e.target.value})}
+                onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })}
                 placeholder="john@company.com"
                 disabled={updatingLead}
               />
@@ -2203,7 +2389,7 @@ const [changingStage, setChangingStage] = useState(false);
                 <Label htmlFor="edit-source">Source</Label>
                 <Select
                   value={leadForm.source}
-                  onValueChange={(value) => setLeadForm({...leadForm, source: value})}
+                  onValueChange={(value) => setLeadForm({ ...leadForm, source: value })}
                   disabled={updatingLead}
                 >
                   <SelectTrigger>
@@ -2222,7 +2408,7 @@ const [changingStage, setChangingStage] = useState(false);
                 <Input
                   id="edit-source_campaign"
                   value={leadForm.source_campaign}
-                  onChange={(e) => setLeadForm({...leadForm, source_campaign: e.target.value})}
+                  onChange={(e) => setLeadForm({ ...leadForm, source_campaign: e.target.value })}
                   placeholder="Campaign name"
                   disabled={updatingLead}
                 />
@@ -2322,151 +2508,159 @@ const [changingStage, setChangingStage] = useState(false);
 
 
       {/* Lead Actions Modal */}
-<Dialog open={actionsModalOpen} onOpenChange={setActionsModalOpen}>
-  <DialogContent className="sm:max-w-[500px]">
-    {selectedLead && (
-      <>
-        <DialogHeader>
-          <DialogTitle>Lead Actions</DialogTitle>
-          <DialogDescription>
-            Select an action for {selectedLead.name}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {hasPermission(permissions, 'leads', 'read') && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setActionsModalOpen(false);
-                  handleViewLead(selectedLead);
-                }}
-                className="h-auto py-4 justify-start"
-              >
-                <div className="flex items-center gap-3">
-                  <Eye className="w-5 h-5" />
-                  <div className="text-left">
-                    <div className="font-medium">View Details</div>
-                    <div className="text-xs text-muted-foreground">View complete lead information</div>
-                  </div>
-                </div>
-              </Button>
-            )}
-            
-            {hasPermission(permissions, 'leads', 'update') && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setActionsModalOpen(false);
-                  handleEditLead(selectedLead);
-                }}
-                className="h-auto py-4 justify-start"
-              >
-                <div className="flex items-center gap-3">
-                  <Edit className="w-5 h-5" />
-                  <div className="text-left">
-                    <div className="font-medium">Edit Lead</div>
-                    <div className="text-xs text-muted-foreground">Update lead information</div>
-                  </div>
-                </div>
-              </Button>
-            )}
-            
-            {hasPermission(permissions, 'leads', 'status_change') && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setActionsModalOpen(false);
-                  setSelectedStatus(selectedLead.status);
-                  setStatusModalOpen(true);
-                }}
-                className="h-auto py-4 justify-start"
-              >
-                <div className="flex items-center gap-3">
-                  {selectedLead.status === 'active' ? (
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                  ) : selectedLead.status === 'lost' ? (
-                    <XCircle className="w-5 h-5 text-red-600" />
-                  ) : (
-                    <TrendingUp className="w-5 h-5 text-blue-600" />
+      <Dialog open={actionsModalOpen} onOpenChange={setActionsModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          {selectedLead && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Lead Actions</DialogTitle>
+                <DialogDescription>
+                  Select an action for {selectedLead.name}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {hasPermission(permissions, 'leads', 'read') && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setActionsModalOpen(false);
+                        handleViewLead(selectedLead);
+                      }}
+                      className="h-auto py-4 justify-start"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Eye className="w-5 h-5" />
+                        <div className="text-left">
+                          <div className="font-medium">View Details</div>
+                          <div className="text-xs text-muted-foreground">View complete lead information</div>
+                        </div>
+                      </div>
+                    </Button>
                   )}
-                  <div className="text-left">
-                    <div className="font-medium">Change Status</div>
-                    <div className="text-xs text-muted-foreground">Update lead status</div>
-                  </div>
-                </div>
-              </Button>
-            )}
-            
-            {hasPermission(permissions, 'leads', 'stage_change') && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setActionsModalOpen(false);
-                  setChangeStageModalOpen(true);
-                }}
-                className="h-auto py-4 justify-start"
-              >
-                <div className="flex items-center gap-3">
-                  <TrendingUp className="w-5 h-5 text-purple-600" />
-                  <div className="text-left">
-                    <div className="font-medium">Change Stage</div>
-                    <div className="text-xs text-muted-foreground">Move to different stage</div>
-                  </div>
-                </div>
-              </Button>
-            )}
-          </div>
-          
-          <div className="pt-4 border-t">
-            <h4 className="font-medium mb-2">Quick Info</h4>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>
-                <span className="text-muted-foreground">Current Stage:</span>
-                <Badge variant="outline" className="ml-2">
-                  {selectedLead.stageId.name}
-                </Badge>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Status:</span>
-                <span className="ml-2">
-                  {getStatusBadge(selectedLead.status)}
-                </span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Source:</span>
-                <span className="ml-2">
-                  {getSourceBadge(selectedLead.source)}
-                </span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Assigned:</span>
-                <span className="ml-2">
-                  {selectedLead.assignedTo?.name || 'Not assigned'}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setActionsModalOpen(false)}>
-            Close
-          </Button>
-        </DialogFooter>
-      </>
-    )}
-  </DialogContent>
-</Dialog>
 
-{/* Change Stage Modal */}
-<ChangeStageModal
-  open={changeStageModalOpen}
-  onOpenChange={setChangeStageModalOpen}
-  selectedLead={selectedLead}
-  stages={stages}
-  loadingStages={loadingStages}
-  changingStage={changingStage}
-  onSubmit={handleStageSubmit}
+                  {hasPermission(permissions, 'leads', 'update') && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setActionsModalOpen(false);
+                        handleEditLead(selectedLead);
+                      }}
+                      className="h-auto py-4 justify-start"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Edit className="w-5 h-5" />
+                        <div className="text-left">
+                          <div className="font-medium">Edit Lead</div>
+                          <div className="text-xs text-muted-foreground">Update lead information</div>
+                        </div>
+                      </div>
+                    </Button>
+                  )}
+
+                  {hasPermission(permissions, 'leads', 'status_change') && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setActionsModalOpen(false);
+                        setSelectedStatus(selectedLead.status);
+                        setStatusModalOpen(true);
+                      }}
+                      className="h-auto py-4 justify-start"
+                    >
+                      <div className="flex items-center gap-3">
+                        {selectedLead.status === 'active' ? (
+                          <CheckCircle className="w-5 h-5 text-green-600" />
+                        ) : selectedLead.status === 'lost' ? (
+                          <XCircle className="w-5 h-5 text-red-600" />
+                        ) : (
+                          <TrendingUp className="w-5 h-5 text-blue-600" />
+                        )}
+                        <div className="text-left">
+                          <div className="font-medium">Change Status</div>
+                          <div className="text-xs text-muted-foreground">Update lead status</div>
+                        </div>
+                      </div>
+                    </Button>
+                  )}
+
+                  {hasPermission(permissions, 'leads', 'stage_change') && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setActionsModalOpen(false);
+                        setChangeStageModalOpen(true);
+                      }}
+                      className="h-auto py-4 justify-start"
+                    >
+                      <div className="flex items-center gap-3">
+                        <TrendingUp className="w-5 h-5 text-purple-600" />
+                        <div className="text-left">
+                          <div className="font-medium">Change Stage</div>
+                          <div className="text-xs text-muted-foreground">Move to different stage</div>
+                        </div>
+                      </div>
+                    </Button>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t">
+                  <h4 className="font-medium mb-2">Quick Info</h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Current Stage:</span>
+                      <Badge variant="outline" className="ml-2">
+                        {selectedLead.stageId.name}
+                      </Badge>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Status:</span>
+                      <span className="ml-2">
+                        {getStatusBadge(selectedLead.status)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Source:</span>
+                      <span className="ml-2">
+                        {getSourceBadge(selectedLead.source)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Assigned:</span>
+                      <span className="ml-2">
+                        {selectedLead.assignedTo?.name || 'Not assigned'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setActionsModalOpen(false)}>
+                  Close
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Stage Modal */}
+      <ChangeStageModal
+        open={changeStageModalOpen}
+        onOpenChange={setChangeStageModalOpen}
+        selectedLead={selectedLead}
+        stages={stages}
+        loadingStages={loadingStages}
+        changingStage={changingStage}
+        onSubmit={handleStageSubmit}
+      />
+
+      <DuplicateLeadsModal
+  open={duplicateModalOpen}
+  onOpenChange={setDuplicateModalOpen}
+  onMergeSuccess={() => {
+    fetchLeads(); // Refresh leads after merge
+  }}
 />
     </div>
   );

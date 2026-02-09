@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Copy, Loader2, RefreshCw, UserPlus } from 'lucide-react';
 import { RoleType } from '@/types/user';
+import { toast } from 'sonner';
 
 interface NewUserModalProps {
   roles: RoleType[];
@@ -46,7 +47,7 @@ export function NewUserModal({ roles, loadingRoles, onSubmit, trigger }: NewUser
 
   const copyPasswordToClipboard = () => {
     navigator.clipboard.writeText(form.password);
-    // Add toast notification here
+    toast.success("Password Copied")
   };
 
   const handleSubmit = async () => {
@@ -61,139 +62,143 @@ export function NewUserModal({ roles, loadingRoles, onSubmit, trigger }: NewUser
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button>
-            <UserPlus className="w-4 h-4 mr-2" />
-            New Employee
-          </Button>
-        )}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Add New Employee</DialogTitle>
-          <DialogDescription>
-            Fill in the details to create a new user account.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="name">Full Name</Label>
-            <Input
-              id="name"
-              value={form.name}
-              onChange={(e) => setForm({...form, name: e.target.value})}
-              placeholder="John Doe"
-              disabled={addingUser}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm({...form, email: e.target.value})}
-              placeholder="john@company.com"
-              disabled={addingUser}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="number">Phone Number</Label>
-            <Input
-              id="number"
-              value={form.number}
-              onChange={(e) => setForm({...form, number: e.target.value})}
-              placeholder="1234567890"
-              disabled={addingUser}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="role">Role</Label>
-            <Select 
-              value={form.role} 
-              onValueChange={(value) => setForm({...form, role: value})}
-              disabled={addingUser || loadingRoles}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a role" />
-              </SelectTrigger>
-              <SelectContent>
-                {loadingRoles ? (
-                  <div className="py-2 text-center">
-                    <Loader2 className="w-4 h-4 mx-auto animate-spin" />
-                  </div>
-                ) : (
-                  roles.map((role) => (
-                    <SelectItem key={role._id} value={role._id}>
-                      {role.name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Generated Password</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={copyPasswordToClipboard}
-                disabled={addingUser}
-              >
-                <Copy className="w-3 h-3 mr-1" />
-                Copy
-              </Button>
-            </div>
-            <div className="flex gap-2">
-              <Input
-                id="password"
-                type="text"
-                value={form.password}
-                onChange={(e) => setForm({...form, password: e.target.value})}
-                placeholder="Auto-generated password"
-                disabled={addingUser}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  const firstName = form.name.split(' ')[0] || '';
-                  const firstFourDigits = form.number.slice(0, 4);
-                  setForm(prev => ({
-                    ...prev,
-                    password: `${firstName}@${firstFourDigits}`
-                  }));
-                }}
-                disabled={addingUser}
-              >
-                <RefreshCw className="w-4 h-4" />
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Password is auto-generated from name and phone number
-            </p>
-          </div>
+   <Dialog open={open} onOpenChange={setOpen}>
+  <DialogTrigger asChild>
+    {trigger || (
+      <Button>
+        <UserPlus className="w-4 h-4 mr-2" />
+        New Employee
+      </Button>
+    )}
+  </DialogTrigger>
+  <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-hidden">
+    <DialogHeader className="px-6 pt-6">
+      <DialogTitle>Add New Employee</DialogTitle>
+      <DialogDescription>
+        Fill in the details to create a new user account.
+      </DialogDescription>
+    </DialogHeader>
+    
+    <div className="flex-1 overflow-y-auto px-6 py-2 max-h-[calc(90vh-180px)]">
+      <div className="grid gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="name">Full Name</Label>
+          <Input
+            id="name"
+            value={form.name}
+            onChange={(e) => setForm({...form, name: e.target.value})}
+            placeholder="John Doe"
+            disabled={addingUser}
+          />
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={addingUser}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={addingUser}>
-            {addingUser ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              'Create User'
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <div className="grid gap-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({...form, email: e.target.value})}
+            placeholder="john@company.com"
+            disabled={addingUser}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="number">Phone Number</Label>
+          <Input
+            id="number"
+            value={form.number}
+            onChange={(e) => setForm({...form, number: e.target.value})}
+            placeholder="1234567890"
+            disabled={addingUser}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="role">Role</Label>
+          <Select 
+            value={form.role} 
+            onValueChange={(value) => setForm({...form, role: value})}
+            disabled={addingUser || loadingRoles}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a role" />
+            </SelectTrigger>
+            <SelectContent>
+              {loadingRoles ? (
+                <div className="py-2 text-center">
+                  <Loader2 className="w-4 h-4 mx-auto animate-spin" />
+                </div>
+              ) : (
+                roles.map((role) => (
+                  <SelectItem key={role._id} value={role._id}>
+                    {role.name}
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Generated Password</Label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={copyPasswordToClipboard}
+              disabled={addingUser}
+            >
+              <Copy className="w-3 h-3 mr-1" />
+              Copy
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              id="password"
+              type="text"
+              value={form.password}
+              onChange={(e) => setForm({...form, password: e.target.value})}
+              placeholder="Auto-generated password"
+              disabled={addingUser}
+            />
+            {/* <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const firstName = form.name.split(' ')[0] || '';
+                const firstFourDigits = form.number.slice(0, 4);
+                setForm(prev => ({
+                  ...prev,
+                  password: `${firstName}@${firstFourDigits}`
+                }));
+              }}
+              disabled={addingUser}
+            >
+              <RefreshCw className="w-4 h-4" />
+            </Button> */}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Password is auto-generated from name and phone number
+          </p>
+        </div>
+      </div>
+    </div>
+    
+    <DialogFooter className="px-6 pb-6 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <Button variant="outline" onClick={() => setOpen(false)} disabled={addingUser}>
+        Cancel
+      </Button>
+      <Button onClick={handleSubmit} disabled={addingUser}>
+        {addingUser ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Creating...
+          </>
+        ) : (
+          'Create User'
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
   );
 }

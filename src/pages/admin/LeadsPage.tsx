@@ -18,12 +18,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Search, 
-  Plus, 
-  MoreHorizontal, 
-  Edit, 
-  Eye, 
+import {
+  Search,
+  Plus,
+  MoreHorizontal,
+  Edit,
+  Eye,
   Download,
   RefreshCw,
   Loader2,
@@ -47,7 +47,8 @@ import {
   ChevronUp,
   ChevronDown,
   ArrowRight,
-  ListTodo
+  ListTodo,
+  AlertTriangle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -76,6 +77,8 @@ import { SearchableSelect } from '@/components/modal/SearchableSelect';
 import { ChangeStageModal } from '@/components/ChangeStageModal';
 import { LeadActionsModal } from '@/components/LeadActionsModal';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
+import { DuplicateLeadsModal } from '@/components/modal/DuplicateLeadsModal';
+import { CopyCheck } from 'lucide-react';
 // import { LeadType, StageType, UserType, LeadHistoryType } from '@/types/lead';
 interface LeadType {
   _id: string;
@@ -101,6 +104,7 @@ interface LeadType {
     _id: string;
     name: string;
     email: string;
+    employeeId:number
   };
 }
 
@@ -140,6 +144,11 @@ interface UserType {
   _id: string;
   name: string;
   email: string;
+  role?: {
+    _id: string;
+    name: string;
+  }
+  employeeId: number;
   profile?: {
     departmentId?: {
       _id: string;
@@ -201,7 +210,7 @@ export function LeadsPage() {
   const [limit, setLimit] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalLeads, setTotalLeads] = useState(0);
-  
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   // Filters
   const [filters, setFilters] = useState<Filters>({
     search: '',
@@ -216,7 +225,7 @@ export function LeadsPage() {
     fromDate: '',
     toDate: ''
   });
-  
+
   // Modal states
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [bulkLeadOpen, setBulkLeadOpen] = useState(false);
@@ -231,12 +240,12 @@ export function LeadsPage() {
   const [selectedLead, setSelectedLead] = useState<LeadType | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<'active' | 'lost' | 'converted'>('active');
   const [selectedUser, setSelectedUser] = useState<string>('');
-  
+
   // Selection states
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [isAssignmentMode, setIsAssignmentMode] = useState(false);
-  
+
   // Form states
   const [leadForm, setLeadForm] = useState<LeadForm>({
     name: '',
@@ -247,14 +256,14 @@ export function LeadsPage() {
     source_campaign: '',
     assignedTo: ''
   });
-  
+
   const [bulkLeads, setBulkLeads] = useState<BulkLead[]>([
     { name: '', phone: '', email: '', source: 'manual', stageId: '', assignedTo: '' }
   ]);
-  
+
   // Progress tracking
   const [progressItems, setProgressItems] = useState<ProgressItem[]>([]);
-  
+
   // Loading states
   const [addingLead, setAddingLead] = useState(false);
   const [addingBulkLeads, setAddingBulkLeads] = useState(false);
@@ -265,10 +274,10 @@ export function LeadsPage() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingStages, setLoadingStages] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  
+
   // Filter visibility
   const [showFilters, setShowFilters] = useState(false);
-  
+
   const [assignUserId, setAssignUserId] = useState<string>('');
 
   // Build query params
@@ -286,18 +295,18 @@ export function LeadsPage() {
     if (filters.stageId && filters.stageId !== "all") params.stageId = filters.stageId;
     if (filters.assignedTo && filters.assignedTo !== "all") params.assignedTo = filters.assignedTo;
     if (filters.modifiedBy && filters.modifiedBy !== "all") params.modifiedBy = filters.modifiedBy;
-    
+
     if (filters.isActive && filters.isActive !== "all") {
-      params.isActive = filters.isActive === "true" ? true : 
-                       filters.isActive === "false" ? false : filters.isActive;
+      params.isActive = filters.isActive === "true" ? true :
+        filters.isActive === "false" ? false : filters.isActive;
     }
-    
+
     if (filters.sort && filters.sort !== "all") params.sort = filters.sort;
-    
+
     if (filters.dateFilter && filters.dateFilter !== "all") {
       params.dateFilter = filters.dateFilter;
     }
-    
+
     if (filters.fromDate && filters.fromDate !== "all") params.fromDate = filters.fromDate;
     if (filters.toDate && filters.toDate !== "all") params.toDate = filters.toDate;
 
@@ -310,7 +319,7 @@ export function LeadsPage() {
       setLoading(true);
       const queryParams = buildQueryParams();
       const response = await getDataHandlerWithToken("getAllLeads", queryParams, null);
-      
+
       if (response?.data) {
         setLeads(response.data);
         setTotalLeads(response.meta.total);
@@ -354,7 +363,7 @@ export function LeadsPage() {
   const fetchUsers = async () => {
     try {
       setLoadingUsers(true);
-      const response = await getDataHandlerWithToken("getAllUser", null, null);
+      const response = await getDataHandlerWithToken("getAllProfile", null, null);
       if (response) {
         setUsers(response);
       }
@@ -420,15 +429,17 @@ export function LeadsPage() {
       // Remove assignedTo if empty
       if (!dataToSend.assignedTo) {
         delete dataToSend.assignedTo;
+        // delete dataToSend.reason;
       }
-      
+      console.log(dataToSend)
+
       const response = await postDataHandlerWithToken("createNewLead", dataToSend);
-      
+
       toast({
         title: "Success",
         description: response?.message || "Lead created successfully",
       });
-      
+
       setLeadForm({
         name: '',
         phone: '',
@@ -456,11 +467,11 @@ export function LeadsPage() {
     try {
       setAddingBulkLeads(true);
       setProgressModalOpen(true);
-      
-      const validLeads = bulkLeads.filter(lead => 
+
+      const validLeads = bulkLeads.filter(lead =>
         lead.name && lead.phone && lead.email && lead.stageId
       );
-      
+
       if (validLeads.length === 0) {
         toast({
           title: "Error",
@@ -481,9 +492,9 @@ export function LeadsPage() {
       // Process leads one by one
       for (let i = 0; i < validLeads.length; i++) {
         const lead = validLeads[i];
-        
+
         // Update progress to processing
-        setProgressItems(prev => prev.map((item, idx) => 
+        setProgressItems(prev => prev.map((item, idx) =>
           idx === i ? { ...item, status: 'processing' } : item
         ));
 
@@ -493,18 +504,18 @@ export function LeadsPage() {
           if (!dataToSend.assignedTo) {
             delete dataToSend.assignedTo;
           }
-          
+
           await postDataHandlerWithToken("createNewLead", dataToSend);
-          
+
           // Update progress to success
-          setProgressItems(prev => prev.map((item, idx) => 
+          setProgressItems(prev => prev.map((item, idx) =>
             idx === i ? { ...item, status: 'success' } : item
           ));
         } catch (error: any) {
           // Update progress to error
-          setProgressItems(prev => prev.map((item, idx) => 
-            idx === i ? { 
-              ...item, 
+          setProgressItems(prev => prev.map((item, idx) =>
+            idx === i ? {
+              ...item,
               status: 'error',
               message: error.response?.data?.message || "Failed to create lead"
             } : item
@@ -516,7 +527,7 @@ export function LeadsPage() {
         title: "Bulk Upload Complete",
         description: `${validLeads.length} leads processed`,
       });
-      
+
       // Reset form after delay
       setTimeout(() => {
         setBulkLeads([{ name: '', phone: '', email: '', source: 'manual', stageId: stages[0]?._id || '', assignedTo: '' }]);
@@ -524,7 +535,7 @@ export function LeadsPage() {
         setProgressModalOpen(false);
         fetchLeads();
       }, 2000);
-      
+
     } catch (error: any) {
       toast({
         title: "Error",
@@ -539,17 +550,17 @@ export function LeadsPage() {
   // Update lead
   const handleUpdateLead = async () => {
     if (!selectedLead) return;
-    
+
     try {
       setUpdatingLead(true);
       const endpoint = ApiConfig.updateLead(selectedLead._id);
       const response = await patchTokenDataHandler(endpoint, leadForm, true);
-      
+
       toast({
         title: "Success",
         description: response?.message || "Lead updated successfully",
       });
-      
+
       setEditLeadOpen(false);
       setSelectedLead(null);
       fetchLeads();
@@ -567,17 +578,17 @@ export function LeadsPage() {
   // Update lead status
   const handleUpdateStatus = async () => {
     if (!selectedLead) return;
-    
+
     try {
       setUpdatingStatus(true);
       const endpoint = ApiConfig.changeStatusLead(selectedLead._id);
       const response = await patchTokenDataHandler(endpoint, { status: selectedStatus }, true);
-      
+
       toast({
         title: "Success",
         description: response?.message || "Lead status updated successfully",
       });
-      
+
       setStatusModalOpen(false);
       setSelectedLead(null);
       fetchLeads();
@@ -598,12 +609,12 @@ export function LeadsPage() {
       setChangingStage(true);
       const endpoint = ApiConfig.changeStageLead(leadId);
       const response = await patchTokenDataHandler(endpoint, { stageId }, true);
-      
+
       toast({
         title: "Success",
         description: response?.message || "Lead stage updated successfully",
       });
-      
+
       setChangeStageModalOpen(false);
       fetchLeads();
     } catch (error: any) {
@@ -623,78 +634,78 @@ export function LeadsPage() {
     await handleChangeStage(leadId, stageId);
   };
 
-// Assign leads to user
-const handleAssignLeads = async () => {
-  if (selectedLeads.length === 0) {
-    toast({
-      title: "Error",
-      description: "Please select at least one lead",
-      variant: "destructive",
-    });
-    return;
-  }
-  
-  if (!assignUserId) {
-    toast({
-      title: "Error",
-      description: "Please select a user",
-      variant: "destructive",
-    });
-    return;
-  }
+  // Assign leads to user
+  const handleAssignLeads = async () => {
+    if (selectedLeads.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please select at least one lead",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  if (!assignReason.trim()) {
-    toast({
-      title: "Error",
-      description: "Please enter a reason for assignment",
-      variant: "destructive",
-    });
-    return;
-  }
-  
-  // Prepare data for API
-  const dataToSend: any = {
-    leadIds: selectedLeads,
-    assignedTo: assignUserId,
-    reason: assignReason.trim() // Add reason to the request
+    if (!assignUserId) {
+      toast({
+        title: "Error",
+        description: "Please select a user",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!assignReason.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a reason for assignment",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Prepare data for API
+    const dataToSend: any = {
+      leadIds: selectedLeads,
+      assignedTo: assignUserId,
+      reason: assignReason.trim() // Add reason to the request
+    };
+
+    try {
+      setAssigningLeads(true);
+
+      const response = await patchTokenDataHandler("assignLead", dataToSend);
+
+      toast({
+        title: "Success",
+        description: response?.message || "Leads assigned successfully",
+      });
+
+      // Reset modal state
+      setAssignModalOpen(false);
+      setAssignUserId('');
+      setAssignReason('');
+      setSelectedLeads([]);
+      setIsAssignmentMode(false);
+
+      // Refresh leads
+      fetchLeads();
+    } catch (error: any) {
+      console.error("Assign leads error:", error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to assign leads",
+        variant: "destructive",
+      });
+    } finally {
+      setAssigningLeads(false);
+    }
   };
-  
-  try {
-    setAssigningLeads(true);
-    
-    const response = await patchTokenDataHandler("assignLead", dataToSend);
-    
-    toast({
-      title: "Success",
-      description: response?.message || "Leads assigned successfully",
-    });
-    
-    // Reset modal state
-    setAssignModalOpen(false);
-    setAssignUserId('');
-    setAssignReason('');
-    setSelectedLeads([]);
-    setIsAssignmentMode(false);
-    
-    // Refresh leads
-    fetchLeads();
-  } catch (error: any) {
-    console.error("Assign leads error:", error);
-    toast({
-      title: "Error",
-      description: error.response?.data?.message || "Failed to assign leads",
-      variant: "destructive",
-    });
-  } finally {
-    setAssigningLeads(false);
-  }
-};
 
   // View lead details
   const handleViewLead = (lead: LeadType) => {
     setSelectedLead(lead);
     setViewLeadOpen(true);
-    fetchLeadHistory(lead._id);
+    fetchLeadHistory(lead.leadId.toString());
   };
 
   // Edit lead
@@ -712,40 +723,40 @@ const handleAssignLeads = async () => {
     setEditLeadOpen(true);
   };
 
-// Lead actions
-const leadActions = {
-  onView: (lead: LeadType) => {
-    handleViewLead(lead);
-  },
-  onEdit: (lead: LeadType) => {
-    handleEditLead(lead);
-  },
-  onChangeStatus: (lead: LeadType) => {
-    setSelectedLead(lead);
-    setSelectedStatus(lead.status);
-    setStatusModalOpen(true);
-  },
-  onChangeStage: (lead: LeadType) => {
-    setSelectedLead(lead);
-    setChangeStageModalOpen(true);
-  },
-  onAssign: (lead: LeadType) => {
-    setSelectedLead(lead);
-    setSelectedLeads([lead._id]);
-    setIsAssignmentMode(true);
-    setAssignModalOpen(true);
-  },
-  onConvert: (lead: LeadType) => {
-    setSelectedLead(lead);
-    setSelectedStatus('converted');
-    setStatusModalOpen(true);
-  }
-};
+  // Lead actions
+  const leadActions = {
+    onView: (lead: LeadType) => {
+      handleViewLead(lead);
+    },
+    onEdit: (lead: LeadType) => {
+      handleEditLead(lead);
+    },
+    onChangeStatus: (lead: LeadType) => {
+      setSelectedLead(lead);
+      setSelectedStatus(lead.status);
+      setStatusModalOpen(true);
+    },
+    onChangeStage: (lead: LeadType) => {
+      setSelectedLead(lead);
+      setChangeStageModalOpen(true);
+    },
+    onAssign: (lead: LeadType) => {
+      setSelectedLead(lead);
+      setSelectedLeads([lead._id]);
+      setIsAssignmentMode(true);
+      setAssignModalOpen(true);
+    },
+    onConvert: (lead: LeadType) => {
+      setSelectedLead(lead);
+      setSelectedStatus('converted');
+      setStatusModalOpen(true);
+    }
+  };
 
   // Toggle lead selection
   const toggleLeadSelection = (leadId: string) => {
-    setSelectedLeads(prev => 
-      prev.includes(leadId) 
+    setSelectedLeads(prev =>
+      prev.includes(leadId)
         ? prev.filter(id => id !== leadId)
         : [...prev, leadId]
     );
@@ -928,6 +939,7 @@ const leadActions = {
         lead.healthScore,
         lead.assignedTo?.name || "",
         lead.assignedTo?.email || "",
+        lead.assignedTo?.employeeId || "",
         new Date(lead.createdAt).toLocaleString(),
         new Date(lead.modifiedAt).toLocaleString(),
         lead.isActive ? "Yes" : "No"
@@ -944,11 +956,11 @@ const leadActions = {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      
+
       // Generate filename
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
       const filename = `leads_page_${page}_${timestamp}.csv`;
-      
+
       link.setAttribute("download", filename);
       document.body.appendChild(link);
       link.click();
@@ -983,18 +995,18 @@ const leadActions = {
       if (filters.stageId && filters.stageId !== "all") queryParams.stageId = filters.stageId;
       if (filters.assignedTo && filters.assignedTo !== "all") queryParams.assignedTo = filters.assignedTo;
       if (filters.modifiedBy && filters.modifiedBy !== "all") queryParams.modifiedBy = filters.modifiedBy;
-      
+
       if (filters.isActive && filters.isActive !== "all") {
-        queryParams.isActive = filters.isActive === "true" ? true : 
-                             filters.isActive === "false" ? false : filters.isActive;
+        queryParams.isActive = filters.isActive === "true" ? true :
+          filters.isActive === "false" ? false : filters.isActive;
       }
-      
+
       if (filters.sort && filters.sort !== "all") queryParams.sort = filters.sort;
-      
+
       if (filters.dateFilter && filters.dateFilter !== "all") {
         queryParams.dateFilter = filters.dateFilter;
       }
-      
+
       if (filters.fromDate && filters.fromDate !== "all") queryParams.fromDate = filters.fromDate;
       if (filters.toDate && filters.toDate !== "all") queryParams.toDate = filters.toDate;
 
@@ -1009,13 +1021,13 @@ const leadActions = {
       });
 
       const response = await getDataHandlerWithToken("getAllLeads", queryParams, null);
-      
+
       if (!response?.data) {
         throw new Error("No data to export");
       }
 
       const leadsData = response.data;
-      
+
       // Define CSV headers
       const headers = [
         "ID",
@@ -1045,6 +1057,7 @@ const leadActions = {
         lead.healthScore,
         lead.assignedTo?.name || "",
         lead.assignedTo?.email || "",
+        lead.assignedTo?.employeeId || "",
         new Date(lead.createdAt).toLocaleString(),
         new Date(lead.modifiedAt).toLocaleString(),
         lead.isActive ? "Yes" : "No"
@@ -1061,16 +1074,16 @@ const leadActions = {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      
+
       // Generate filename with timestamp
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
       const filterInfo = [];
       if (filters.search) filterInfo.push(`search-${filters.search}`);
       if (filters.status !== "all") filterInfo.push(`status-${filters.status}`);
       if (filters.source !== "all") filterInfo.push(`source-${filters.source}`);
-      
+
       const filename = `leads_export_${timestamp}${filterInfo.length > 0 ? `_${filterInfo.join('_')}` : ''}.csv`;
-      
+
       link.setAttribute("download", filename);
       document.body.appendChild(link);
       link.click();
@@ -1132,7 +1145,14 @@ const leadActions = {
               Lead Assignment
             </Button>
           )}
-          
+    <Button
+      variant="outline"
+      onClick={() => setDuplicateModalOpen(true)}
+    >
+      <CopyCheck className="w-4 h-4 mr-2" />
+      Find Duplicates
+    </Button>
+  
           <Dialog open={bulkLeadOpen} onOpenChange={setBulkLeadOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -1248,31 +1268,32 @@ const leadActions = {
                             disabled={addingBulkLeads}
                           />
                         </div>
-                        <div className="space-y-2">
+                        {/* <div className="space-y-2">
                           <Label>Assign To (Optional)</Label>
-                           <SearchableDropdown
-    options={[
-      { value: "", label: "Not assigned" },
-      ...users.map(user => ({
-        value: user._id,
-        label: user.name,
-        email: user.email // Additional data
-      }))
-    ]}
-    value={lead.assignedTo || ""}
-    onValueChange={(value) => updateBulkLeadRow(index, 'assignedTo', value)}
-    placeholder="Select user"
-    searchPlaceholder="Search user..."
-    emptyMessage="No users found"
-    disabled={addingBulkLeads || loadingUsers}
-    allowClear
-  />
-                        </div>
+                          <SearchableDropdown
+                            options={[
+                              { value: "", label: "Not assigned" },
+                              ...users.map(user => ({
+                                value: user._id,
+                                label: user.name,
+                                role: user.role?.name,
+                                empId: user.employeeId
+                              }))
+                            ]}
+                            value={lead.assignedTo || ""}
+                            onValueChange={(value) => updateBulkLeadRow(index, 'assignedTo', value)}
+                            placeholder="Select user"
+                            searchPlaceholder="Search user..."
+                            emptyMessage="No users found"
+                            disabled={addingBulkLeads || loadingUsers}
+                            allowClear
+                          />
+                        </div> */}
                       </div>
                     </CardContent>
                   </Card>
                 ))}
-                
+
                 <Button
                   type="button"
                   variant="outline"
@@ -1336,132 +1357,158 @@ const leadActions = {
                 Add New Lead
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Add New Lead</DialogTitle>
-                <DialogDescription>
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] h-auto overflow-hidden flex flex-col">
+              {/* Fixed Header */}
+              <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+                <DialogTitle className="text-lg sm:text-xl">Add New Lead</DialogTitle>
+                <DialogDescription className="text-sm sm:text-base">
                   Fill in the details to create a new lead.
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
+
+              {/* Scrollable Content Area */}
+              <div className="flex-1 overflow-y-auto px-6 py-4">
+                <div className="grid gap-4 sm:gap-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name" className="text-sm sm:text-base">Name *</Label>
+                      <Input
+                        id="name"
+                        value={leadForm.name}
+                        onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })}
+                        placeholder="John Doe"
+                        disabled={addingLead}
+                        className="h-10 sm:h-11 text-sm sm:text-base"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="text-sm sm:text-base">Phone *</Label>
+                      <Input
+                        id="phone"
+                        value={leadForm.phone}
+                        onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })}
+                        placeholder="1234567890"
+                        disabled={addingLead}
+                        className="h-10 sm:h-11 text-sm sm:text-base"
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="name">Name *</Label>
+                    <Label htmlFor="email" className="text-sm sm:text-base">Email *</Label>
                     <Input
-                      id="name"
-                      value={leadForm.name}
-                      onChange={(e) => setLeadForm({...leadForm, name: e.target.value})}
-                      placeholder="John Doe"
+                      id="email"
+                      type="email"
+                      value={leadForm.email}
+                      onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })}
+                      placeholder="john@company.com"
                       disabled={addingLead}
+                      className="h-10 sm:h-11 text-sm sm:text-base"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone *</Label>
-                    <Input
-                      id="phone"
-                      value={leadForm.phone}
-                      onChange={(e) => setLeadForm({...leadForm, phone: e.target.value})}
-                      placeholder="1234567890"
-                      disabled={addingLead}
-                    />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="source" className="text-sm sm:text-base">Source *</Label>
+                      <Select
+                        value={leadForm.source}
+                        onValueChange={(value) => setLeadForm({ ...leadForm, source: value })}
+                        disabled={addingLead}
+                      >
+                        <SelectTrigger className="h-10 sm:h-11 text-sm sm:text-base">
+                          <SelectValue placeholder="Select source" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="manual">Manual</SelectItem>
+                          <SelectItem value="facebook">Facebook</SelectItem>
+                          <SelectItem value="google">Google</SelectItem>
+                          <SelectItem value="api">API</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="source_campaign" className="text-sm sm:text-base">Campaign (Optional)</Label>
+                      <Input
+                        id="source_campaign"
+                        value={leadForm.source_campaign || ''}
+                        onChange={(e) => setLeadForm({ ...leadForm, source_campaign: e.target.value })}
+                        placeholder="Campaign name"
+                        disabled={addingLead}
+                        className="h-10 sm:h-11 text-sm sm:text-base"
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={leadForm.email}
-                    onChange={(e) => setLeadForm({...leadForm, email: e.target.value})}
-                    placeholder="john@company.com"
-                    disabled={addingLead}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+
                   <div className="space-y-2">
-                    <Label htmlFor="source">Source *</Label>
+                    <Label htmlFor="stage" className="text-sm sm:text-base">Stage *</Label>
                     <Select
-                      value={leadForm.source}
-                      onValueChange={(value) => setLeadForm({...leadForm, source: value})}
-                      disabled={addingLead}
+                      value={leadForm.stageId}
+                      onValueChange={(value) => setLeadForm({ ...leadForm, stageId: value })}
+                      disabled={addingLead || loadingStages}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select source" />
+                      <SelectTrigger className="h-10 sm:h-11 text-sm sm:text-base">
+                        <SelectValue placeholder="Select stage" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="manual">Manual</SelectItem>
-                        <SelectItem value="facebook">Facebook</SelectItem>
-                        <SelectItem value="google">Google</SelectItem>
-                        <SelectItem value="api">API</SelectItem>
+                        {loadingStages ? (
+                          <div className="py-2 text-center">
+                            <Loader2 className="w-4 h-4 mx-auto animate-spin" />
+                          </div>
+                        ) : (
+                          stages.map((stage) => (
+                            <SelectItem key={stage._id} value={stage._id}>
+                              {stage.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="source_campaign">Campaign (Optional)</Label>
-                    <Input
-                      id="source_campaign"
-                      value={leadForm.source_campaign || ''}
-                      onChange={(e) => setLeadForm({...leadForm, source_campaign: e.target.value})}
-                      placeholder="Campaign name"
-                      disabled={addingLead}
+                    <Label htmlFor="assignedTo" className="text-sm sm:text-base">Assign To (Optional)</Label>
+                    <SearchableDropdown
+                      options={[
+                        { value: "", label: "Not assigned" },
+                        ...users.map((user) => ({
+                          value: user._id,
+                          label: user.name,
+                          role: user.role?.name,
+                          empId: user.employeeId,
+                          email: user.email,
+                          department: user.profile?.departmentId?.name
+                        }))
+                      ]}
+                      value={leadForm.assignedTo || ""}
+                      onValueChange={(value) => setLeadForm({ ...leadForm, assignedTo: value })}
+                      placeholder="Select user"
+                      searchPlaceholder="Search user by name..."
+                      emptyMessage="No users found"
+                      disabled={addingLead || loadingUsers}
+                      allowClear
+                      onClear={() => setLeadForm({ ...leadForm, assignedTo: "" })}
+                      triggerClassName="h-10 sm:h-11 text-sm sm:text-base"
+                      contentClassName="w-full sm:max-w-[var(--radix-popover-trigger-width)]"
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="stage">Stage *</Label>
-                  <Select
-                    value={leadForm.stageId}
-                    onValueChange={(value) => setLeadForm({...leadForm, stageId: value})}
-                    disabled={addingLead || loadingStages}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select stage" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {loadingStages ? (
-                        <div className="py-2 text-center">
-                          <Loader2 className="w-4 h-4 mx-auto animate-spin" />
-                        </div>
-                      ) : (
-                        stages.map((stage) => (
-                          <SelectItem key={stage._id} value={stage._id}>
-                            {stage.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-  <Label htmlFor="assignedTo">Assign To (Optional)</Label>
-  <SearchableDropdown
-    options={[
-      { value: "", label: "Not assigned" },
-      ...users.map((user) => ({
-        value: user._id,
-        label: user.name,
-        email: user.email, // Additional data if needed
-        department: user.profile?.departmentId?.name // Additional data
-      }))
-    ]}
-    value={leadForm.assignedTo || ""}
-    onValueChange={(value) => setLeadForm({...leadForm, assignedTo: value})}
-    placeholder="Select user"
-    searchPlaceholder="Search user by name..."
-    emptyMessage="No users found"
-    disabled={addingLead || loadingUsers}
-    allowClear
-    onClear={() => setLeadForm({...leadForm, assignedTo: ""})}
-    triggerClassName="h-10 sm:h-11 text-sm sm:text-base"
-    contentClassName="w-full sm:max-w-[var(--radix-popover-trigger-width)]"
-  />
-</div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setNewLeadOpen(false)} disabled={addingLead}>
+
+
+              <DialogFooter className="px-6 py-4 border-t shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                <Button
+                  variant="outline"
+                  onClick={() => setNewLeadOpen(false)}
+                  disabled={addingLead}
+                  className="h-10 sm:h-11 text-sm sm:text-base px-4 sm:px-6"
+                >
                   Cancel
                 </Button>
-                <Button onClick={handleAddLead} disabled={addingLead || !leadForm.name || !leadForm.phone || !leadForm.email || !leadForm.stageId}>
+                <Button
+                  onClick={handleAddLead}
+                  disabled={addingLead || !leadForm.name || !leadForm.phone || !leadForm.email || !leadForm.stageId}
+                  className="h-10 sm:h-11 text-sm sm:text-base px-4 sm:px-6"
+                >
                   {addingLead ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1498,7 +1545,7 @@ const leadActions = {
             </>
           )}
         </Button>
-        
+
         {showFilters && (
           <Button
             variant="outline"
@@ -1523,17 +1570,17 @@ const leadActions = {
                   <Input
                     placeholder="Search leads..."
                     value={filters.search}
-                    onChange={(e) => setFilters({...filters, search: e.target.value})}
+                    onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                     className="pl-10"
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Status</Label>
                 <Select
                   value={filters.status}
-                  onValueChange={(value) => setFilters({...filters, status: value})}
+                  onValueChange={(value) => setFilters({ ...filters, status: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="All statuses" />
@@ -1546,12 +1593,12 @@ const leadActions = {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Source</Label>
                 <Select
                   value={filters.source}
-                  onValueChange={(value) => setFilters({...filters, source: value})}
+                  onValueChange={(value) => setFilters({ ...filters, source: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="All sources" />
@@ -1565,12 +1612,12 @@ const leadActions = {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Stage</Label>
                 <Select
                   value={filters.stageId}
-                  onValueChange={(value) => setFilters({...filters, stageId: value})}
+                  onValueChange={(value) => setFilters({ ...filters, stageId: value })}
                   disabled={loadingStages}
                 >
                   <SelectTrigger>
@@ -1586,32 +1633,34 @@ const leadActions = {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               {/* Assigned To Filter */}
-<div className="space-y-2">
-  <Label>Assigned To</Label>
-  <SearchableDropdown
-    options={[
-      { value: "all", label: "All Users" },
-      ...users.map(user => ({
-        value: user._id,
-        label: user.name
-      }))
-    ]}
-    value={filters.assignedTo}
-    onValueChange={(value) => setFilters({...filters, assignedTo: value})}
-    placeholder="All Users"
-    searchPlaceholder="Search user..."
-    emptyMessage="No users found"
-    disabled={loadingUsers}
-  />
-</div>
-              
+              <div className="space-y-2">
+                <Label>Assigned To</Label>
+                <SearchableDropdown
+                  options={[
+                    { value: "all", label: "All Users" },
+                    ...users.map(user => ({
+                      value: user._id,
+                      label: user.name,
+                      role: user.role.name,
+                      empId: user.employeeId
+                    }))
+                  ]}
+                  value={filters.assignedTo}
+                  onValueChange={(value) => setFilters({ ...filters, assignedTo: value })}
+                  placeholder="All Users"
+                  searchPlaceholder="Search user..."
+                  emptyMessage="No users found"
+                  disabled={loadingUsers}
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label>Date Filter</Label>
                 <Select
                   value={filters.dateFilter}
-                  onValueChange={(value) => setFilters({...filters, dateFilter: value})}
+                  onValueChange={(value) => setFilters({ ...filters, dateFilter: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select period" />
@@ -1626,12 +1675,12 @@ const leadActions = {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Sort By</Label>
                 <Select
                   value={filters.sort}
-                  onValueChange={(value) => setFilters({...filters, sort: value})}
+                  onValueChange={(value) => setFilters({ ...filters, sort: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -1644,7 +1693,7 @@ const leadActions = {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               {filters.dateFilter === 'custom' && (
                 <>
                   <div className="space-y-2">
@@ -1652,7 +1701,7 @@ const leadActions = {
                     <Input
                       type="date"
                       value={filters.fromDate}
-                      onChange={(e) => setFilters({...filters, fromDate: e.target.value})}
+                      onChange={(e) => setFilters({ ...filters, fromDate: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -1660,7 +1709,7 @@ const leadActions = {
                     <Input
                       type="date"
                       value={filters.toDate}
-                      onChange={(e) => setFilters({...filters, toDate: e.target.value})}
+                      onChange={(e) => setFilters({ ...filters, toDate: e.target.value })}
                     />
                   </div>
                 </>
@@ -1670,105 +1719,193 @@ const leadActions = {
         </Card>
       )}
 
+
       {/* Leads Table */}
+      <CardTitle className="text-lg">
+                    All Leads ({totalLeads})
+                    {loading && (
+                      <span className="ml-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-3 h-3 inline animate-spin mr-1" />
+                        Loading...
+                      </span>
+                    )}
+                  </CardTitle>
       <Table>
-  <TableHeader>
-    <TableRow>
-      {isAssignmentMode && (
-        <TableHead className="w-12">
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              checked={selectAll}
-              onChange={() => setSelectAll(!selectAll)}
-              className="h-4 w-4"
-            />
-          </div>
-        </TableHead>
-      )}
-      <TableHead>Lead</TableHead>
-      <TableHead>Contact</TableHead>
-      <TableHead>Source</TableHead>
-      <TableHead>Stage</TableHead>
-      <TableHead>Status</TableHead>
-      <TableHead>Assigned To</TableHead>
-      {/* REMOVED: Actions column header */}
-    </TableRow>
-  </TableHeader>
-  <TableBody>
-    {leads.map((lead) => (
-      <TableRow 
-        key={lead._id} 
-        className={cn(
-          isAssignmentMode && selectedLeads.includes(lead._id) && "bg-blue-50",
-          "cursor-pointer hover:bg-muted/50" // Add hover effect for clickable rows
-        )}
-        onClick={() => {
-          setSelectedLead(lead);
-          setActionsModalOpen(true);
-        }}
-      >
-        {isAssignmentMode && (
-          <TableCell onClick={(e) => e.stopPropagation()}>
-            <input
-              type="checkbox"
-              checked={selectedLeads.includes(lead._id)}
-              onChange={(e) => {
-                e.stopPropagation();
-                toggleLeadSelection(lead._id);
+        
+        <TableHeader>
+          <TableRow>
+            {isAssignmentMode && (
+              <TableHead className="w-12">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={selectAll}
+                    onChange={() => setSelectAll(!selectAll)}
+                    className="h-4 w-4"
+                  />
+                </div>
+              </TableHead>
+            )}
+            <TableHead>Lead</TableHead>
+            <TableHead>Contact</TableHead>
+            <TableHead>Source</TableHead>
+            <TableHead>Stage</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Assigned To</TableHead>
+            {/* REMOVED: Actions column header */}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {leads.map((lead) => (
+            <TableRow
+              key={lead._id}
+              className={cn(
+                isAssignmentMode && selectedLeads.includes(lead._id) && "bg-blue-50",
+                "cursor-pointer hover:bg-muted/50" // Add hover effect for clickable rows
+              )}
+              onClick={() => {
+                setSelectedLead(lead);
+                setActionsModalOpen(true);
               }}
-              className="h-4 w-4"
-            />
-          </TableCell>
-        )}
-        <TableCell>
-          <div className="font-medium">{lead.name}</div>
-          <div className="text-xs text-muted-foreground">
-            ID: {lead.leadId}
+            >
+              {isAssignmentMode && (
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selectedLeads.includes(lead._id)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      toggleLeadSelection(lead._id);
+                    }}
+                    className="h-4 w-4"
+                  />
+                </TableCell>
+              )}
+              <TableCell>
+                <div className="font-medium">{lead.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  ID: {lead.leadId}
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1 text-sm">
+                    <Phone className="w-3 h-3" />
+                    {lead.phone}
+                  </div>
+                  <div className="flex items-center gap-1 text-sm">
+                    <Mail className="w-3 h-3" />
+                    {lead.email}
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell>{getSourceBadge(lead.source)}</TableCell>
+              <TableCell>
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <ListTodo className="w-3 h-3" />
+                  {lead.stageId.name}
+                </Badge>
+              </TableCell>
+              <TableCell>{getStatusBadge(lead.status)}</TableCell>
+              <TableCell>
+                {lead.assignedTo ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-xs font-medium">
+                        {lead.assignedTo.name.charAt(0)}
+                      </span>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium">{lead.assignedTo.name}</div>
+                      <div className="text-xs text-muted-foreground">{lead.assignedTo.employeeId}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">Not assigned</span>
+                )}
+              </TableCell>
+              {/* REMOVED: Actions column cell */}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+
+
+      {/* Pagination */}
+      {leads.length > 0 && (
+        <div className="flex items-center justify-between mt-4">
+          <div className="text-sm text-muted-foreground">
+            Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, totalLeads)} of {totalLeads} leads
           </div>
-        </TableCell>
-        <TableCell>
-          <div className="space-y-1">
-            <div className="flex items-center gap-1 text-sm">
-              <Phone className="w-3 h-3" />
-              {lead.phone}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(prev => Math.max(1, prev - 1))}
+              disabled={page === 1 || loading}
+            >
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Previous
+            </Button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (page <= 3) {
+                  pageNum = i + 1;
+                } else if (page >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = page - 2 + i;
+                }
+
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={page === pageNum ? "default" : "outline"}
+                    size="sm"
+                    className="w-8 h-8 p-0"
+                    onClick={() => setPage(pageNum)}
+                    disabled={loading}
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
             </div>
-            <div className="flex items-center gap-1 text-sm">
-              <Mail className="w-3 h-3" />
-              {lead.email}
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={page === totalPages || loading}
+            >
+              Next
+              <ChevronRight className="h-4 w-4 ml-2" />
+            </Button>
           </div>
-        </TableCell>
-        <TableCell>{getSourceBadge(lead.source)}</TableCell>
-        <TableCell>
-          <Badge variant="outline" className="flex items-center gap-1">
-            <ListTodo className="w-3 h-3" />
-            {lead.stageId.name}
-          </Badge>
-        </TableCell>
-        <TableCell>{getStatusBadge(lead.status)}</TableCell>
-        <TableCell>
-          {lead.assignedTo ? (
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-xs font-medium">
-                  {lead.assignedTo.name.charAt(0)}
-                </span>
-              </div>
-              <div>
-                <div className="text-sm font-medium">{lead.assignedTo.name}</div>
-                <div className="text-xs text-muted-foreground">{lead.assignedTo.email}</div>
-              </div>
-            </div>
-          ) : (
-            <span className="text-muted-foreground">Not assigned</span>
-          )}
-        </TableCell>
-        {/* REMOVED: Actions column cell */}
-      </TableRow>
-    ))}
-  </TableBody>
-</Table>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Show:</span>
+            <Select
+              value={limit.toString()}
+              onValueChange={(value) => {
+                setLimit(parseInt(value));
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
 
       {/* CSV Upload Modal */}
       <CSVUploadModal
@@ -1810,137 +1947,220 @@ const leadActions = {
         onSubmit={handleStageSubmit}
       />
 
-{/* Assign Leads Modal */}
-<Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
-  <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-4 sm:mx-0 max-h-[90vh] overflow-hidden">
-    <DialogHeader className="px-1">
-      <DialogTitle className="text-lg sm:text-xl">Assign Leads</DialogTitle>
-      <DialogDescription className="text-sm sm:text-base">
-        Assign {selectedLeads.length} selected leads to a user
-      </DialogDescription>
-    </DialogHeader>
-    
-    <div className="overflow-y-auto px-1 py-2 max-h-[calc(90vh-160px)]">
-      <div className="grid gap-3 sm:gap-4 py-2">
-        <div className="space-y-3 sm:space-y-4">
-          {/* User Selection */}
-          <div className="space-y-2">
-            <Label className="text-sm sm:text-base">Select User *</Label>
-            <SearchableSelect
-              value={assignUserId}
-              onValueChange={(value) => {
-                setAssignUserId(value);
-              }}
-              options={users.map(user => ({
-                value: user._id,
-                label: `${user.name}${user.email ? ` (${user.email})` : ''}`,
-                name: user.name,
-                email: user.email,
-              }))}
-              placeholder="Select user"
-              searchPlaceholder="Search by name or email..."
-              emptyMessage="No users found."
-              disabled={assigningLeads || loadingUsers}
-              showAllOption={false}
-              triggerClassName="h-10 sm:h-11 text-sm sm:text-base"
-              contentClassName="w-full sm:max-w-[var(--radix-popover-trigger-width)] max-h-[60vh] sm:max-h-none"
-            />
-          </div>
+      {/* Assign Leads Modal */}
+      <Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] h-auto overflow-hidden flex flex-col">
+          {/* Fixed Header */}
+          <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+            <DialogTitle className="text-lg sm:text-xl">Assign Leads</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base">
+              Assign {selectedLeads.length} selected leads to a user
+            </DialogDescription>
+          </DialogHeader>
 
-          {/* Reason Message */}
-          <div className="space-y-2">
-            <Label htmlFor="assignReason" className="text-sm sm:text-base">
-              Reason for Assignment/Reassignment *
-            </Label>
-            <textarea
-              id="assignReason"
-              value={assignReason}
-              onChange={(e) => setAssignReason(e.target.value)}
-              placeholder="Enter reason for assigning/reassigning these leads..."
-              className="w-full min-h-[80px] sm:min-h-[100px] p-3 border rounded-md text-sm sm:text-base resize-y"
-              disabled={assigningLeads}
-              required
-              rows={4}
-            />
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              This reason will be recorded in the lead history.
-            </p>
-          </div>
-        </div>
-        
-        {/* Validation message */}
-        {(!assignUserId || !assignReason.trim()) && (
-          <div className="p-3 sm:p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-            <p className="text-xs sm:text-sm text-yellow-800">
-              Please select a user and enter a reason for assignment
-            </p>
-          </div>
-        )}
-        
-        <div className="p-3 sm:p-4 bg-muted rounded-md">
-          <p className="text-sm sm:text-base font-medium">
-            Selected Leads ({selectedLeads.length})
-          </p>
-          <div className="mt-2 max-h-32 overflow-y-auto">
-            {leads
-              .filter(lead => selectedLeads.includes(lead._id))
-              .slice(0, 5)
-              .map(lead => (
-                <div key={lead._id} className="text-xs sm:text-sm py-1 sm:py-1.5 border-b last:border-0">
-                  <div className="font-medium truncate">{lead.name}</div>
-                  <div className="text-muted-foreground truncate">{lead.email}</div>
-                </div>
-              ))}
-            {selectedLeads.length > 5 && (
-              <div className="text-xs sm:text-sm py-1 sm:py-1.5 text-muted-foreground">
-                + {selectedLeads.length - 5} more leads
+          {/* Scrollable Content Area */}
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="grid gap-4 sm:gap-5">
+              {/* User Selection */}
+              <div className="space-y-2">
+                <Label className="text-sm sm:text-base">Select User *</Label>
+                <SearchableDropdown
+                  options={[
+                    { value: "", label: "Select user..." },
+                    ...users.map(user => ({
+                      value: user._id,
+                      label: user.name,
+                      role: user.role?.name || user.role,
+                      empId: user.employeeId,
+                      email: user.email,
+                      department: user.profile?.departmentId?.name
+                    }))
+                  ]}
+                  value={assignUserId}
+                  onValueChange={setAssignUserId}
+                  placeholder="Select user"
+                  searchPlaceholder="Search by name, email, or role..."
+                  emptyMessage="No users found"
+                  disabled={assigningLeads || loadingUsers}
+                  allowClear
+                  onClear={() => setAssignUserId("")}
+                  triggerClassName="h-10 sm:h-11 text-sm sm:text-base"
+                  contentClassName="w-full sm:max-w-[var(--radix-popover-trigger-width)]"
+                />
               </div>
-            )}
-          </div>
-          {selectedLeads.length > 0 && (
-            <div className="mt-2 text-xs sm:text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <span>Current stage:</span>
-                <Badge variant="outline" className="text-xs">
-                  {leads.find(l => l._id === selectedLeads[0])?.stageId.name || 'N/A'}
-                </Badge>
+
+              {/* Reason Message */}
+              <div className="space-y-2">
+                <Label htmlFor="assignReason" className="text-sm sm:text-base">
+                  Reason for Assignment/Reassignment *
+                </Label>
+                <textarea
+                  id="assignReason"
+                  value={assignReason}
+                  onChange={(e) => setAssignReason(e.target.value)}
+                  placeholder="Enter reason for assigning/reassigning these leads..."
+                  className="w-full min-h-[80px] sm:min-h-[100px] p-3 border rounded-md text-sm sm:text-base resize-y focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={assigningLeads}
+                  required
+                  rows={4}
+                />
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  This reason will be recorded in the lead history.
+                </p>
+              </div>
+
+              {/* Validation message */}
+              {(!assignUserId || !assignReason.trim()) && (
+                <div className="p-3 sm:p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs sm:text-sm text-yellow-800">
+                      Please select a user and enter a reason for assignment
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Selected Leads Preview */}
+              <div className="p-3 sm:p-4 bg-muted/50 rounded-lg border">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm sm:text-base font-medium">
+                    Selected Leads ({selectedLeads.length})
+                  </p>
+                  <Badge variant="outline" className="text-xs">
+                    {selectedLeads.length} selected
+                  </Badge>
+                </div>
+
+                <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                  {leads
+                    .filter(lead => selectedLeads.includes(lead._id))
+                    .slice(0, 6)
+                    .map((lead, index) => (
+                      <div
+                        key={lead._id}
+                        className="flex items-center justify-between p-2 bg-background rounded border text-sm"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{lead.name || "Unnamed Lead"}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {lead.email || "No email"} • {lead.phone || "No phone"}
+                          </div>
+                        </div>
+                        <Badge variant="secondary" className="text-xs ml-2 flex-shrink-0">
+                          {lead.stageId?.name || "No stage"}
+                        </Badge>
+                      </div>
+                    ))}
+
+                  {selectedLeads.length > 6 && (
+                    <div className="text-center py-2">
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        + {selectedLeads.length - 6} more lead{selectedLeads.length - 6 > 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedLeads.length === 0 && (
+                    <div className="text-center py-4">
+                      <p className="text-sm text-muted-foreground">
+                        No leads selected
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {selectedLeads.length > 0 && (
+                  <div className="mt-4 pt-3 border-t">
+                    <div className="grid grid-cols-2 gap-4 text-xs sm:text-sm">
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">Stages:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {Array.from(new Set(
+                            leads
+                              .filter(lead => selectedLeads.includes(lead._id))
+                              .map(lead => lead.stageId?.name)
+                              .filter(Boolean)
+                          )).slice(0, 3).map((stageName, idx) => (
+                            <Badge key={idx} variant="outline" className="text-xs">
+                              {stageName}
+                            </Badge>
+                          ))}
+                          {Array.from(new Set(
+                            leads
+                              .filter(lead => selectedLeads.includes(lead._id))
+                              .map(lead => lead.stageId?.name)
+                              .filter(Boolean)
+                          )).length > 3 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{Array.from(new Set(
+                                  leads
+                                    .filter(lead => selectedLeads.includes(lead._id))
+                                    .map(lead => lead.stageId?.name)
+                                    .filter(Boolean)
+                                )).length - 3} more
+                              </Badge>
+                            )}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">Sources:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {Array.from(new Set(
+                            leads
+                              .filter(lead => selectedLeads.includes(lead._id))
+                              .map(lead => lead.source)
+                              .filter(Boolean)
+                          )).slice(0, 3).map((source, idx) => (
+                            <Badge key={idx} variant="secondary" className="text-xs">
+                              {source}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          )}
-        </div>
-      </div>
-    </div>
-    
-    <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 pt-3 sm:pt-4 border-t">
-      <Button 
-        variant="outline" 
-        onClick={() => {
-          setAssignModalOpen(false);
-          setAssignUserId('');
-          setAssignReason('');
-        }} 
-        disabled={assigningLeads}
-        className="w-full sm:w-auto order-2 sm:order-1 text-sm sm:text-base"
-      >
-        Cancel
-      </Button>
-      <Button 
-        onClick={handleAssignLeads} 
-        disabled={selectedLeads.length === 0 || assigningLeads || (!assignUserId) || !assignReason.trim()}
-        className="w-full sm:w-auto order-1 sm:order-2 text-sm sm:text-base"
-      >
-        {assigningLeads ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Assigning...
-          </>
-        ) : (
-          'Assign Now'
-        )}
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+          </div>
+
+          {/* Fixed Footer */}
+          <DialogFooter className="px-6 py-4 border-t shrink-0 bg-background">
+            <div className="flex flex-col relative justify-around sm:flex-row gap-2 w-full">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAssignModalOpen(false);
+                  setAssignUserId('');
+                  setAssignReason('');
+                }}
+                disabled={assigningLeads}
+                className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base px-4 sm:px-6"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAssignLeads}
+                disabled={selectedLeads.length === 0 || assigningLeads || !assignUserId || !assignReason.trim()}
+                className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base px-4 sm:px-6"
+              >
+                {assigningLeads ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Assigning...
+                  </>
+                ) : (
+                  <>
+                    <Users className="mr-2 h-4 w-4" />
+                    Assign Now
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* View Lead Modal */}
       <Dialog open={viewLeadOpen} onOpenChange={setViewLeadOpen}>
@@ -2011,7 +2231,7 @@ const leadActions = {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => fetchLeadHistory(selectedLead._id)}
+                      onClick={() => fetchLeadHistory(selectedLead.leadId.toString())}
                       disabled={loadingHistory}
                     >
                       {loadingHistory ? (
@@ -2021,7 +2241,7 @@ const leadActions = {
                       )}
                     </Button>
                   </div>
-                  
+
                   {loadingHistory ? (
                     <div className="text-center py-4">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto" />
@@ -2046,7 +2266,7 @@ const leadActions = {
                               {formatDate(history.createdAt)}
                             </span>
                           </div>
-                          
+
                           {history.actionType === 'assigned' && (
                             <div className="text-sm">
                               {history.fromUser ? (
@@ -2056,12 +2276,12 @@ const leadActions = {
                               )}
                               {history.reason ? (
                                 <p>Reason : {history.reason}</p>
-                              ):(
+                              ) : (
                                 <p>Reason not given</p>
                               )}
                             </div>
                           )}
-                          
+
                           {history.actionType === 'status_changed' && (
                             <div className="text-sm">
                               Status changed from{' '}
@@ -2072,9 +2292,14 @@ const leadActions = {
                               <Badge variant="outline" className="mx-1">
                                 {history.changes.status?.to}
                               </Badge>
+                              {history.reason ? (
+                                <p>Reason : {history.reason}</p>
+                              ) : (
+                                <p>Reason not given</p>
+                              )}
                             </div>
                           )}
-                          
+
                           {history.actionType === 'stage_changed' && (
                             <div className="text-sm">
                               Stage changed from{' '}
@@ -2085,9 +2310,28 @@ const leadActions = {
                               <Badge variant="outline" className="mx-1">
                                 {history.changes.stage?.to}
                               </Badge>
+                              {history.reason ? (
+                                <p>Reason : {history.reason}</p>
+                              ) : (
+                                <p>Reason not given</p>
+                              )}
                             </div>
                           )}
-                          
+
+                          {history.actionType === 'call_log' && (
+                            <div className="text-sm">
+                              Call logs {' '}
+                              <Badge variant="outline" className="mx-1">
+                                {history.changes.outcome}
+                              </Badge>
+                              {history.reason ? (
+                                <p>Reason : {history.reason}</p>
+                              ) : (
+                                <p>Reason not given</p>
+                              )}
+                            </div>
+                          )}
+
                           {history.actionType === 'updated' && history.changes.from && history.changes.to && (
                             <div className="text-sm space-y-1">
                               {Object.keys(history.changes.from).map((key) => {
@@ -2127,227 +2371,236 @@ const leadActions = {
       </Dialog>
 
       {/* Edit Lead Modal */}
-     <Dialog open={editLeadOpen} onOpenChange={setEditLeadOpen}>
-  <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-4 sm:mx-0">
-    <DialogHeader>
-      <DialogTitle className="text-lg sm:text-xl">Edit Lead</DialogTitle>
-      <DialogDescription className="text-sm sm:text-base">
-        Update the lead information for {selectedLead?.name}
-      </DialogDescription>
-    </DialogHeader>
-    <div className="grid gap-4 py-4">
-      {/* Name and Phone - Stack on mobile, side-by-side on larger screens */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="edit-name" className="text-sm sm:text-base">Name</Label>
-          <Input
-            id="edit-name"
-            value={leadForm.name}
-            onChange={(e) => setLeadForm({...leadForm, name: e.target.value})}
-            placeholder="John Doe"
-            disabled={updatingLead}
-            className="h-10 sm:h-11 text-sm sm:text-base"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-phone" className="text-sm sm:text-base">Phone</Label>
-          <Input
-            id="edit-phone"
-            value={leadForm.phone}
-            onChange={(e) => setLeadForm({...leadForm, phone: e.target.value})}
-            placeholder="1234567890"
-            disabled={updatingLead}
-            className="h-10 sm:h-11 text-sm sm:text-base"
-          />
-        </div>
-      </div>
-      
-      {/* Email - Full width */}
-      <div className="space-y-2">
-        <Label htmlFor="edit-email" className="text-sm sm:text-base">Email</Label>
-        <Input
-          id="edit-email"
-          type="email"
-          value={leadForm.email}
-          onChange={(e) => setLeadForm({...leadForm, email: e.target.value})}
-          placeholder="john@company.com"
-          disabled={updatingLead}
-          className="h-10 sm:h-11 text-sm sm:text-base"
-        />
-      </div>
-      
-      {/* Source and Campaign - Stack on mobile, side-by-side on larger screens */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="edit-source" className="text-sm sm:text-base">Source</Label>
-          <Select
-            value={leadForm.source}
-            onValueChange={(value) => setLeadForm({...leadForm, source: value})}
-            disabled={updatingLead}
-          >
-            <SelectTrigger className="h-10 sm:h-11 text-sm sm:text-base">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="max-h-[60vh] sm:max-h-none">
-              <SelectItem value="manual" className="text-sm sm:text-base">Manual</SelectItem>
-              <SelectItem value="facebook" className="text-sm sm:text-base">Facebook</SelectItem>
-              <SelectItem value="google" className="text-sm sm:text-base">Google</SelectItem>
-              <SelectItem value="api" className="text-sm sm:text-base">API</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-source_campaign" className="text-sm sm:text-base">
-            Campaign <span className="text-muted-foreground">(Optional)</span>
-          </Label>
-          <Input
-            id="edit-source_campaign"
-            value={leadForm.source_campaign}
-            onChange={(e) => setLeadForm({...leadForm, source_campaign: e.target.value})}
-            placeholder="Campaign name"
-            disabled={updatingLead}
-            className="h-10 sm:h-11 text-sm sm:text-base"
-          />
-        </div>
-      </div>
-      
-      {/* Stage - Full width */}
-      <div className="space-y-2">
-        <Label htmlFor="edit-stage" className="text-sm sm:text-base">Stage</Label>
-        <Select
-          value={leadForm.stageId}
-          onValueChange={(value) => setLeadForm({...leadForm, stageId: value})}
-          disabled={updatingLead || loadingStages}
-        >
-          <SelectTrigger className="h-10 sm:h-11 text-sm sm:text-base">
-            <SelectValue placeholder="Select stage" />
-          </SelectTrigger>
-          <SelectContent className="max-h-[60vh] sm:max-h-none">
-            {loadingStages ? (
-              <div className="py-2 sm:py-3 text-center">
-                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 mx-auto animate-spin" />
+      <Dialog open={editLeadOpen} onOpenChange={setEditLeadOpen}>
+        <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-4 sm:mx-0">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl">Edit Lead</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base">
+              Update the lead information for {selectedLead?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {/* Name and Phone - Stack on mobile, side-by-side on larger screens */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name" className="text-sm sm:text-base">Name</Label>
+                <Input
+                  id="edit-name"
+                  value={leadForm.name}
+                  onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })}
+                  placeholder="John Doe"
+                  disabled={updatingLead}
+                  className="h-10 sm:h-11 text-sm sm:text-base"
+                />
               </div>
-            ) : (
-              stages.map((stage) => (
-                <SelectItem key={stage._id} value={stage._id} className="text-sm sm:text-base">
-                  {stage.name}
-                </SelectItem>
-              ))
-            )}
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
-    <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
-      <Button 
-        variant="outline" 
-        onClick={() => setEditLeadOpen(false)} 
-        disabled={updatingLead}
-        className="w-full sm:w-auto order-2 sm:order-1"
-      >
-        Cancel
-      </Button>
-      <Button 
-        onClick={handleUpdateLead} 
-        disabled={updatingLead}
-        className="w-full sm:w-auto order-1 sm:order-2"
-      >
-        {updatingLead ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Updating...
-          </>
-        ) : (
-          'Update Lead'
-        )}
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+              <div className="space-y-2">
+                <Label htmlFor="edit-phone" className="text-sm sm:text-base">Phone</Label>
+                <Input
+                  id="edit-phone"
+                  value={leadForm.phone}
+                  onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })}
+                  placeholder="1234567890"
+                  disabled={updatingLead}
+                  className="h-10 sm:h-11 text-sm sm:text-base"
+                />
+              </div>
+            </div>
+
+            {/* Email - Full width */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-email" className="text-sm sm:text-base">Email</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={leadForm.email}
+                onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })}
+                placeholder="john@company.com"
+                disabled={updatingLead}
+                className="h-10 sm:h-11 text-sm sm:text-base"
+              />
+            </div>
+
+            {/* Source and Campaign - Stack on mobile, side-by-side on larger screens */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-source" className="text-sm sm:text-base">Source</Label>
+                <Select
+                  value={leadForm.source}
+                  onValueChange={(value) => setLeadForm({ ...leadForm, source: value })}
+                  disabled={updatingLead}
+                >
+                  <SelectTrigger className="h-10 sm:h-11 text-sm sm:text-base">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[60vh] sm:max-h-none">
+                    <SelectItem value="manual" className="text-sm sm:text-base">Manual</SelectItem>
+                    <SelectItem value="facebook" className="text-sm sm:text-base">Facebook</SelectItem>
+                    <SelectItem value="google" className="text-sm sm:text-base">Google</SelectItem>
+                    <SelectItem value="api" className="text-sm sm:text-base">API</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-source_campaign" className="text-sm sm:text-base">
+                  Campaign <span className="text-muted-foreground">(Optional)</span>
+                </Label>
+                <Input
+                  id="edit-source_campaign"
+                  value={leadForm.source_campaign}
+                  onChange={(e) => setLeadForm({ ...leadForm, source_campaign: e.target.value })}
+                  placeholder="Campaign name"
+                  disabled={updatingLead}
+                  className="h-10 sm:h-11 text-sm sm:text-base"
+                />
+              </div>
+            </div>
+
+            {/* Stage - Full width */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-stage" className="text-sm sm:text-base">Stage</Label>
+              <Select
+                value={leadForm.stageId}
+                onValueChange={(value) => setLeadForm({ ...leadForm, stageId: value })}
+                disabled={updatingLead || loadingStages}
+              >
+                <SelectTrigger className="h-10 sm:h-11 text-sm sm:text-base">
+                  <SelectValue placeholder="Select stage" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[60vh] sm:max-h-none">
+                  {loadingStages ? (
+                    <div className="py-2 sm:py-3 text-center">
+                      <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 mx-auto animate-spin" />
+                    </div>
+                  ) : (
+                    stages.map((stage) => (
+                      <SelectItem key={stage._id} value={stage._id} className="text-sm sm:text-base">
+                        {stage.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setEditLeadOpen(false)}
+              disabled={updatingLead}
+              className="w-full sm:w-auto order-2 sm:order-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateLead}
+              disabled={updatingLead}
+              className="w-full sm:w-auto order-1 sm:order-2"
+            >
+              {updatingLead ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Update Lead'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Change Status Modal */}
       <Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
-  <DialogContent className="sm:max-w-[400px] max-w-[calc(100vw-2rem)] mx-4 sm:mx-0">
-    {selectedLead && (
-      <>
-        <DialogHeader>
-          <DialogTitle className="text-lg sm:text-xl">
-            Change Lead Status
-          </DialogTitle>
-          <DialogDescription className="text-sm sm:text-base">
-            Update status for {selectedLead.name}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label className="text-sm sm:text-base">Select Status</Label>
-            <Select
-              value={selectedStatus}
-              onValueChange={(value: any) => setSelectedStatus(value)}
-              disabled={updatingStatus}
-            >
-              <SelectTrigger className="h-10 sm:h-12 text-sm sm:text-base">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent className="max-h-[60vh] sm:max-h-none">
-                <SelectItem value="active" className="text-sm sm:text-base">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
-                    Active
-                  </div>
-                </SelectItem>
-                <SelectItem value="lost" className="text-sm sm:text-base">
-                  <div className="flex items-center gap-2">
-                    <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
-                    Lost
-                  </div>
-                </SelectItem>
-                <SelectItem value="converted" className="text-sm sm:text-base">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                    Converted
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="p-3 sm:p-4 bg-muted rounded-md">
-            <p className="text-sm sm:text-base">
-              Current status:{' '}
-              <Badge variant="outline" className="ml-2 text-xs sm:text-sm">
-                {selectedLead.status}
-              </Badge>
-            </p>
-          </div>
-        </div>
-        <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
-          <Button 
-            variant="outline" 
-            onClick={() => setStatusModalOpen(false)} 
-            disabled={updatingStatus}
-            className="w-full sm:w-auto order-2 sm:order-1"
-          >
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleUpdateStatus} 
-            disabled={updatingStatus}
-            className="w-full sm:w-auto order-1 sm:order-2"
-          >
-            {updatingStatus ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Updating...
-              </>
-            ) : (
-              'Update Status'
-            )}
-          </Button>
-        </DialogFooter>
-      </>
-    )}
-  </DialogContent>
-</Dialog>
+        <DialogContent className="sm:max-w-[400px] max-w-[calc(100vw-2rem)] mx-4 sm:mx-0">
+          {selectedLead && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-lg sm:text-xl">
+                  Change Lead Status
+                </DialogTitle>
+                <DialogDescription className="text-sm sm:text-base">
+                  Update status for {selectedLead.name}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label className="text-sm sm:text-base">Select Status</Label>
+                  <Select
+                    value={selectedStatus}
+                    onValueChange={(value: any) => setSelectedStatus(value)}
+                    disabled={updatingStatus}
+                  >
+                    <SelectTrigger className="h-10 sm:h-12 text-sm sm:text-base">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[60vh] sm:max-h-none">
+                      <SelectItem value="active" className="text-sm sm:text-base">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+                          Active
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="lost" className="text-sm sm:text-base">
+                        <div className="flex items-center gap-2">
+                          <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
+                          Lost
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="converted" className="text-sm sm:text-base">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                          Converted
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="p-3 sm:p-4 bg-muted rounded-md">
+                  <p className="text-sm sm:text-base">
+                    Current status:{' '}
+                    <Badge variant="outline" className="ml-2 text-xs sm:text-sm">
+                      {selectedLead.status}
+                    </Badge>
+                  </p>
+                </div>
+              </div>
+              <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+                <Button
+                  variant="outline"
+                  onClick={() => setStatusModalOpen(false)}
+                  disabled={updatingStatus}
+                  className="w-full sm:w-auto order-2 sm:order-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpdateStatus}
+                  disabled={updatingStatus}
+                  className="w-full sm:w-auto order-1 sm:order-2"
+                >
+                  {updatingStatus ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Status'
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+
+            <DuplicateLeadsModal
+        open={duplicateModalOpen}
+        onOpenChange={setDuplicateModalOpen}
+        onMergeSuccess={() => {
+          fetchLeads(); // Refresh leads after merge
+        }}
+        />
     </div>
   );
 }

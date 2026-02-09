@@ -8,8 +8,6 @@ export function hasPermission(
   module: string,
   action: string,
 ): boolean {
-    console.log(permissions)
-    console.log(module,action)
   return permissions.some((perm) => {
     // 🔥 Super admin
     if (perm.module === '*' && perm.actions.includes('*')) {

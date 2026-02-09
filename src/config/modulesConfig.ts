@@ -24,6 +24,22 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'export', label: 'Export Leads' }
     ]
   },
+  Calls:{
+    id:'call_logs',
+    label: 'Call Logs Management',
+    actions:[
+      {id:'create', label:'create Call Log'},
+      {id:'read', label:'read Call Log'}
+    ]
+  },
+  Meeting:{
+    id:'meeting_logs',
+    label:'Meeting Logs Management',
+    actions:[
+      {id:'create', label:'create Meeting Log'},
+      {id:'read', label:'read Meeting Log'}
+    ],
+  },
   users: {
     id: 'user',
     label: 'User Management',

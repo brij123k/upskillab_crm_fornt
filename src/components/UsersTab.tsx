@@ -33,6 +33,7 @@ import { PermissionsSelector } from './PermissionsSelector';
 import { UserType, RoleType, DepartmentType } from '@/types/user';
 import { modulesConfig } from '@/config/modulesConfig';
 import { CreateProfileModal } from './CreateProfileModal';
+import { toast } from 'sonner';
 
 interface UsersTabProps {
     users: UserType[];
@@ -308,9 +309,9 @@ export function UsersTab({
                                     className="pl-10 w-64"
                                 />
                             </div>
-                            <Button variant="outline" size="icon">
+                            {/* <Button variant="outline" size="icon">
                                 <Download className="h-4 w-4" />
-                            </Button>
+                            </Button> */}
                         </div>
                     </div>
                 </CardHeader>
@@ -333,147 +334,152 @@ export function UsersTab({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredUsers.map((user) => (
-                                    <TableRow key={user._id}>
-                                        <TableCell>
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                    <span className="text-xs font-medium text-primary">
-                                                        {getInitials(user.name)}
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <div className="font-medium">{user.name}</div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        Joined {formatDate(user.createdAt)}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="space-y-1">
-                                                <div className="text-sm">{user.email}</div>
-                                                <div className="text-xs text-muted-foreground">{user.number}</div>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge variant="secondary" className={cn(
-                                                user.role.isSuperAdmin && "bg-purple-100 text-purple-800 hover:bg-purple-100"
-                                            )}>
-                                                {user.role.name}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="space-y-1">
-                                                <Badge
-                                                    variant="outline"
-                                                    className={cn(
-                                                        user.status === 'active'
-                                                            ? 'border-green-500 text-green-700 bg-green-50'
-                                                            : user.status === 'inactive'
-                                                                ? 'border-gray-500 text-gray-700 bg-gray-50'
-                                                                : user.status === 'probation'
-                                                                    ? 'border-yellow-500 text-yellow-700 bg-yellow-50'
-                                                                    : 'border-red-500 text-red-700 bg-red-50'
-                                                    )}
-                                                >
-                                                    {user.status}
-                                                </Badge>
-                                                {user.isBlocked && (
-                                                    <Badge variant="destructive" className="text-xs">
-                                                        Blocked
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="text-sm text-muted-foreground">
-                                                {user.lastLoginAt ? formatDate(user.lastLoginAt) : 'Never'}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" disabled={togglingBlock === user._id}>
-                                                        {togglingBlock === user._id ? (
-                                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                                        ) : (
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        )}
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="w-48">
-                                                    <DropdownMenuItem
-                                                        onClick={() => {
-                                                            setSelectedUser(user);
-                                                            setProfileModalOpen(true);
-                                                        }}
-                                                        disabled={togglingBlock === user._id}
-                                                    >
-                                                        <Eye className="mr-2 h-4 w-4" />
-                                                        View Profile
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        onClick={() => handleEditUserOpen(user)}
-                                                        disabled={togglingBlock === user._id}
-                                                    >
-                                                        <Edit className="mr-2 h-4 w-4" />
-                                                        Edit User
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        onClick={() => {
-                                                            setSelectedUser(user);
-                                                            setSelectedStatus(user.status);
-                                                            setStatusModalOpen(true);
-                                                        }}
-                                                        disabled={togglingBlock === user._id}
-                                                    >
-                                                        {user.status === 'active' ? (
-                                                            <CheckCircle className="mr-2 h-4 w-4" />
-                                                        ) : user.status === 'probation' ? (
-                                                            <Clock className="mr-2 h-4 w-4" />
-                                                        ) : user.status === 'resigned' ? (
-                                                            <LogOut className="mr-2 h-4 w-4" />
-                                                        ) : (
-                                                            <Clock className="mr-2 h-4 w-4" />
-                                                        )}
-                                                        Change Status
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        onClick={() => handleToggleBlock(user._id)}
-                                                        disabled={togglingBlock === user._id}
-                                                    >
-                                                        {togglingBlock === user._id ? (
-                                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                        ) : user.isBlocked ? (
-                                                            <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
-                                                        ) : (
-                                                            <Ban className="mr-2 h-4 w-4 text-destructive" />
-                                                        )}
-                                                        <span className={cn(
-                                                            togglingBlock !== user._id && (
-                                                                user.isBlocked ? "text-green-600" : "text-destructive"
-                                                            )
-                                                        )}>
-                                                            {togglingBlock === user._id ? 'Updating...' :
-                                                                user.isBlocked ? 'Unblock User' : 'Block User'}
-                                                        </span>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        onClick={() => {
-                                                            // Add password reset logic here
-                                                        }}
-                                                        disabled={togglingBlock === user._id}
-                                                    >
-                                                        <Key className="mr-2 h-4 w-4" />
-                                                        Reset Password
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
+    {filteredUsers.map((user) => (
+        <TableRow key={user._id}>
+            <TableCell>
+                <div className="flex items-center gap-3">
+                    <div className="w-12 h-8 rounded-2xl bg-primary/10 flex items-center justify-center cursor-pointer hover:bg-primary/20 transition-colors"
+                         onClick={() => {
+                             navigator.clipboard.writeText(user.employeeId);
+                             toast.success("Employee ID copied");
+                         }}
+                         title="Click to copy Employee ID">
+                        <span className="text-xs font-medium text-primary">
+                            {user.employeeId}
+                        </span>
+                    </div>
+                    <div>
+                        <div className="font-medium">{user.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                            Joined {formatDate(user.createdAt)}
+                        </div>
+                    </div>
+                </div>
+            </TableCell>
+            <TableCell>
+                <div className="space-y-1">
+                    <div className="text-sm">{user.email}</div>
+                    <div className="text-xs text-muted-foreground">{user.number}</div>
+                </div>
+            </TableCell>
+            <TableCell>
+                <Badge variant="secondary" className={cn(
+                    user.role.isSuperAdmin && "bg-purple-100 text-purple-800 hover:bg-purple-100"
+                )}>
+                    {user.role.name}
+                </Badge>
+            </TableCell>
+            <TableCell>
+                <div className="space-y-1">
+                    <Badge
+                        variant="outline"
+                        className={cn(
+                            user.status === 'active'
+                                ? 'border-green-500 text-green-700 bg-green-50'
+                                : user.status === 'inactive'
+                                    ? 'border-gray-500 text-gray-700 bg-gray-50'
+                                    : user.status === 'probation'
+                                        ? 'border-yellow-500 text-yellow-700 bg-yellow-50'
+                                        : 'border-red-500 text-red-700 bg-red-50'
+                        )}
+                    >
+                        {user.status}
+                    </Badge>
+                    {user.isBlocked && (
+                        <Badge variant="destructive" className="text-xs">
+                            Blocked
+                        </Badge>
+                    )}
+                </div>
+            </TableCell>
+            <TableCell>
+                <div className="text-sm text-muted-foreground">
+                    {user.lastLoginAt ? formatDate(user.lastLoginAt) : 'Never'}
+                </div>
+            </TableCell>
+            <TableCell className="text-right">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" disabled={togglingBlock === user._id}>
+                            {togglingBlock === user._id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <MoreHorizontal className="h-4 w-4" />
+                            )}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem
+                            onClick={() => {
+                                setSelectedUser(user);
+                                setProfileModalOpen(true);
+                            }}
+                            disabled={togglingBlock === user._id}
+                        >
+                            <Eye className="mr-2 h-4 w-4" />
+                            View Profile
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => handleEditUserOpen(user)}
+                            disabled={togglingBlock === user._id}
+                        >
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit User
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => {
+                                setSelectedUser(user);
+                                setSelectedStatus(user.status);
+                                setStatusModalOpen(true);
+                            }}
+                            disabled={togglingBlock === user._id}
+                        >
+                            {user.status === 'active' ? (
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                            ) : user.status === 'probation' ? (
+                                <Clock className="mr-2 h-4 w-4" />
+                            ) : user.status === 'resigned' ? (
+                                <LogOut className="mr-2 h-4 w-4" />
+                            ) : (
+                                <Clock className="mr-2 h-4 w-4" />
+                            )}
+                            Change Status
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => handleToggleBlock(user._id)}
+                            disabled={togglingBlock === user._id}
+                        >
+                            {togglingBlock === user._id ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : user.isBlocked ? (
+                                <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
+                            ) : (
+                                <Ban className="mr-2 h-4 w-4 text-destructive" />
+                            )}
+                            <span className={cn(
+                                togglingBlock !== user._id && (
+                                    user.isBlocked ? "text-green-600" : "text-destructive"
+                                )
+                            )}>
+                                {togglingBlock === user._id ? 'Updating...' :
+                                    user.isBlocked ? 'Unblock User' : 'Block User'}
+                            </span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => {
+                                // Add password reset logic here
+                            }}
+                            disabled={togglingBlock === user._id}
+                        >
+                            <Key className="mr-2 h-4 w-4" />
+                            Reset Password
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </TableCell>
+        </TableRow>
+    ))}
+</TableBody>
                         </Table>
                     )}
                 </CardContent>

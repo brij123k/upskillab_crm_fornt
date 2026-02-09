@@ -3,17 +3,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Upload, FileSpreadsheet, Download, Check, X, AlertCircle, Loader2, Search } from 'lucide-react';
+import { Upload, FileSpreadsheet, Download, Check, X, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { postDataHandlerWithToken } from '@/config/services';
+import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 
 interface CSVUploadModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  users: Array<{ _id: string; name: string; email: string }>;
+  users: Array<{ _id: string; name: string; email: string; role?: { name: string }; employeeId?: string }>;
   onUploadSuccess: () => void;
 }
 
@@ -24,6 +24,7 @@ interface CSVLead {
   source: string;
   source_campaign?: string;
   assignedTo?: string;
+  reason?: string;
   isValid: boolean;
   errors: string[];
 }
@@ -39,7 +40,7 @@ export function CSVUploadModal({
   const [uploading, setUploading] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [bulkReason, setBulkReason] = useState<string>('');
 
   const downloadCSVTemplate = () => {
     const headers = ['name', 'phone', 'email', 'source', 'source_campaign'];
@@ -172,7 +173,7 @@ export function CSVUploadModal({
       toast({
         title: 'No Data',
         description: 'No valid leads to upload',
-        variant: 'destructive',
+        variant: "destructive",
       });
       return;
     }
@@ -182,7 +183,17 @@ export function CSVUploadModal({
       toast({
         title: 'Invalid Data',
         description: 'No valid leads found in CSV',
-        variant: 'destructive',
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate bulk assignment
+    if (selectedUserId && selectedUserId.trim() !== "" && !bulkReason.trim()) {
+      toast({
+        title: 'Reason Required',
+        description: 'Please provide a reason for bulk assignment',
+        variant: "destructive",
       });
       return;
     }
@@ -203,7 +214,8 @@ export function CSVUploadModal({
             source: lead.source || 'manual',
             stageId: '696cadcadcbcf508621922e6',
             source_campaign: lead.source_campaign || undefined,
-            assignedTo: selectedUserId || lead.assignedTo || undefined
+            assignedTo: selectedUserId || lead.assignedTo || undefined,
+            reason: selectedUserId ? bulkReason : (lead.reason || undefined)
           };
 
           // Remove undefined values
@@ -230,14 +242,14 @@ export function CSVUploadModal({
       setFile(null);
       setParsedLeads([]);
       setSelectedUserId('');
-      setSearchQuery('');
+      setBulkReason('');
       onOpenChange(false);
       onUploadSuccess();
     } catch (error) {
       toast({
         title: 'Upload Failed',
         description: 'Failed to upload leads',
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setUploading(false);
@@ -332,53 +344,60 @@ export function CSVUploadModal({
                 <h3 className="font-medium">3. Optional: Assign All Leads</h3>
                 <div className="space-y-2">
                   <Label>Assign To (Optional)</Label>
-                  <Select
+                  <SearchableDropdown
+                    options={[
+                      { value: "", label: "Not assigned" },
+                      ...users.map(user => ({
+                        value: user._id,
+                        label: user.name,
+                        role: user.role?.name || user.role,
+                        empId: user.employeeId,
+                        email: user.email
+                      }))
+                    ]}
                     value={selectedUserId}
                     onValueChange={setSelectedUserId}
+                    placeholder="Select user to assign all leads"
+                    searchPlaceholder="Search by name, email, or role..."
+                    emptyMessage="No users found"
                     disabled={uploading}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select user to assign all leads" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <div className="p-2 border-b">
-                        <div className="relative">
-                          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            placeholder="Search users..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-8 h-8 text-sm"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </div>
-                      </div>
-                      <SelectItem value=" ">Not assigned</SelectItem>
-                      {users
-                        .filter(user => {
-                          // Filter by search query
-                          if (searchQuery) {
-                            const query = searchQuery.toLowerCase();
-                            return user.name.toLowerCase().includes(query) || 
-                                   user.email.toLowerCase().includes(query);
-                          }
-                          return true;
-                        })
-                        .map((user) => (
-                          <SelectItem key={user._id} value={user._id}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{user.name}</span>
-                              <span className="text-xs text-muted-foreground">{user.email}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                    allowClear
+                    onClear={() => {
+                      setSelectedUserId("");
+                      setBulkReason("");
+                    }}
+                    triggerClassName="h-10 text-sm"
+                    contentClassName="w-full max-w-[var(--radix-popover-trigger-width)]"
+                  />
                 </div>
                 <p className="text-xs text-muted-foreground">
                   This will assign all leads to the selected user
                 </p>
               </div>
+
+              {/* Bulk Reason Field - Only shown when user is selected */}
+              {selectedUserId && selectedUserId.trim() !== "" && (
+                <div className="space-y-2">
+                  <Label htmlFor="bulk-reason">
+                    Reason for Bulk Assignment *
+                    <span className="text-xs text-muted-foreground ml-1">
+                      (Required when assigning all leads)
+                    </span>
+                  </Label>
+                  <textarea
+                    id="bulk-reason"
+                    value={bulkReason}
+                    onChange={(e) => setBulkReason(e.target.value)}
+                    placeholder="Enter reason for assigning all leads..."
+                    className="w-full min-h-[60px] p-2 border rounded-md text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={uploading}
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This reason will be recorded in the lead history for all assigned leads.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Preview Section */}
@@ -440,7 +459,17 @@ export function CSVUploadModal({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={uploading}>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              onOpenChange(false);
+              setFile(null);
+              setParsedLeads([]);
+              setSelectedUserId('');
+              setBulkReason('');
+            }} 
+            disabled={uploading}
+          >
             Cancel
           </Button>
           <Button

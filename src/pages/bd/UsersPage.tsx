@@ -19,7 +19,7 @@ import { UserType, RoleType, DepartmentType } from '@/types/user';
 import { modulesConfig } from '@/config/modulesConfig';
 import { DepartmentsTab } from '@/components/DepartmentsTab';
 
-export function UsersPage() {
+export function BDUsersPage() {
   const [users, setUsers] = useState<UserType[]>([]);
   const [roles, setRoles] = useState<RoleType[]>([]);
   const [departments, setDepartments] = useState<DepartmentType[]>([]);
