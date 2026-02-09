@@ -21,7 +21,8 @@ import {
   Calendar,
   MessageSquare,
   Users,
-  Phone
+  Phone,
+  AlertCircle
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -44,6 +45,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { getDataHandlerWithToken, postDataHandlerWithToken } from '@/config/services';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ApiConfig from '@/config/apiConfig';
 
 interface CallLogType {
   _id: string;
@@ -59,6 +61,7 @@ interface CallLogType {
     name: string;
   };
   outcome?: string;
+  startedAt:string;
   createdAt: string;
   updatedAt: string;
 }
@@ -108,6 +111,8 @@ interface Filters {
   sort: string;
 }
 
+
+
 export function CallLogsPage() {
   // State declarations
   const [callLogs, setCallLogs] = useState<CallLogType[]>([]);
@@ -118,7 +123,9 @@ export function CallLogsPage() {
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [loadingStages, setLoadingStages] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  
+    const [CallModalOpen, setCallModalOpen] = useState(false);
+  const [selectedCallLog, setSelectedCallLog] = useState<CallLogType>();
+  const [currentreview,setCurrentreview] = useState<any>({})
   // Pagination
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -349,6 +356,17 @@ export function CallLogsPage() {
     });
   };
 
+  const fatchCallReview = async (id:string)=>{
+    try{
+      const endpoint = ApiConfig.getcallLogReview(id)
+      const response = await getDataHandlerWithToken(endpoint, null, null,true)
+      setCurrentreview(response)
+      return true
+    }catch(error){
+      console.error(error || "call review sendig error")
+      return false
+    }
+  }
   // Reset filters
   const resetFilters = () => {
     setFilters({
@@ -623,8 +641,7 @@ export function CallLogsPage() {
           <CardContent className="pt-6">
             <Tabs defaultValue="basic" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="basic">Basic Filters</TabsTrigger>
-                <TabsTrigger value="advanced">Advanced Filters</TabsTrigger>
+                <TabsTrigger value="basic">Filters</TabsTrigger>
               </TabsList>
               
               <TabsContent value="basic" className="space-y-4 pt-4">
@@ -660,26 +677,6 @@ export function CallLogsPage() {
                       disabled={loadingLeads}
                     />
                   </div>
-                  
-                  {/* <div className="space-y-2">
-                    <Label>Agent</Label>
-                    <SearchableDropdown
-                      options={[
-                        { value: 'all', label: 'All Agents' },
-                        ...users.map(user => ({
-                          value: user._id,
-                          label: user.name
-                        }))
-                      ]}
-                      value={filters.userId}
-                      onValueChange={(value) => setFilters({...filters, userId: value})}
-                      placeholder="Select agent"
-                      searchPlaceholder="Search agents..."
-                      emptyMessage="No agents found"
-                      disabled={loadingUsers}
-                    />
-                  </div> */}
-                  
                   <div className="space-y-2">
                     <Label>Date Filter</Label>
                     <Select
@@ -700,28 +697,27 @@ export function CallLogsPage() {
                     </Select>
                   </div>
                 </div>
-              </TabsContent>
-              
-              <TabsContent value="advanced" className="space-y-4 pt-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label>Stage</Label>
-                    <SearchableDropdown
-                      options={[
-                        { value: 'all', label: 'All Stages' },
-                        ...stages.map(stage => ({
-                          value: stage._id,
-                          label: stage.name
-                        }))
-                      ]}
-                      value={filters.stageId}
-                      onValueChange={(value) => setFilters({...filters, stageId: value})}
-                      placeholder="Select stage"
-                      searchPlaceholder="Search stages..."
-                      emptyMessage="No stages found"
-                      disabled={loadingStages}
-                    />
-                  </div>
+                <Label>Stage</Label>
+                <Select
+                  value={filters.stageId}
+                  onValueChange={(value) => setFilters({...filters, stageId: value})}
+                  disabled={loadingStages}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All stages" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="max-h-60 overflow-y-auto">
+                    <SelectItem value="all">All Stages</SelectItem>
+                    {stages.map((stage) => (
+                      <SelectItem key={stage._id} value={stage._id}>
+                        {stage.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
                   
                   <div className="space-y-2">
                     <Label>Outcome Contains</Label>
@@ -744,13 +740,11 @@ export function CallLogsPage() {
                       <SelectContent position="popper" className="max-h-60 overflow-y-auto">
                         <SelectItem value="new">Newest First</SelectItem>
                         <SelectItem value="old">Oldest First</SelectItem>
-                        <SelectItem value="duration_asc">Shortest Duration</SelectItem>
-                        <SelectItem value="duration_desc">Longest Duration</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   
-                  <div className="space-y-2">
+                  {/* <div className="space-y-2">
                     <Label>Min Duration (seconds)</Label>
                     <Input
                       type="number"
@@ -770,7 +764,7 @@ export function CallLogsPage() {
                       value={filters.durationMax}
                       onChange={(e) => setFilters({...filters, durationMax: e.target.value})}
                     />
-                  </div>
+                  </div> */}
                 </div>
                 
                 {filters.dateFilter === 'custom' && (
@@ -881,17 +875,23 @@ export function CallLogsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="hidden sm:table-cell">Lead</TableHead>
-                      {/* <TableHead>Agent</TableHead> */}
+                      {/* <TableHead>outcome</TableHead> */}
                       <TableHead>Duration</TableHead>
                       <TableHead className="hidden md:table-cell">Stage</TableHead>
-                      <TableHead>Notes</TableHead>
+                      <TableHead>outCome</TableHead>
                       <TableHead className="hidden lg:table-cell">Date & Time</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {callLogs.map((log) => (
                       <TableRow key={log._id} className="hover:bg-muted/50">
-                        <TableCell className="hidden sm:table-cell">
+                        <TableCell className="hidden sm:table-cell cursor-pointer"
+                        onClick={()=>{
+                          fatchCallReview(log._id)
+                            setSelectedCallLog(log)
+                            setCallModalOpen(true)
+                          }}
+                          >
                           <div className="font-medium">Lead ID: {log.leadId}</div>
                           <div className="text-xs text-muted-foreground">
                             {leads.find(l => l.leadId === log.leadId)?.name || 'Unknown Lead'}
@@ -939,7 +939,7 @@ export function CallLogsPage() {
                         <TableCell className="hidden lg:table-cell">
                           <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm">{formatDate(log.createdAt)}</span>
+                            <span className="text-sm">{formatDate(log.startedAt)}</span>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1008,6 +1008,114 @@ export function CallLogsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={CallModalOpen} onOpenChange={setCallModalOpen}>
+  <DialogContent className="sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[90vh]">
+    <DialogHeader>
+      <DialogTitle className="text-xl">Call Remark</DialogTitle>
+      <DialogDescription>
+        Detailed remark and information about the call
+      </DialogDescription>
+    </DialogHeader>
+    
+    <div className="py-2 max-h-[calc(90vh-180px)] overflow-y-auto pr-2">
+      {selectedCallLog ? (
+        <div className="space-y-6">
+          {/* Main Info Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Left Column - Basic Info */}
+            <div className="space-y-4">
+              <div className="bg-muted/30 p-4 rounded-lg">
+                <h3 className="font-medium text-sm text-muted-foreground mb-2">Call Details</h3>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Lead ID</p>
+                    <p className="text-sm font-medium">{selectedCallLog.leadId || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Lead Name</p>
+                    <p className="text-sm font-medium">{currentreview.leaddetail?.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Stage</p>
+                    <p className="text-sm font-medium">{selectedCallLog.stageId?.name || "N/A"}</p>
+                  </div>
+                 
+                </div>
+              </div>
+
+              {/* Outcome Section */}
+              <div className="bg-muted/30 p-4 rounded-lg">
+                <h3 className="font-medium text-sm text-muted-foreground mb-2">Outcome</h3>
+                <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${selectedCallLog.outcome === 'Success' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : selectedCallLog.outcome === 'Failed' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'}`}>
+                  {selectedCallLog.outcome || "Not Specified"}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Timing Info */}
+            <div className="space-y-4">
+              <div className="bg-muted/30 p-4 rounded-lg">
+                <h3 className="font-medium text-sm text-muted-foreground mb-2">Timing Information</h3>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Started At</p>
+                    <p className="text-sm font-medium">{formatDate(selectedCallLog.startedAt) || "N/A"}</p>
+                  </div>
+                   <div>
+                    <p className="text-xs text-muted-foreground">Agent</p>
+                    <p className="text-sm font-medium">{selectedCallLog.userId?.name || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Duration</p>
+                    <p className="text-sm font-medium">{formatDuration(selectedCallLog.duration) || "0:00"}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Remarks Section - Full Width */}
+          <div className="bg-muted/30 p-4 rounded-lg">
+            <h3 className="font-medium text-sm text-muted-foreground mb-3">Remark</h3>
+            <div className="bg-background border border-border rounded-lg p-4 min-h-[100px]">
+              <p className="text-sm whitespace-pre-wrap text-foreground">
+                {currentreview?.remark || "No remarks provided"}
+              </p>
+            </div>
+          </div>
+
+          {/* Additional Info Section if needed */}
+          {/* {selectedCallLog.additionalNotes && (
+            <div className="bg-muted/30 p-4 rounded-lg">
+              <h3 className="font-medium text-sm text-muted-foreground mb-2">Additional Notes</h3>
+              <p className="text-sm whitespace-pre-wrap bg-background border border-border rounded-lg p-3">
+                {selectedCallLog.additionalNotes}
+              </p>
+            </div>
+          )} */}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-8">
+          <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+          <h3 className="text-lg font-medium mb-1">No Data Available</h3>
+          <p className="text-muted-foreground text-center">
+            No call remark data found for this session
+          </p>
+        </div>
+      )}
+    </div>
+    
+    <DialogFooter className=" bottom-0 bg-background pt-4 border-t">
+      <Button 
+        onClick={() => setCallModalOpen(false)}
+        className="w-full sm:w-auto"
+      >
+        Close
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
     </div>
   );
 }

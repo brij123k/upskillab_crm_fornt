@@ -62,7 +62,6 @@ export function SearchableDropdown({
   const [searchQuery, setSearchQuery] = useState("");
 
   // Filter options based on search query
-  // Filter options based on search query
   const filteredOptions = useMemo(() => {
     if (!searchQuery.trim()) return options;
 

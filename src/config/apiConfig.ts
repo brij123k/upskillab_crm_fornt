@@ -39,6 +39,9 @@ const ApiConfig = {
   MeetingLog:`${url}/meeting-logs`,
   getMeetingLog:`${url}/meeting-logs/with-feedbacks`,
 
+  instantnotify:(leadId:number)=>`${url}/lead-schedules/${leadId}`,
+
+  getcallLogReview:(callId:string)=> `${url}/call-logs/callLogReview/${callId}`,
   // notifications
 
   notification:`${url}/notifications`,

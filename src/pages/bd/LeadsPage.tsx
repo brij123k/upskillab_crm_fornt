@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DuplicateLeadsModal } from '@/components/modal/DuplicateLeadsModal';
-import { CopyCheck } from 'lucide-react';
+import { CopyCheck,MousePointer, PhoneCall,  } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -728,6 +728,25 @@ const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
     }
   };
 
+
+  const sendNotify = async (leadId:number) => {
+    const endpoint = ApiConfig.instantnotify(leadId)
+    try{
+      await postDataHandlerWithToken(endpoint,null,true)
+      toast({
+      title:"Successfull",
+      description:"call Request sended to Your APP"
+    })
+    }catch(error){
+        toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to send instant notify",
+        variant: "destructive",
+      });
+      return false
+    }  
+    return true
+  }
   // View lead details
   const handleViewLead = (lead: LeadType) => {
     setSelectedLead(lead);
@@ -1779,8 +1798,8 @@ const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
                     <TableHead>Contact</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead>Stage</TableHead>
-                    <TableHead>Status</TableHead>
-                    {/* <TableHead>Assigned To</TableHead> */}
+                    <TableHead>Notify Now</TableHead>
+                    <TableHead>Assigned To</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1791,10 +1810,7 @@ const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
                         isAssignmentMode && selectedLeads.includes(lead._id) && "bg-blue-50",
                         "cursor-pointer hover:bg-muted/50" // Add hover effect
                       )}
-                      onClick={() => {
-                        setSelectedLead(lead);
-                        setActionsModalOpen(true);
-                      }}
+                      
                     >
                       {isAssignmentMode && (
                         <TableCell onClick={(e) => e.stopPropagation()}>
@@ -1809,11 +1825,21 @@ const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
                           />
                         </TableCell>
                       )}
-                      <TableCell>
+                      <TableCell
+                      onClick={() => {
+                        setSelectedLead(lead);
+                        setActionsModalOpen(true);
+                      }}
+                      className='flex justify-center items-center gap-4 border-2 rounded-2xl shadow-lg hover:bg-[#0000002c]'
+                      title="click Here"
+                      >
+                      <MousePointer className='h-3 w-3'/>
+                      <div>
                         <div className="font-medium">{lead.name}</div>
                         <div className="text-xs text-muted-foreground">
                           ID: {lead.leadId}
-                        </div>
+
+                        </div></div>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
@@ -1833,7 +1859,10 @@ const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
                           {lead.stageId.name}
                         </Badge>
                       </TableCell>
-                      <TableCell>{getStatusBadge(lead.status)}</TableCell>
+                      {/* <TableCell>{getStatusBadge(lead.status)}</TableCell> */}
+                      <TableCell className='flex justify-center items-center'>
+                        <PhoneCall onClick={() =>sendNotify(lead.leadId)}/>
+                        </TableCell>
                       <TableCell>
                         {lead.assignedTo ? (
                           <div className="flex items-center gap-2">
