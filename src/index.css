@@ -1,7 +1,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap');
 @layer base {
   :root {
     /* Base colors - Vibrant Orange theme */
@@ -123,6 +123,7 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+     font-family: 'Poppins', sans-serif;
   }
 }
 

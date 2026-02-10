@@ -76,6 +76,7 @@ import { CSVUploadModal } from '@/components/modal/CSVUploadModal';
 import { SearchableSelect } from '@/components/modal/SearchableSelect';
 import { hasPermission } from '@/utils/permissions';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
+import { LeadHistoryModal } from '@/components/modal/LeadHistory';
 
 interface LeadType {
   _id: string;
@@ -210,7 +211,7 @@ export function BDLeadsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalLeads, setTotalLeads] = useState(0);
 const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
-
+const [historyModalOpen, setHistoryModalOpen] = useState(false);
   // Filters
   const [filters, setFilters] = useState<Filters>({
     search: '',
@@ -356,6 +357,12 @@ const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
       setLoadingStages(false);
     }
   };
+
+  const handleViewLeadHistory = async (lead: LeadType) => {
+  setSelectedLead(lead);
+  await fetchLeadHistory(lead.leadId.toString());
+  setHistoryModalOpen(true);
+};
 
   // Fetch users
   const fetchUsers = async () => {
@@ -2631,6 +2638,24 @@ const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
                       </div>
                     </Button>
                   )}
+{hasPermission(permissions, 'leads', 'read') && (
+  <Button
+    variant="outline"
+    onClick={() => {
+      setActionsModalOpen(false);
+      handleViewLeadHistory(selectedLead);
+    }}
+    className="h-auto py-4 justify-start"
+  >
+    <div className="flex items-center gap-3">
+      <FileText className="w-5 h-5" />
+      <div className="text-left">
+        <div className="font-medium">View History</div>
+        <div className="text-xs text-muted-foreground">View complete lead history</div>
+      </div>
+    </div>
+  </Button>
+)}
                 </div>
 
                 <div className="pt-4 border-t">
@@ -2690,6 +2715,15 @@ const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   onMergeSuccess={() => {
     fetchLeads(); // Refresh leads after merge
   }}
+/>
+
+<LeadHistoryModal
+  open={historyModalOpen}
+  onOpenChange={setHistoryModalOpen}
+  leadHistory={leadHistory}
+  loadingHistory={loadingHistory}
+  selectedLeadName={selectedLead?.name}
+  onRefresh={() => selectedLead && fetchLeadHistory(selectedLead.leadId.toString())}
 />
     </div>
   );
