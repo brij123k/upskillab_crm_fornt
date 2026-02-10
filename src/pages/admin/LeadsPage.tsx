@@ -79,9 +79,7 @@ import { LeadActionsModal } from '@/components/LeadActionsModal';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 import { DuplicateLeadsModal } from '@/components/modal/DuplicateLeadsModal';
 import { CopyCheck } from 'lucide-react';
-import { LeadHistoryModal } from '@/components/modal/LeadHistory';
 // import { LeadType, StageType, UserType, LeadHistoryType } from '@/types/lead';
-
 interface LeadType {
   _id: string;
   leadId: number;
@@ -214,7 +212,6 @@ export function LeadsPage() {
   const [totalLeads, setTotalLeads] = useState(0);
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   // Filters
-  const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>({
     search: '',
     status: 'all',
@@ -316,11 +313,6 @@ export function LeadsPage() {
     return params;
   };
 
-  const handleViewLeadHistory = async (lead: LeadType) => {
-  setSelectedLead(lead);
-  await fetchLeadHistory(lead.leadId.toString());
-  setHistoryModalOpen(true);
-};
   // Fetch leads with filters
   const fetchLeads = async () => {
     try {
@@ -733,36 +725,33 @@ export function LeadsPage() {
 
   // Lead actions
   const leadActions = {
-  onView: (lead: LeadType) => {
-    handleViewLead(lead);
-  },
-  onEdit: (lead: LeadType) => {
-    handleEditLead(lead);
-  },
-  onChangeStatus: (lead: LeadType) => {
-    setSelectedLead(lead);
-    setSelectedStatus(lead.status);
-    setStatusModalOpen(true);
-  },
-  onChangeStage: (lead: LeadType) => {
-    setSelectedLead(lead);
-    setChangeStageModalOpen(true);
-  },
-  onAssign: (lead: LeadType) => {
-    setSelectedLead(lead);
-    setSelectedLeads([lead._id]);
-    setIsAssignmentMode(true);
-    setAssignModalOpen(true);
-  },
-  onConvert: (lead: LeadType) => {
-    setSelectedLead(lead);
-    setSelectedStatus('converted');
-    setStatusModalOpen(true);
-  },
-  onHistory: (lead: LeadType) => { // Add this
-    handleViewLeadHistory(lead);
-  }
-};
+    onView: (lead: LeadType) => {
+      handleViewLead(lead);
+    },
+    onEdit: (lead: LeadType) => {
+      handleEditLead(lead);
+    },
+    onChangeStatus: (lead: LeadType) => {
+      setSelectedLead(lead);
+      setSelectedStatus(lead.status);
+      setStatusModalOpen(true);
+    },
+    onChangeStage: (lead: LeadType) => {
+      setSelectedLead(lead);
+      setChangeStageModalOpen(true);
+    },
+    onAssign: (lead: LeadType) => {
+      setSelectedLead(lead);
+      setSelectedLeads([lead._id]);
+      setIsAssignmentMode(true);
+      setAssignModalOpen(true);
+    },
+    onConvert: (lead: LeadType) => {
+      setSelectedLead(lead);
+      setSelectedStatus('converted');
+      setStatusModalOpen(true);
+    }
+  };
 
   // Toggle lead selection
   const toggleLeadSelection = (leadId: string) => {
@@ -2612,15 +2601,6 @@ export function LeadsPage() {
           fetchLeads(); // Refresh leads after merge
         }}
         />
-
-        <LeadHistoryModal
-  open={historyModalOpen}
-  onOpenChange={setHistoryModalOpen}
-  leadHistory={leadHistory}
-  loadingHistory={loadingHistory}
-  selectedLeadName={selectedLead?.name}
-  onRefresh={() => selectedLead && fetchLeadHistory(selectedLead.leadId.toString())}
-/>
     </div>
   );
 }

@@ -38,7 +38,6 @@ interface LeadActionsModalProps {
     onChangeStage: (lead: LeadType) => void;
     onAssign: (lead: LeadType) => void;
     onConvert?: (lead: LeadType) => void;
-    onHistory?: (lead: LeadType) => void; // Add this
   };
 }
 
@@ -68,7 +67,7 @@ export function LeadActionsModal({
             Available actions for <strong>{selectedLead.name}</strong>
           </DialogDescription>
         </DialogHeader>
-
+        
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           <div className="space-y-4 sm:space-y-5">
@@ -154,7 +153,7 @@ export function LeadActionsModal({
               </Button>
 
               {/* Change Status */}
-              {/* <Button
+              <Button
                 variant="outline"
                 className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px] hover:bg-accent"
                 onClick={() => handleAction('onChangeStatus')}
@@ -162,21 +161,6 @@ export function LeadActionsModal({
               >
                 <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
                 <div className="text-xs sm:text-sm text-center">Change Status</div>
-              </Button> */}
-
-              <Button
-                variant="outline"
-                className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px] hover:bg-accent"
-                onClick={() => {
-                  // You'll need to modify the actions prop to include onHistory
-                  // For now, we'll use a generic approach
-                  const event = new CustomEvent('leadHistory', { detail: selectedLead });
-                  window.dispatchEvent(event);
-                }}
-                disabled={loading}
-              >
-                <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
-                <div className="text-xs sm:text-sm text-center">View History</div>
               </Button>
 
               {/* Change Stage */}
@@ -252,19 +236,19 @@ export function LeadActionsModal({
             </div>
           </div>
         </div>
-
+        
         {/* Fixed Footer */}
         <DialogFooter className="px-6 py-4 border-t shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="flex flex-col relative justify-around sm:flex-row gap-2 w-full">
-            <Button
-              variant="outline"
+            <Button 
+              variant="outline" 
               onClick={() => onOpenChange(false)}
               className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base px-4 sm:px-6 order-2 sm:order-1"
             >
               Close
             </Button>
-            <Button
-              variant="default"
+            <Button 
+              variant="default" 
               onClick={() => handleAction('onView')}
               className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base px-4 sm:px-6 order-1 sm:order-2"
             >
