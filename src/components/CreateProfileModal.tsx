@@ -40,6 +40,7 @@ export function CreateProfileModal({
     departmentId: '',
     education: '',
     salary: '',
+    reportingSenierId:'',
     extraAccessControls: [] as Array<{ module: string; actions: string[] }>
   });
 
@@ -53,6 +54,7 @@ export function CreateProfileModal({
         departmentId: '',
         education: '',
         salary: '',
+        reportingSenierId:'',
         extraAccessControls: []
       });
     } catch (error) {
@@ -67,6 +69,7 @@ export function CreateProfileModal({
         departmentId: '',
         education: '',
         salary: '',
+        reportingSenierId:'',
         extraAccessControls: []
       });
     }
@@ -134,6 +137,17 @@ export function CreateProfileModal({
               value={profileForm.salary}
               onChange={(e) => setProfileForm({...profileForm, salary: e.target.value})}
               placeholder="e.g., 50000"
+              disabled={creatingProfile}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="salary">Reporting Senior</Label>
+            <Input
+              id="reportingSenierId"
+              value={profileForm.reportingSenierId}
+              onChange={(e) => setProfileForm({...profileForm, reportingSenierId: e.target.value})}
+              placeholder="e.g., Senoir Name"
               disabled={creatingProfile}
             />
           </div>
