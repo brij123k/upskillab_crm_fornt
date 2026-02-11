@@ -6,8 +6,8 @@ import ApiConfig from './apiConfig';
 
 let socket: Socket | null = null;
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-// const SOCKET_URL = import.meta.env.VITE_API_URL || 'https://crm.upskillab.in';
+// const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const SOCKET_URL = import.meta.env.VITE_API_URL || 'https://crm.upskillab.in';
 
 export function connectNotificationSocket(
   onNew: (n: any) => void,
