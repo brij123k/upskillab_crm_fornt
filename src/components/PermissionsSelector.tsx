@@ -87,7 +87,7 @@ export function PermissionsSelector({
       
       <div className="space-y-3">
         {Object.values(modulesConfig).map((module) => {
-            console.log(module)
+            // console.log(module)
           const modulePermission = permissions.find(p => p.module === module.id);
           const selectedActions = modulePermission?.actions || [];
         //   console.log(selectedActions)

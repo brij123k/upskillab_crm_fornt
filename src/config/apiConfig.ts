@@ -11,6 +11,7 @@ const ApiConfig = {
   getAllUser:`${url}/users`,
   getAllProfile:`${url}/users/profile`,
   getUserByDepartmentId:(departmentId:string)=>`${url}/profiles/department/${departmentId}`,
+  getUserBydepId:(depId:string)=>`${url}/users/${depId}`,
   getAllRoles:`${url}/roles`,
   getAllDepartments:`${url}/departments`,
   getAllStages:`${url}/lead-stages`,
@@ -38,7 +39,7 @@ const ApiConfig = {
 
   MeetingLog:`${url}/meeting-logs`,
   getMeetingLog:`${url}/meeting-logs/with-feedbacks`,
-
+  addMettingFeedback:`${url}/meeting-logs/feeback`,
   instantnotify:(leadId:number)=>`${url}/lead-schedules/${leadId}`,
 
   getcallLogReview:(callId:string)=> `${url}/call-logs/callLogReview/${callId}`,

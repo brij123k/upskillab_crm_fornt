@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,9 +13,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Users } from 'lucide-react';
 import { PermissionsSelector } from './PermissionsSelector';
 import { UserType, DepartmentType } from '@/types/user';
+import { SearchableDropdown } from './ui/searchable-dropdown';
+import { getDataHandlerWithToken } from '@/config/services';
+import ApiConfig from '@/config/apiConfig';
+import { toast } from '@/hooks/use-toast';
+
+interface DepartmentUser {
+  _id: string;
+  userId: {
+    _id: string;
+    name: string;
+    employeeId: number;
+    email: string;
+    role:{
+      _id:string;
+      name:string;
+    }
+  };
+}
 
 interface CreateProfileModalProps {
   open: boolean;
@@ -40,9 +58,44 @@ export function CreateProfileModal({
     departmentId: '',
     education: '',
     salary: '',
-    reportingSenierId:'',
+    reportingSeniorId: '',
     extraAccessControls: [] as Array<{ module: string; actions: string[] }>
   });
+
+  const [departmentUsers, setDepartmentUsers] = useState<DepartmentUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Fetch users when department is selected
+  useEffect(() => {
+    const fetchDepartmentUsers = async () => {
+      if (!profileForm.departmentId) {
+        setDepartmentUsers([]);
+        return;
+      }
+
+      try {
+        setLoadingUsers(true);
+        const endpoint = ApiConfig.getUserBydepId(profileForm.departmentId);
+        console.log(endpoint)
+        const response = await getDataHandlerWithToken(endpoint, null, null,true);
+        console.log(response)
+        if (response) {
+          setDepartmentUsers(response);
+        }
+      } catch (error) {
+        console.error('Error fetching department users:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch department users",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+
+    fetchDepartmentUsers();
+  }, [profileForm.departmentId]);
 
   const handleSubmit = async () => {
     if (!selectedUser) return;
@@ -54,7 +107,7 @@ export function CreateProfileModal({
         departmentId: '',
         education: '',
         salary: '',
-        reportingSenierId:'',
+        reportingSeniorId: '',
         extraAccessControls: []
       });
     } catch (error) {
@@ -69,14 +122,33 @@ export function CreateProfileModal({
         departmentId: '',
         education: '',
         salary: '',
-        reportingSenierId:'',
+        reportingSeniorId: '',
         extraAccessControls: []
       });
+      setDepartmentUsers([]);
     }
     onOpenChange(isOpen);
   };
 
+  // Reset reporting senior when department changes
+  const handleDepartmentChange = (value: string) => {
+    setProfileForm({
+      ...profileForm,
+      departmentId: value,
+      reportingSeniorId: '' // Reset reporting senior when department changes
+    });
+  };
+
   if (!selectedUser) return null;
+
+  // Transform department users for searchable dropdown
+  const userOptions = departmentUsers.map(user => ({
+    value: user.userId._id,
+    label: user.userId.name,
+    empId: user.userId.employeeId,
+    email: user.userId.email,
+    role:user.userId.role.name,
+  }));
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -94,7 +166,7 @@ export function CreateProfileModal({
             <Label htmlFor="department">Department *</Label>
             <Select 
               value={profileForm.departmentId} 
-              onValueChange={(value) => setProfileForm({...profileForm, departmentId: value})}
+              onValueChange={handleDepartmentChange}
               disabled={creatingProfile || loadingDepartments}
             >
               <SelectTrigger>
@@ -141,15 +213,49 @@ export function CreateProfileModal({
             />
           </div>
 
+          {/* Reporting Senior - Searchable Dropdown */}
           <div className="grid gap-2">
-            <Label htmlFor="salary">Reporting Senior</Label>
-            <Input
-              id="reportingSenierId"
-              value={profileForm.reportingSenierId}
-              onChange={(e) => setProfileForm({...profileForm, reportingSenierId: e.target.value})}
-              placeholder="e.g., Senoir Name"
-              disabled={creatingProfile}
-            />
+            <Label htmlFor="reportingSenior">Reporting Senior</Label>
+            {!profileForm.departmentId ? (
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <p className="text-sm text-yellow-800">
+                  Please select a department first to see available seniors
+                </p>
+              </div>
+            ) : (
+              <SearchableDropdown
+                options={[
+                  { value: "", label: "Select reporting senior..." },
+                  ...userOptions
+                ]}
+                value={profileForm.reportingSeniorId}
+                onValueChange={(value) => setProfileForm({...profileForm, reportingSeniorId: value})}
+                placeholder="Select reporting senior"
+                searchPlaceholder="Search by name or email..."
+                emptyMessage={loadingUsers ? "Loading users..." : "No users found in this department"}
+                disabled={creatingProfile || loadingUsers || departmentUsers.length === 0}
+                allowClear
+                onClear={() => setProfileForm({...profileForm, reportingSeniorId: ""})}
+                triggerClassName="h-10 sm:h-11 text-sm sm:text-base"
+                contentClassName="w-full sm:max-w-[var(--radix-popover-trigger-width)]"
+              />
+            )}
+            
+            {/* Show loading state when fetching users */}
+            {profileForm.departmentId && loadingUsers && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Loading department users...
+              </div>
+            )}
+            
+            {/* Show user count when users are loaded */}
+            {profileForm.departmentId && !loadingUsers && departmentUsers.length > 0 && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                <Users className="w-3 h-3" />
+                {departmentUsers.length} user{departmentUsers.length !== 1 ? 's' : ''} available
+              </div>
+            )}
           </div>
           
           {/* Extra Access Controls */}

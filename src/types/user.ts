@@ -21,6 +21,10 @@ export interface ProfileType {
   reportingManagerId: any;
   education: string;
   salary: number;
+  reportingSeniorId:{
+    _id:string;
+    name:string;
+  };
   extraAccessControls: Array<{
     module: string;
     actions: string[];

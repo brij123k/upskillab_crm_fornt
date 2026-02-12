@@ -28,6 +28,7 @@ interface LeadHistoryType {
   _id: string;
   leadId: string;
   actionType: string;
+  meet_log?:any;
   actionBy: HistoryActionBy;
   fromUser?: HistoryUser;
   toUser?: HistoryUser;
@@ -81,6 +82,10 @@ export function LeadHistoryModal({
         return <Calendar className="w-4 h-4" />;
       case 'status_changed':
         return <TrendingUp className="w-4 h-4" />;
+      case 'meet_log':
+        return <Calendar className="w-4 h-4" />; // Using Calendar icon for meetings
+      case 'meet_log_feedback':
+        return <MessageSquare className="w-4 h-4" />; // Using MessageSquare for feedback
       default:
         return <FileText className="w-4 h-4" />;
     }
@@ -102,13 +107,32 @@ export function LeadHistoryModal({
         return <Badge className="bg-pink-100 text-pink-800">Scheduled</Badge>;
       case 'status_changed':
         return <Badge className="bg-orange-100 text-orange-800">Status Changed</Badge>;
+      case 'meet_log':
+        return <Badge className="bg-teal-100 text-teal-800">Meeting</Badge>;
+      case 'meet_log_feedback':
+        return <Badge className="bg-emerald-100 text-emerald-800">Meeting Feedback</Badge>;
       default:
         return <Badge variant="outline">{actionType}</Badge>;
     }
   };
 
+  const formatDuration = (seconds: number) => {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  return `${remainingSeconds}s`;
+};
+
+
   const renderChanges = (history: LeadHistoryType) => {
-    const { actionType, changes, reason } = history;
+    const { actionType, changes, reason,meet_log } = history;
 
     switch (actionType) {
       case 'created':
@@ -142,12 +166,6 @@ export function LeadHistoryModal({
                   <span className="font-medium">{changes.source}</span>
                 </div>
               )}
-              {/* {changes.stageId && (
-                <div>
-                  <span className="text-muted-foreground">Initial Stage:</span>{' '}
-                  <span className="font-medium">{changes.stageId}</span>
-                </div>
-              )} */}
             </div>
             {reason && (
               <div className="text-sm">
@@ -198,7 +216,7 @@ export function LeadHistoryModal({
           </div>
         );
 
-      case 'stage changed by calls':
+      case 'stage_changed_by_calls':
         return (
           <div className="space-y-2">
             <div className="text-sm">
@@ -281,6 +299,115 @@ export function LeadHistoryModal({
                 <span className="font-medium">Lead information updated</span>
               </div>
             )}
+          </div>
+        );
+      case 'meet_log':
+        return (
+          <div className="space-y-2">
+            <div className="text-sm">
+              <span className="font-medium">Meeting Details:</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {changes.meetingType && (
+                <div>
+                  <span className="text-muted-foreground">Meeting Type:</span>{' '}
+                  <span className="font-medium">{changes.meetingType}</span>
+                </div>
+              )}
+              {changes.duration !== undefined && (
+                <div>
+                  <span className="text-muted-foreground">Duration:</span>{' '}
+                  <span className="font-medium">{changes.duration} seconds</span>
+                </div>
+              )}
+              {changes.outcome && (
+                <div>
+                  <span className="text-muted-foreground">Outcome:</span>{' '}
+                  <span className="font-medium">{changes.outcome}</span>
+                </div>
+              )}
+              {/* {changes.stageId && (
+                <div>
+                  <span className="text-muted-foreground">Stage:</span>{' '}
+                  <span className="font-medium">{changes.stageId}</span>
+                </div>
+              )} */}
+              {changes.startedAt && (
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">Started At:</span>{' '}
+                  <span className="font-medium">
+                    {new Date(changes.startedAt).toLocaleString()}
+                  </span>
+                </div>
+              )}
+            </div>
+            {changes.notes && (
+              <div className="text-sm">
+                <span className="font-medium">Notes:</span>{' '}
+                <span className="text-muted-foreground">{changes.notes}</span>
+              </div>
+            )}
+            {reason && (
+              <div className="text-sm">
+                <span className="font-medium">Reason:</span>{' '}
+                <span className="text-muted-foreground">{reason}</span>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'meet_log_feedback':
+        return (
+          <div className="space-y-2">
+            <div className="text-sm">
+              <span className="font-medium">Meeting Feedback:</span>
+            </div>
+            <div className="bg-muted/50 p-3 rounded-lg text-sm">
+              <span className="text-muted-foreground">Feedback:</span>{' '}
+              <span className="font-medium">{changes.feedback || reason}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {meet_log.meetingType && (
+                <div>
+                  <span className="text-muted-foreground">Meeting Type:</span>{' '}
+                  <span className="font-medium">{meet_log.meetingType}</span>
+                </div>
+              )}
+              {meet_log.duration !== undefined && (
+                <div>
+                  <span className="text-muted-foreground">Duration:</span>{' '}
+                  <span className="font-medium">{meet_log.duration} seconds</span>
+                </div>
+              )}
+              {meet_log.outcome && (
+                <div>
+                  <span className="text-muted-foreground">Outcome:</span>{' '}
+                  <span className="font-medium">{meet_log.outcome}</span>
+                </div>
+              )}
+              {meet_log.startedAt && (
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">Started At:</span>{' '}
+                  <span className="font-medium">
+                    {new Date(meet_log.startedAt).toLocaleString()}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mt-1">
+              {/* {changes.meetingId && (
+                <div>
+                  <span>Meeting ID: </span>
+                  <span className="font-mono">{changes.meetingId.slice(-6)}</span>
+                </div>
+              )} */}
+              {changes.leadId && (
+                <div>
+                  <span>Lead ID: </span>
+                  <span>{changes.leadId}</span>
+                </div>
+              )}
+            </div>
           </div>
         );
 
@@ -376,6 +503,8 @@ export function LeadHistoryModal({
                           'bg-yellow-500': history.actionType === 'assigned',
                           'bg-pink-500': history.actionType === 'lead_schedule',
                           'bg-orange-500': history.actionType === 'status_changed',
+                          'bg-teal-500': history.actionType === 'meet_log',
+                          'bg-emerald-500': history.actionType === 'meet_log_feedback',
                           'bg-gray-500': true, // default
                         }
                       )}

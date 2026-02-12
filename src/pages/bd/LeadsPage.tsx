@@ -1527,7 +1527,7 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
       {showFilters && (
         <Card>
           <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Search</Label>
                 <div className="relative">
@@ -1577,7 +1577,8 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
                   </SelectContent>
                 </Select>
               </div>
-
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="space-y-2">
   <Label>Stage</Label>
   <Select
@@ -1598,28 +1599,7 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
     </SelectContent>
   </Select>
 </div>
-              {hasPermission(permissions, 'user', 'read') && (
-                <div className="space-y-2">
-                  <Label>Assigned To</Label>
-                  <SearchableDropdown
-                  options={[
-                    { value: "all", label: "All Users" },
-                    ...users.map(user => ({
-                      value: user._id,
-                      label: user.name,
-                      role: user.role.name,
-                      empId: user.employeeId
-                    }))
-                  ]}
-                  value={filters.assignedTo}
-                  onValueChange={(value) => setFilters({ ...filters, assignedTo: value })}
-                  placeholder="All Users"
-                  searchPlaceholder="Search user..."
-                  emptyMessage="No users found"
-                  disabled={loadingUsers}
-                />
-                </div>
-              )}
+             
 
               <div className="space-y-2">
                 <Label>Date Filter</Label>
@@ -1658,6 +1638,30 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
                   </SelectContent>
                 </Select>
               </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4">
+               {hasPermission(permissions, 'user', 'read') && (
+                <div className="space-y-2">
+                  <Label>Assigned To</Label>
+                  <SearchableDropdown
+                  options={[
+                    { value: "all", label: "All Users" },
+                    ...users.map(user => ({
+                      value: user._id,
+                      label: user.name,
+                      role: user.role.name,
+                      empId: user.employeeId
+                    }))
+                  ]}
+                  value={filters.assignedTo}
+                  onValueChange={(value) => setFilters({ ...filters, assignedTo: value })}
+                  placeholder="All Users"
+                  searchPlaceholder="Search user..."
+                  emptyMessage="No users found"
+                  disabled={loadingUsers}
+                />
+                </div>
+              )}
 
               {filters.dateFilter === 'custom' && (
                 <>

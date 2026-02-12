@@ -210,6 +210,7 @@ toast({
         departmentId: data.departmentId,
         education: data.education,
         salary: parseInt(data.salary) || 0,
+        reportingSeniorId:data.reportingSeniorId,
         extraAccessControls: data.extraAccessControls.filter((control: any) => control.actions.length > 0)
       }, true);
       
@@ -277,6 +278,7 @@ toast({
         departmentId: data.departmentId,
         education: data.education,
         salary: parseInt(data.salary) || 0,
+        reportingSeniorId:data.reportingSeniorId,
         extraAccessControls: data.extraAccessControls.filter((control: any) => control.actions.length > 0)
       }, true);
       
