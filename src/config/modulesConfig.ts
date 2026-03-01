@@ -17,7 +17,6 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'create', label: 'Create Lead' },
       { id: 'read', label: 'View Leads' },
       { id: 'update', label: 'Update Lead' },
-      { id: 'delete', label: 'Delete Lead' },
       { id: 'assign', label: 'Assign Lead' },
       { id: 'status_change', label: 'Change Lead Status' },
       { id: 'stage_change', label: 'Change Lead Stage' },
@@ -47,7 +46,6 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'create', label: 'Create User' },
       { id: 'read', label: 'View Users' },
       { id: 'update', label: 'Update User' },
-      { id: 'delete', label: 'Delete User' },
       { id: 'status', label: 'Change User Status' },
       { id: 'block', label: 'Block/Unblock User' },
       { id: 'password_reset', label: 'Reset Password' }
@@ -60,7 +58,6 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'create', label: 'Create Role' },
       { id: 'read', label: 'View Roles' },
       { id: 'update', label: 'Update Role' },
-      { id: 'delete', label: 'Delete Role' },
       { id: 'assign', label: 'Assign Role' }
     ]
   },
@@ -71,7 +68,6 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'create', label: 'Create Department' },
       { id: 'read', label: 'View Departments' },
       { id: 'update', label: 'Update Department' },
-      { id: 'delete', label: 'Delete Department' },
       { id: 'assign', label: 'Assign to Department' }
     ]
   },

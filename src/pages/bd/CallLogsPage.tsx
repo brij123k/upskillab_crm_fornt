@@ -49,6 +49,7 @@ import { getDataHandlerWithToken, postDataHandlerWithToken } from '@/config/serv
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ApiConfig from '@/config/apiConfig';
+import { LeadHistoryModal } from '@/components/modal/LeadHistory';
 
 interface CallLogType {
   _id: string;
@@ -136,7 +137,9 @@ export function CallLogsPage() {
   const [CallModalOpen, setCallModalOpen] = useState(false);
   const [selectedCallLog, setSelectedCallLog] = useState<CallLogType>();
   const [currentreview, setCurrentreview] = useState<any>({});
-
+  const [leadHistoryModalOpen, setLeadHistoryModalOpen] = useState(false);
+  const [leadHistory, setLeadHistory] = useState<any[]>([]);
+  const [loadingLeadHistory, setLoadingLeadHistory] = useState(false);
   // Pagination
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25); // Increased for better view
@@ -313,6 +316,28 @@ export function CallLogsPage() {
     fetchCallLogs();
   }, [page, limit, buildQueryParams]);
 
+  const fetchLeadHistory = async (leadId: number) => {
+    try {
+      setLoadingLeadHistory(true);
+      const endpoint = ApiConfig.leadHistory(leadId.toString());
+      const response = await getDataHandlerWithToken(endpoint, null, null, true);
+      if (response) {
+        setLeadHistory(response);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch lead history",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingLeadHistory(false);
+    }
+  };
+  const handleViewLeadHistory = async (leadId: number) => {
+    await fetchLeadHistory(leadId);
+    setLeadHistoryModalOpen(true);
+  };
   // Add new call log
   const handleAddCallLog = async () => {
     try {
@@ -466,8 +491,8 @@ export function CallLogsPage() {
         "Lead Name",
         "Lead Phone",
         "Lead Email",
-        "Agent",
-        "Agent Email",
+        "Call By",
+        "Caller Email",
         "Duration (seconds)",
         "Formatted Duration",
         "Stage",
@@ -799,13 +824,13 @@ export function CallLogsPage() {
                   </Select>
                 </div>
 
-               
+
               </div>
 
               {/* Second Row */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
- <div className="space-y-2">
+
+                <div className="space-y-2">
                   <Label>Date Filter</Label>
                   <Select
                     value={filters.dateFilter}
@@ -824,7 +849,7 @@ export function CallLogsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
 
                 <div className="space-y-2">
                   <Label>Sort By</Label>
@@ -925,7 +950,7 @@ export function CallLogsPage() {
                 )}
                 {filters.userId !== 'all' && (
                   <Badge variant="secondary" className="text-xs">
-                    Agent: {users.find(u => u._id === filters.userId)?.name || filters.userId}
+                    Call By: {users.find(u => u._id === filters.userId)?.name || filters.userId}
                   </Badge>
                 )}
                 {filters.stageId !== 'all' && (
@@ -1128,6 +1153,20 @@ export function CallLogsPage() {
                               </Badge>
                             )}
                           </TableCell>
+                          <TableCell className='whitespace-nowrap'>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewLeadHistory(log.leadId);
+                              }}
+                              className="h-7 w-7 p-0"
+                              title="View Lead History"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       );
                     })}
@@ -1261,7 +1300,7 @@ export function CallLogsPage() {
                   {/* Right Column - Timing & Agent Info */}
                   <div className="space-y-4">
                     <div className="bg-muted/30 p-4 rounded-lg">
-                      <h3 className="font-medium text-sm text-muted-foreground mb-3">Agent Information</h3>
+                      <h3 className="font-medium text-sm text-muted-foreground mb-3">Employee Information</h3>
                       <div className="space-y-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1325,7 +1364,7 @@ export function CallLogsPage() {
             )}
           </div>
 
-          <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t">
+          <DialogFooter className="bottom-0 bg-background pt-4 border-t">
             <Button
               onClick={() => setCallModalOpen(false)}
               className="w-full sm:w-auto"
@@ -1335,6 +1374,19 @@ export function CallLogsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <LeadHistoryModal
+        open={leadHistoryModalOpen}
+        onOpenChange={setLeadHistoryModalOpen}
+        leadHistory={leadHistory}
+        loadingHistory={loadingLeadHistory}
+        selectedLeadName={leads.find(l => l.leadId === callLogs.find(m => m.leadId)?.leadId)?.name}
+        onRefresh={() => {
+          if (selectedCallLog) {
+            fetchLeadHistory(selectedCallLog.leadId);
+          }
+        }}
+      />
     </div>
   );
 }

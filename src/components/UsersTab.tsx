@@ -165,10 +165,10 @@ const handleEditUserOpen = (user: UserType) => {
     email: user.email,
     number: user.number,
     role: user.role._id,
-    departmentId: user.profile?.departmentId?._id || '',
+    departmentId: user.profile?.departmentId._id || '',
     education: user.profile?.education || '',
     salary: user.profile?.salary?.toString() || '',
-    reportingSeniorId: user.profile?.reportingSeniorId._id || '',
+    reportingSeniorId: user.profile?.reportingSeniorId?._id || '',
     extraAccessControls: user.profile?.extraAccessControls || []
   });
   
@@ -697,7 +697,7 @@ const handleEditUserOpen = (user: UserType) => {
                           role: user.userId.role?.name
                         }))
                       ]}
-                      value={editUserForm.reportingSeniorId || ""}
+                      value={editUserForm.reportingSeniorId}
                       onValueChange={(value) => setEditUserForm({ ...editUserForm, reportingSeniorId: value })}
                       placeholder="Select reporting senior"
                       searchPlaceholder="Search by name, email, or role..."
@@ -946,9 +946,9 @@ const handleEditUserOpen = (user: UserType) => {
                           </div>
                           <div>
                             <p className="text-sm font-medium">{selectedUser.profile.reportingSeniorId.name}</p>
-                            <p className="text-xs text-muted-foreground">
+                            {/* <p className="text-xs text-muted-foreground">
                               {selectedUser.profile.reportingSeniorId.email?.split('@')[0] || ''}
-                            </p>
+                            </p> */}
                           </div>
                         </>
                       ) : (
