@@ -26,7 +26,6 @@ export function PermissionsSelector({
   title = "Permissions",
   description = "Select modules and actions for this role"
 }: PermissionsSelectorProps) {
-  console.log(permissions)
   const toggleAction = (moduleId: string, actionId: string) => {
     const updatedPermissions = [...permissions];
     const moduleIndex = updatedPermissions.findIndex(p => p.module === moduleId);

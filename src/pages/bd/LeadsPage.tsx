@@ -77,6 +77,7 @@ import { SearchableSelect } from '@/components/modal/SearchableSelect';
 import { hasPermission } from '@/utils/permissions';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 import { LeadHistoryModal } from '@/components/modal/LeadHistory';
+import { hasModulePermission } from '@/utils/modulePermissions';
 
 interface LeadType {
   _id: string;
@@ -432,9 +433,13 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   // Initialize data
   useEffect(() => {
+    if(hasModulePermission(permissions, "leads")){
     fetchLeads();
+    }
+    if(hasModulePermission(permissions, "user")){
+      fetchUsers();
+    }
     fetchStages();
-    fetchUsers();
   }, [page, limit, filters]);
 
   // Reset selection when leads change

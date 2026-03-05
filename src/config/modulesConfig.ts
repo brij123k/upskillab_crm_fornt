@@ -71,6 +71,15 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'assign', label: 'Assign to Department' }
     ]
   },
+  pool: {
+    id: 'pool',
+    label: 'Pool Management',
+    actions: [
+      { id: 'create', label: 'Create Pool' },
+      { id: 'read', label: 'View Pool' },
+      { id: 'update', label: 'Update Pool' },
+    ]
+  },
   reports: {
     id: 'reports',
     label: 'Reports & Analytics',

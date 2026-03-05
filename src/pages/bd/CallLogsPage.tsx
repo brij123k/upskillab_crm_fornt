@@ -50,6 +50,7 @@ import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ApiConfig from '@/config/apiConfig';
 import { LeadHistoryModal } from '@/components/modal/LeadHistory';
+import { hasModulePermission } from '@/utils/modulePermissions';
 
 interface CallLogType {
   _id: string;
@@ -173,7 +174,9 @@ export function CallLogsPage() {
     stageId: '',
     outcome: ''
   });
-
+  const permissions = JSON.parse(
+    localStorage.getItem("permissions") || "[]"
+  );
   // Loading states
   const [addingCallLog, setAddingCallLog] = useState(false);
 
@@ -305,9 +308,13 @@ export function CallLogsPage() {
 
   // Initialize data
   useEffect(() => {
-    fetchUsers();
+    if(hasModulePermission(permissions, "user")){
+          fetchUsers();
+        }
     fetchCallLogs();
+    if(hasModulePermission(permissions, "leads")){
     fetchLeads();
+    }
     fetchStages();
   }, []);
 

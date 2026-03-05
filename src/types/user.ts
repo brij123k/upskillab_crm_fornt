@@ -25,6 +25,10 @@ export interface ProfileType {
     _id:string;
     name:string;
   };
+  poolId?: {
+    _id: string;
+    name: string;
+  } | string;
   extraAccessControls: Array<{
     module: string;
     actions: string[];
@@ -34,7 +38,22 @@ export interface ProfileType {
   updatedAt: string;
   __v: number;
 }
+export interface PoolType {
+  _id: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
+export interface StageType {
+  _id: string;
+  name: string;
+  departmentId: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
 export interface RoleType {
   _id: string;
   name: string;

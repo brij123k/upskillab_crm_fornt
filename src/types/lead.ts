@@ -10,6 +10,10 @@ export interface LeadType {
     name: string;
     order: number;
   };
+  poolId?: {  // Add poolId field
+    _id: string;
+    name: string;
+  } | string;
   status: 'active' | 'lost' | 'converted';
   healthScore: number;
   modifiedBy: string;

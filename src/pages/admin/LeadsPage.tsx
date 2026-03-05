@@ -48,7 +48,8 @@ import {
   ChevronDown,
   ArrowRight,
   ListTodo,
-  AlertTriangle
+  AlertTriangle,
+  Database
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -79,6 +80,7 @@ import { LeadActionsModal } from '@/components/LeadActionsModal';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 import { DuplicateLeadsModal } from '@/components/modal/DuplicateLeadsModal';
 import { CopyCheck } from 'lucide-react';
+import { PoolType } from '@/types/user';
 // import { LeadType, StageType, UserType, LeadHistoryType } from '@/types/lead';
 interface LeadType {
   _id: string;
@@ -92,6 +94,10 @@ interface LeadType {
     name: string;
     order: number;
   };
+  poolId?: {
+    _id: string;
+    name: string;
+  } | string;
   status: 'active' | 'lost' | 'converted';
   healthScore: number;
   modifiedBy: string;
@@ -104,7 +110,7 @@ interface LeadType {
     _id: string;
     name: string;
     email: string;
-    employeeId:number
+    employeeId: number
   };
 }
 
@@ -165,6 +171,7 @@ interface LeadForm {
   stageId: string;
   source_campaign?: string;
   assignedTo?: string;
+  poolId?: string;
 }
 
 interface BulkLead {
@@ -175,6 +182,7 @@ interface BulkLead {
   stageId: string;
   source_campaign?: string;
   assignedTo?: string;
+  poolId?: string;
 }
 
 interface Filters {
@@ -182,6 +190,7 @@ interface Filters {
   status: string;
   source: string;
   stageId: string;
+  poolId: string;
   assignedTo: string;
   modifiedBy: string;
   isActive: string;
@@ -212,12 +221,15 @@ export function LeadsPage() {
   const [totalLeads, setTotalLeads] = useState(0);
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   // Filters
+  const [pools, setPools] = useState<PoolType[]>([]);
+  const [loadingPools, setLoadingPools] = useState(false);
   const [filters, setFilters] = useState<Filters>({
     search: '',
     status: 'all',
     source: 'all',
     stageId: 'all',
     assignedTo: 'all',
+    poolId: 'all',
     modifiedBy: 'all',
     isActive: 'all',
     sort: 'new',
@@ -254,11 +266,12 @@ export function LeadsPage() {
     source: 'manual',
     stageId: '',
     source_campaign: '',
-    assignedTo: ''
+    assignedTo: '',
+    poolId: ''
   });
 
   const [bulkLeads, setBulkLeads] = useState<BulkLead[]>([
-    { name: '', phone: '', email: '', source: 'manual', stageId: '', assignedTo: '' }
+    { name: '', phone: '', email: '', source: 'manual', stageId: '', assignedTo: '', poolId: '' }
   ]);
 
   // Progress tracking
@@ -293,6 +306,7 @@ export function LeadsPage() {
     if (filters.status && filters.status !== "all") params.status = filters.status;
     if (filters.source && filters.source !== "all") params.source = filters.source;
     if (filters.stageId && filters.stageId !== "all") params.stageId = filters.stageId;
+    if (filters.poolId && filters.poolId !== "all") params.poolId = filters.poolId;
     if (filters.assignedTo && filters.assignedTo !== "all") params.assignedTo = filters.assignedTo;
     if (filters.modifiedBy && filters.modifiedBy !== "all") params.modifiedBy = filters.modifiedBy;
 
@@ -333,6 +347,25 @@ export function LeadsPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fetch pools
+  const fetchPools = async () => {
+    try {
+      setLoadingPools(true);
+      const response = await getDataHandlerWithToken("getAllPools", null, null);
+      if (response) {
+        setPools(response);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch pools",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingPools(false);
     }
   };
 
@@ -403,6 +436,7 @@ export function LeadsPage() {
     fetchLeads();
     fetchStages();
     fetchUsers();
+    fetchPools();
   }, [page, limit, filters]);
 
   // Reset selection when leads change
@@ -431,6 +465,9 @@ export function LeadsPage() {
         delete dataToSend.assignedTo;
         // delete dataToSend.reason;
       }
+      if (!dataToSend.poolId) {
+        delete dataToSend.poolId;
+      }
       console.log(dataToSend)
 
       const response = await postDataHandlerWithToken("createNewLead", dataToSend);
@@ -447,7 +484,8 @@ export function LeadsPage() {
         source: 'manual',
         stageId: stages[0]?._id || '',
         source_campaign: '',
-        assignedTo: ''
+        assignedTo: '',
+        poolId: ''
       });
       setNewLeadOpen(false);
       fetchLeads();
@@ -504,7 +542,9 @@ export function LeadsPage() {
           if (!dataToSend.assignedTo) {
             delete dataToSend.assignedTo;
           }
-
+          if (!dataToSend.poolId) {
+            delete dataToSend.poolId;
+          }
           await postDataHandlerWithToken("createNewLead", dataToSend);
 
           // Update progress to success
@@ -552,8 +592,21 @@ export function LeadsPage() {
     if (!selectedLead) return;
 
     try {
+      
       setUpdatingLead(true);
       const endpoint = ApiConfig.updateLead(selectedLead._id);
+      const dataToSend = { ...leadForm };
+    
+    // Remove empty fields
+    if (!dataToSend.assignedTo) {
+      delete dataToSend.assignedTo;
+    }
+    if (!dataToSend.poolId) {
+      delete dataToSend.poolId;
+    }
+    if (!dataToSend.source_campaign) {
+      delete dataToSend.source_campaign;
+    }
       const response = await patchTokenDataHandler(endpoint, leadForm, true);
 
       toast({
@@ -718,7 +771,8 @@ export function LeadsPage() {
       source: lead.source,
       stageId: lead.stageId._id,
       source_campaign: '',
-      assignedTo: lead.assignedTo?._id
+      assignedTo: lead.assignedTo?._id,
+      poolId: typeof lead.poolId === 'object' ? lead.poolId._id : lead.poolId || ''
     });
     setEditLeadOpen(true);
   };
@@ -864,6 +918,7 @@ export function LeadsPage() {
       status: 'all',
       source: 'all',
       stageId: 'all',
+      poolId: 'all',
       assignedTo: 'all',
       modifiedBy: 'all',
       isActive: 'all',
@@ -918,6 +973,7 @@ export function LeadsPage() {
         "Email",
         "Source",
         "Stage",
+        "Pool",
         "Status",
         "Health Score",
         "Assigned To",
@@ -1053,6 +1109,7 @@ export function LeadsPage() {
         lead.email,
         lead.source,
         lead.stageId?.name || "",
+        typeof lead.poolId === 'object' ? lead.poolId.name : (lead.poolId || ""),
         lead.status,
         lead.healthScore,
         lead.assignedTo?.name || "",
@@ -1145,14 +1202,14 @@ export function LeadsPage() {
               Lead Assignment
             </Button>
           )}
-    <Button
-      variant="outline"
-      onClick={() => setDuplicateModalOpen(true)}
-    >
-      <CopyCheck className="w-4 h-4 mr-2" />
-      Find Duplicates
-    </Button>
-  
+          <Button
+            variant="outline"
+            onClick={() => setDuplicateModalOpen(true)}
+          >
+            <CopyCheck className="w-4 h-4 mr-2" />
+            Find Duplicates
+          </Button>
+
           <Dialog open={bulkLeadOpen} onOpenChange={setBulkLeadOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -1255,6 +1312,37 @@ export function LeadsPage() {
                                     {stage.name}
                                   </SelectItem>
                                 ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-2">
+                            <Database className="w-4 h-4" />
+                            Pool
+                          </Label>
+                          <Select
+                            value={lead.poolId || ""}
+                            onValueChange={(value) => updateBulkLeadRow(index, 'poolId', value)}
+                            disabled={addingBulkLeads || loadingPools}
+                          >
+                            <SelectTrigger className="h-10 sm:h-11">
+                              <SelectValue placeholder="Select pool" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value=" ">No Pool</SelectItem>
+                              {loadingPools ? (
+                                <div className="py-2 text-center">
+                                  <Loader2 className="w-4 h-4 mx-auto animate-spin" />
+                                </div>
+                              ) : (
+                                pools
+                                  .filter(pool => pool.isActive)
+                                  .map((pool) => (
+                                    <SelectItem key={pool._id} value={pool._id}>
+                                      {pool.name}
+                                    </SelectItem>
+                                  ))
                               )}
                             </SelectContent>
                           </Select>
@@ -1466,6 +1554,39 @@ export function LeadsPage() {
                   </div>
 
                   <div className="space-y-2">
+                    <Label htmlFor="pool" className="text-sm sm:text-base flex items-center gap-2">
+                      <Database className="w-4 h-4" />
+                      Pool
+                    </Label>
+                    <Select
+                      value={leadForm.poolId || ""}
+                      onValueChange={(value) => setLeadForm({ ...leadForm, poolId: value })}
+                      disabled={addingLead || loadingPools}
+                    >
+                      <SelectTrigger className="h-10 sm:h-11 text-sm sm:text-base">
+                        <SelectValue placeholder="Select pool" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value=" ">No Pool</SelectItem>
+                        {loadingPools ? (
+                          <div className="py-2 text-center">
+                            <Loader2 className="w-4 h-4 mx-auto animate-spin" />
+                          </div>
+                        ) : (
+                          pools
+                            .map((pool) => (
+                              <SelectItem key={pool._id} value={pool._id}>
+                                <div className="flex items-center justify-between w-full">
+                                  <span>{pool.name}</span>
+                                </div>
+                              </SelectItem>
+                            ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="assignedTo" className="text-sm sm:text-base">Assign To (Optional)</Label>
                     <SearchableDropdown
                       options={[
@@ -1612,8 +1733,8 @@ export function LeadsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Stage</Label>
                 <Select
@@ -1634,7 +1755,7 @@ export function LeadsPage() {
                   </SelectContent>
                 </Select>
               </div>
-                    <div className="space-y-2">
+              <div className="space-y-2">
                 <Label>Sort By</Label>
                 <Select
                   value={filters.sort}
@@ -1651,7 +1772,7 @@ export function LeadsPage() {
                   </SelectContent>
                 </Select>
               </div>
-             
+
 
               <div className="space-y-2">
                 <Label>Date Filter</Label>
@@ -1672,9 +1793,8 @@ export function LeadsPage() {
                   </SelectContent>
                 </Select>
               </div>
-                  </div>
-                   <div className="grid grid-cols-1 gap-4">
-               {/* Assigned To Filter */}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Assigned To</Label>
                 <SearchableDropdown
@@ -1695,7 +1815,30 @@ export function LeadsPage() {
                   disabled={loadingUsers}
                 />
               </div>
-
+              <div className="space-y-2">
+                <Label>Pool</Label>
+                <Select
+                  value={filters.poolId}
+                  onValueChange={(value) => setFilters({ ...filters, poolId: value })}
+                  disabled={loadingPools}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All pools" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Pools</SelectItem>
+                    {pools
+                      .filter(pool => pool.isActive)
+                      .map((pool) => (
+                        <SelectItem key={pool._id} value={pool._id}>
+                          {pool.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
               {filters.dateFilter === 'custom' && (
                 <>
                   <div className="space-y-2">
@@ -1724,16 +1867,16 @@ export function LeadsPage() {
 
       {/* Leads Table */}
       <CardTitle className="text-lg">
-                    All Leads ({totalLeads})
-                    {loading && (
-                      <span className="ml-2 text-sm text-muted-foreground">
-                        <Loader2 className="w-3 h-3 inline animate-spin mr-1" />
-                        Loading...
-                      </span>
-                    )}
-                  </CardTitle>
+        All Leads ({totalLeads})
+        {loading && (
+          <span className="ml-2 text-sm text-muted-foreground">
+            <Loader2 className="w-3 h-3 inline animate-spin mr-1" />
+            Loading...
+          </span>
+        )}
+      </CardTitle>
       <Table>
-        
+
         <TableHeader>
           <TableRow>
             {isAssignmentMode && (
@@ -1752,6 +1895,7 @@ export function LeadsPage() {
             <TableHead>Contact</TableHead>
             <TableHead>Source</TableHead>
             <TableHead>Stage</TableHead>
+            <TableHead>Pool</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Assigned To</TableHead>
             {/* REMOVED: Actions column header */}
@@ -1807,6 +1951,24 @@ export function LeadsPage() {
                   <ListTodo className="w-3 h-3" />
                   {lead.stageId.name}
                 </Badge>
+              </TableCell>
+              <TableCell>
+                {lead.poolId ? (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "flex items-center gap-1",
+                      typeof lead.poolId === 'object'
+                        ? "border-blue-200 bg-blue-50 text-blue-700"
+                        : "border-gray-200 bg-gray-50 text-gray-500"
+                    )}
+                  >
+                    <Database className="w-3 h-3" />
+                    {typeof lead.poolId === 'object' ? lead.poolId.name : 'Pool Assigned'}
+                  </Badge>
+                ) : (
+                  <span className="text-muted-foreground text-sm">—</span>
+                )}
               </TableCell>
               <TableCell>{getStatusBadge(lead.status)}</TableCell>
               <TableCell>
@@ -2201,6 +2363,27 @@ export function LeadsPage() {
                     <div className="p-2 bg-muted rounded-md">{selectedLead.stageId.name}</div>
                   </div>
                   <div className="space-y-2">
+                    <Label>Pool</Label>
+                    <div className="p-2 bg-muted rounded-md">
+                      {selectedLead.poolId ? (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "flex items-center gap-1",
+                            typeof selectedLead.poolId === 'object' && selectedLead.poolId.isActive
+                              ? "border-blue-200 bg-blue-50 text-blue-700"
+                              : "border-gray-200 bg-gray-50 text-gray-500"
+                          )}
+                        >
+                          <Database className="w-3 h-3" />
+                          {typeof selectedLead.poolId === 'object' ? selectedLead.poolId.name : 'Pool Assigned'}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">Not assigned to any pool</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
                     <Label>Status</Label>
                     <div className="p-2 bg-muted rounded-md">
                       {getStatusBadge(selectedLead.status)}
@@ -2374,142 +2557,183 @@ export function LeadsPage() {
 
       {/* Edit Lead Modal */}
       <Dialog open={editLeadOpen} onOpenChange={setEditLeadOpen}>
-        <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-4 sm:mx-0">
-          <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl">Edit Lead</DialogTitle>
-            <DialogDescription className="text-sm sm:text-base">
-              Update the lead information for {selectedLead?.name}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {/* Name and Phone - Stack on mobile, side-by-side on larger screens */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-name" className="text-sm sm:text-base">Name</Label>
-                <Input
-                  id="edit-name"
-                  value={leadForm.name}
-                  onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })}
-                  placeholder="John Doe"
-                  disabled={updatingLead}
-                  className="h-10 sm:h-11 text-sm sm:text-base"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-phone" className="text-sm sm:text-base">Phone</Label>
-                <Input
-                  id="edit-phone"
-                  value={leadForm.phone}
-                  onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })}
-                  placeholder="1234567890"
-                  disabled={updatingLead}
-                  className="h-10 sm:h-11 text-sm sm:text-base"
-                />
-              </div>
-            </div>
+  <DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] mx-4 sm:mx-0 max-h-[90vh] h-auto overflow-hidden flex flex-col p-0">
+    {/* Fixed Header */}
+    <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+      <DialogTitle className="text-lg sm:text-xl">Edit Lead</DialogTitle>
+      <DialogDescription className="text-sm sm:text-base">
+        Update the lead information for {selectedLead?.name}
+      </DialogDescription>
+    </DialogHeader>
 
-            {/* Email - Full width */}
-            <div className="space-y-2">
-              <Label htmlFor="edit-email" className="text-sm sm:text-base">Email</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={leadForm.email}
-                onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })}
-                placeholder="john@company.com"
-                disabled={updatingLead}
-                className="h-10 sm:h-11 text-sm sm:text-base"
-              />
-            </div>
-
-            {/* Source and Campaign - Stack on mobile, side-by-side on larger screens */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-source" className="text-sm sm:text-base">Source</Label>
-                <Select
-                  value={leadForm.source}
-                  onValueChange={(value) => setLeadForm({ ...leadForm, source: value })}
-                  disabled={updatingLead}
-                >
-                  <SelectTrigger className="h-10 sm:h-11 text-sm sm:text-base">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[60vh] sm:max-h-none">
-                    <SelectItem value="manual" className="text-sm sm:text-base">Manual</SelectItem>
-                    <SelectItem value="facebook" className="text-sm sm:text-base">Facebook</SelectItem>
-                    <SelectItem value="google" className="text-sm sm:text-base">Google</SelectItem>
-                    <SelectItem value="api" className="text-sm sm:text-base">API</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-source_campaign" className="text-sm sm:text-base">
-                  Campaign <span className="text-muted-foreground">(Optional)</span>
-                </Label>
-                <Input
-                  id="edit-source_campaign"
-                  value={leadForm.source_campaign}
-                  onChange={(e) => setLeadForm({ ...leadForm, source_campaign: e.target.value })}
-                  placeholder="Campaign name"
-                  disabled={updatingLead}
-                  className="h-10 sm:h-11 text-sm sm:text-base"
-                />
-              </div>
-            </div>
-
-            {/* Stage - Full width */}
-            <div className="space-y-2">
-              <Label htmlFor="edit-stage" className="text-sm sm:text-base">Stage</Label>
-              <Select
-                value={leadForm.stageId}
-                onValueChange={(value) => setLeadForm({ ...leadForm, stageId: value })}
-                disabled={updatingLead || loadingStages}
-              >
-                <SelectTrigger className="h-10 sm:h-11 text-sm sm:text-base">
-                  <SelectValue placeholder="Select stage" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[60vh] sm:max-h-none">
-                  {loadingStages ? (
-                    <div className="py-2 sm:py-3 text-center">
-                      <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 mx-auto animate-spin" />
-                    </div>
-                  ) : (
-                    stages.map((stage) => (
-                      <SelectItem key={stage._id} value={stage._id} className="text-sm sm:text-base">
-                        {stage.name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
+    {/* Scrollable Content Area */}
+    <div className="flex-1 overflow-y-auto px-6 py-4">
+      <div className="grid gap-4">
+        {/* Name and Phone - Stack on mobile, side-by-side on larger screens */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="edit-name" className="text-sm sm:text-base">Name</Label>
+            <Input
+              id="edit-name"
+              value={leadForm.name}
+              onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })}
+              placeholder="John Doe"
+              disabled={updatingLead}
+              className="h-10 sm:h-11 text-sm sm:text-base"
+            />
           </div>
-          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setEditLeadOpen(false)}
+          <div className="space-y-2">
+            <Label htmlFor="edit-phone" className="text-sm sm:text-base">Phone</Label>
+            <Input
+              id="edit-phone"
+              value={leadForm.phone}
+              onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })}
+              placeholder="1234567890"
               disabled={updatingLead}
-              className="w-full sm:w-auto order-2 sm:order-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleUpdateLead}
+              className="h-10 sm:h-11 text-sm sm:text-base"
+            />
+          </div>
+        </div>
+
+        {/* Email - Full width */}
+        <div className="space-y-2">
+          <Label htmlFor="edit-email" className="text-sm sm:text-base">Email</Label>
+          <Input
+            id="edit-email"
+            type="email"
+            value={leadForm.email}
+            onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })}
+            placeholder="john@company.com"
+            disabled={updatingLead}
+            className="h-10 sm:h-11 text-sm sm:text-base"
+          />
+        </div>
+
+        {/* Source and Campaign - Stack on mobile, side-by-side on larger screens */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="edit-source" className="text-sm sm:text-base">Source</Label>
+            <Select
+              value={leadForm.source}
+              onValueChange={(value) => setLeadForm({ ...leadForm, source: value })}
               disabled={updatingLead}
-              className="w-full sm:w-auto order-1 sm:order-2"
             >
-              {updatingLead ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating...
-                </>
+              <SelectTrigger className="h-10 sm:h-11 text-sm sm:text-base">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="max-h-[40vh] sm:max-h-[50vh]">
+                <SelectItem value="manual" className="text-sm sm:text-base">Manual</SelectItem>
+                <SelectItem value="facebook" className="text-sm sm:text-base">Facebook</SelectItem>
+                <SelectItem value="google" className="text-sm sm:text-base">Google</SelectItem>
+                <SelectItem value="api" className="text-sm sm:text-base">API</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit-source_campaign" className="text-sm sm:text-base">
+              Campaign <span className="text-muted-foreground">(Optional)</span>
+            </Label>
+            <Input
+              id="edit-source_campaign"
+              value={leadForm.source_campaign}
+              onChange={(e) => setLeadForm({ ...leadForm, source_campaign: e.target.value })}
+              placeholder="Campaign name"
+              disabled={updatingLead}
+              className="h-10 sm:h-11 text-sm sm:text-base"
+            />
+          </div>
+        </div>
+
+        {/* Stage - Full width */}
+        <div className="space-y-2">
+          <Label htmlFor="edit-stage" className="text-sm sm:text-base">Stage</Label>
+          <Select
+            value={leadForm.stageId}
+            onValueChange={(value) => setLeadForm({ ...leadForm, stageId: value })}
+            disabled={updatingLead || loadingStages}
+          >
+            <SelectTrigger className="h-10 sm:h-11 text-sm sm:text-base">
+              <SelectValue placeholder="Select stage" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[40vh] sm:max-h-[50vh]">
+              {loadingStages ? (
+                <div className="py-2 sm:py-3 text-center">
+                  <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 mx-auto animate-spin" />
+                </div>
               ) : (
-                'Update Lead'
+                stages.map((stage) => (
+                  <SelectItem key={stage._id} value={stage._id} className="text-sm sm:text-base">
+                    {stage.name}
+                  </SelectItem>
+                ))
               )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Pool Selection */}
+        <div className="space-y-2">
+          <Label htmlFor="edit-pool" className="text-sm sm:text-base flex items-center gap-2">
+            <Database className="w-4 h-4" />
+            Pool
+          </Label>
+          <Select
+            value={leadForm.poolId || ""}
+            onValueChange={(value) => setLeadForm({ ...leadForm, poolId: value })}
+            disabled={updatingLead || loadingPools}
+          >
+            <SelectTrigger className="h-10 sm:h-11 text-sm sm:text-base">
+              <SelectValue placeholder="Select pool" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[40vh] sm:max-h-[50vh]">
+              {loadingPools ? (
+                <div className="py-2 sm:py-3 text-center">
+                  <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 mx-auto animate-spin" />
+                </div>
+              ) : (
+                pools.map((pool) => (
+                    <SelectItem key={pool._id} value={pool._id} className="text-sm sm:text-base">
+                      <div className="flex items-center justify-between w-full">
+                        <span>{pool.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </div>
+
+    {/* Fixed Footer */}
+    <DialogFooter className="px-6 py-4 border-t shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="flex flex-col-reverse sm:flex-row gap-2 w-full">
+        <Button
+          variant="outline"
+          onClick={() => setEditLeadOpen(false)}
+          disabled={updatingLead}
+          className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base px-4 sm:px-6"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleUpdateLead}
+          disabled={updatingLead || !leadForm.name || !leadForm.phone || !leadForm.email || !leadForm.stageId}
+          className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base px-4 sm:px-6"
+        >
+          {updatingLead ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Updating...
+            </>
+          ) : (
+            'Update Lead'
+          )}
+        </Button>
+      </div>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
       {/* Change Status Modal */}
       <Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
@@ -2596,13 +2820,13 @@ export function LeadsPage() {
       </Dialog>
 
 
-            <DuplicateLeadsModal
+      <DuplicateLeadsModal
         open={duplicateModalOpen}
         onOpenChange={setDuplicateModalOpen}
         onMergeSuccess={() => {
           fetchLeads(); // Refresh leads after merge
         }}
-        />
+      />
     </div>
   );
 }

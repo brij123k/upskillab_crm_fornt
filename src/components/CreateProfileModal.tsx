@@ -13,9 +13,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2, Users } from 'lucide-react';
+import { Loader2, Users, Database } from 'lucide-react';
 import { PermissionsSelector } from './PermissionsSelector';
-import { UserType, DepartmentType } from '@/types/user';
+import { UserType, DepartmentType, PoolType } from '@/types/user';
 import { SearchableDropdown } from './ui/searchable-dropdown';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
@@ -28,9 +28,9 @@ interface DepartmentUser {
     name: string;
     employeeId: number;
     email: string;
-    role:{
-      _id:string;
-      name:string;
+    role: {
+      _id: string;
+      name: string;
     }
   };
 }
@@ -40,7 +40,9 @@ interface CreateProfileModalProps {
   onOpenChange: (open: boolean) => void;
   selectedUser: UserType | null;
   departments: DepartmentType[];
+  pools?: PoolType[]; // Add pools prop
   loadingDepartments: boolean;
+  loadingPools?: boolean; // Add loading for pools
   creatingProfile: boolean;
   onSubmit: (data: any) => Promise<void>;
 }
@@ -50,7 +52,9 @@ export function CreateProfileModal({
   onOpenChange,
   selectedUser,
   departments,
+  pools = [], // Default to empty array
   loadingDepartments,
+  loadingPools = false,
   creatingProfile,
   onSubmit
 }: CreateProfileModalProps) {
@@ -59,6 +63,7 @@ export function CreateProfileModal({
     education: '',
     salary: '',
     reportingSeniorId: '',
+    poolId: '', // Add poolId field
     extraAccessControls: [] as Array<{ module: string; actions: string[] }>
   });
 
@@ -76,9 +81,7 @@ export function CreateProfileModal({
       try {
         setLoadingUsers(true);
         const endpoint = ApiConfig.getUserBydepId(profileForm.departmentId);
-        console.log(endpoint)
-        const response = await getDataHandlerWithToken(endpoint, null, null,true);
-        console.log(response)
+        const response = await getDataHandlerWithToken(endpoint, null, null, true);
         if (response) {
           setDepartmentUsers(response);
         }
@@ -100,14 +103,27 @@ export function CreateProfileModal({
   const handleSubmit = async () => {
     if (!selectedUser) return;
     
+    // Prepare data to send
+    const dataToSend = {
+      departmentId: profileForm.departmentId,
+      education: profileForm.education,
+      salary: profileForm.salary ? parseInt(profileForm.salary) : 0,
+      reportingSeniorId: profileForm.reportingSeniorId || null,
+      poolId: profileForm.poolId || null, // Include poolId (send null if not selected)
+      extraAccessControls: profileForm.extraAccessControls.filter(
+        control => control.actions.length > 0
+      )
+    };
+    
     try {
-      await onSubmit(profileForm);
+      await onSubmit(dataToSend);
       // Reset form on success
       setProfileForm({
         departmentId: '',
         education: '',
         salary: '',
         reportingSeniorId: '',
+        poolId: '',
         extraAccessControls: []
       });
     } catch (error) {
@@ -123,6 +139,7 @@ export function CreateProfileModal({
         education: '',
         salary: '',
         reportingSeniorId: '',
+        poolId: '',
         extraAccessControls: []
       });
       setDepartmentUsers([]);
@@ -147,7 +164,7 @@ export function CreateProfileModal({
     label: user.userId.name,
     empId: user.userId.employeeId,
     email: user.userId.email,
-    role:user.userId.role.name,
+    role: user.userId.role?.name,
   }));
 
   return (
@@ -186,6 +203,51 @@ export function CreateProfileModal({
                 )}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Pool Selection - NEW */}
+          <div className="grid gap-2">
+            <Label htmlFor="pool" className="flex items-center gap-2">
+              <Database className="w-4 h-4" />
+              Pool
+            </Label>
+            <Select 
+              value={profileForm.poolId} 
+              onValueChange={(value) => setProfileForm({...profileForm, poolId: value})}
+              disabled={creatingProfile || loadingPools}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select pool (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                {loadingPools ? (
+                  <div className="py-2 text-center">
+                    <Loader2 className="w-4 h-4 mx-auto animate-spin" />
+                  </div>
+                ) : (
+                  <>
+                    <SelectItem value="">No Pool</SelectItem>
+                    {pools
+                      .filter(pool => pool.isActive) // Only show active pools
+                      .map((pool) => (
+                        <SelectItem key={pool._id} value={pool._id}>
+                          <div className="flex items-center justify-between w-full">
+                            <span>{pool.name}</span>
+                            {pool.isActive && (
+                              <Badge variant="outline" className="ml-2 text-xs bg-green-50 text-green-700">
+                                Active
+                              </Badge>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                  </>
+                )}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Assign user to a pool (optional)
+            </p>
           </div>
 
           {/* Education */}
@@ -231,7 +293,7 @@ export function CreateProfileModal({
                 value={profileForm.reportingSeniorId}
                 onValueChange={(value) => setProfileForm({...profileForm, reportingSeniorId: value})}
                 placeholder="Select reporting senior"
-                searchPlaceholder="Search by name or email..."
+                searchPlaceholder="Search by name, email, or role..."
                 emptyMessage={loadingUsers ? "Loading users..." : "No users found in this department"}
                 disabled={creatingProfile || loadingUsers || departmentUsers.length === 0}
                 allowClear

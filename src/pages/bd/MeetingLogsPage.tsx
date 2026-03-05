@@ -54,6 +54,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { getDataHandlerWithToken, postDataHandlerWithToken } from '@/config/services';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 import ApiConfig from '@/config/apiConfig';
+import { hasModulePermission } from '@/utils/modulePermissions';
 
 interface MeetingLogType {
   _id: string;
@@ -371,9 +372,13 @@ export function MeetingLogsPage() {
   // Initialize data
   useEffect(() => {
     fetchMeetingLogs();
+    if(hasModulePermission(permissions, "leads")){
     fetchLeads();
+    }
     fetchStages();
-    fetchUsers();
+    if(hasModulePermission(permissions, "user")){
+              fetchUsers();
+            }
   }, []);
 
   // Refresh when filters or pagination changes
