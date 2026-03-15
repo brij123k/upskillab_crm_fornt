@@ -117,7 +117,7 @@ export function CSVUploadModal({
             name: values[headers.indexOf('name')] || '',
             phone: values[headers.indexOf('phone')] || '',
             email: values[headers.indexOf('email')] || '',
-            source: values[headers.indexOf('source')] || 'manual',
+            source: (values[headers.indexOf('source')]).toLowerCase() || 'manual',
             source_campaign: values[headers.indexOf('source_campaign')] || '',
             isValid: true,
             errors: []
@@ -211,7 +211,7 @@ export function CSVUploadModal({
             name: lead.name,
             phone: lead.phone,
             email: lead.email,
-            source: lead.source || 'manual',
+            source: (lead.source).toLowerCase() || 'manual',
             stageId: '696cadcadcbcf508621922e6',
             source_campaign: lead.source_campaign || undefined,
             assignedTo: selectedUserId || lead.assignedTo || undefined,
