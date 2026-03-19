@@ -25,10 +25,7 @@ export interface ProfileType {
     _id:string;
     name:string;
   };
-  poolId?: {
-    _id: string;
-    name: string;
-  } | string;
+poolIds?: string[] | PoolType[]; 
   extraAccessControls: Array<{
     module: string;
     actions: string[];

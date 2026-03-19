@@ -10,14 +10,29 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Plus, Loader2, RefreshCw, Power, Calendar, Clock } from 'lucide-react';
+import { Pencil, Plus, Loader2, RefreshCw, Power, Calendar, Clock, User, Percent, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { SearchableDropdown } from './ui/searchable-dropdown';
+
+interface UserType {
+  _id: string;
+  name: string;
+  email: string;
+  employeeId?: string;
+  role?: {
+    name: string;
+  };
+}
 
 interface PoolType {
   _id: string;
   name: string;
+  revenue_percentage: string;
+  payment_internal: boolean;
+  pool_owner: string | UserType;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -25,9 +40,21 @@ interface PoolType {
 
 interface PoolsTabProps {
   pools: PoolType[];
+  users: UserType[];
   loading: boolean;
-  onAddPool: (data: { name: string }) => Promise<any>;
-  onUpdatePool: (id: string, data: { name: string }) => Promise<any>;
+  loadingUsers?: boolean;
+  onAddPool: (data: { 
+    name: string; 
+    revenue_percentage: string; 
+    payment_internal: boolean; 
+    pool_owner: string;
+  }) => Promise<any>;
+  onUpdatePool: (id: string, data: { 
+    name: string; 
+    revenue_percentage: string; 
+    payment_internal: boolean; 
+    pool_owner: string;
+  }) => Promise<any>;
   onToggleActive: (id: string) => Promise<any>;
   onRefresh: () => void;
   fetchingData?: boolean;
@@ -35,7 +62,9 @@ interface PoolsTabProps {
 
 export function PoolsTab({
   pools,
+  users,
   loading,
+  loadingUsers = false,
   onAddPool,
   onUpdatePool,
   onToggleActive,
@@ -46,10 +75,23 @@ export function PoolsTab({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedPool, setSelectedPool] = useState<PoolType | null>(null);
   const [poolName, setPoolName] = useState('');
+  const [revenuePercentage, setRevenuePercentage] = useState('');
+  const [paymentInternal, setPaymentInternal] = useState(false);
+  const [poolOwner, setPoolOwner] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const resetForm = () => {
+    setPoolName('');
+    setRevenuePercentage('');
+    setPaymentInternal(false);
+    setPoolOwner('');
+    setSelectedPool(null);
+  };
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation
     if (!poolName.trim()) {
       toast({
         title: "Error",
@@ -59,10 +101,43 @@ export function PoolsTab({
       return;
     }
 
+    if (!revenuePercentage.trim()) {
+      toast({
+        title: "Error",
+        description: "Revenue percentage is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const percentageNum = parseFloat(revenuePercentage);
+    if (isNaN(percentageNum) || percentageNum < 0 || percentageNum > 100) {
+      toast({
+        title: "Error",
+        description: "Revenue percentage must be a number between 0 and 100",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!poolOwner) {
+      toast({
+        title: "Error",
+        description: "Pool owner is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setSubmitting(true);
-      await onAddPool({ name: poolName });
-      setPoolName('');
+      await onAddPool({ 
+        name: poolName, 
+        revenue_percentage: revenuePercentage,
+        payment_internal: paymentInternal,
+        pool_owner: poolOwner
+      });
+      resetForm();
       setIsAddModalOpen(false);
       toast({
         title: "Success",
@@ -77,6 +152,8 @@ export function PoolsTab({
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation
     if (!poolName.trim() || !selectedPool) {
       toast({
         title: "Error",
@@ -86,11 +163,43 @@ export function PoolsTab({
       return;
     }
 
+    if (!revenuePercentage.trim()) {
+      toast({
+        title: "Error",
+        description: "Revenue percentage is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const percentageNum = parseFloat(revenuePercentage);
+    if (isNaN(percentageNum) || percentageNum < 0 || percentageNum > 100) {
+      toast({
+        title: "Error",
+        description: "Revenue percentage must be a number between 0 and 100",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!poolOwner) {
+      toast({
+        title: "Error",
+        description: "Pool owner is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setSubmitting(true);
-      await onUpdatePool(selectedPool._id, { name: poolName });
-      setPoolName('');
-      setSelectedPool(null);
+      await onUpdatePool(selectedPool._id, { 
+        name: poolName,
+        revenue_percentage: revenuePercentage,
+        payment_internal: paymentInternal,
+        pool_owner: poolOwner
+      });
+      resetForm();
       setIsEditModalOpen(false);
       toast({
         title: "Success",
@@ -118,6 +227,10 @@ export function PoolsTab({
   const openEditModal = (pool: PoolType) => {
     setSelectedPool(pool);
     setPoolName(pool.name);
+    setRevenuePercentage(pool.revenue_percentage);
+    setPaymentInternal(pool.payment_internal);
+    // Handle if pool_owner is an object or string
+    setPoolOwner(typeof pool.pool_owner === 'object' ? pool.pool_owner._id : pool.pool_owner);
     setIsEditModalOpen(true);
   };
 
@@ -136,6 +249,27 @@ export function PoolsTab({
       })
     };
   };
+
+  const getPoolOwnerName = (pool: PoolType): string => {
+    if (typeof pool.pool_owner === 'object' && pool.pool_owner?.name) {
+      return pool.pool_owner.name;
+    }
+    // If it's just an ID, try to find the user in the users list
+    const user = users.find(u => u._id === pool.pool_owner);
+    return user?.name || 'Unknown Owner';
+  };
+
+  // Prepare options for searchable dropdown
+  const userOptions = [
+    { value: "", label: "Select pool owner..." },
+    ...users.map(user => ({
+      value: user._id,
+      label: user.name,
+      empId: user.employeeId,
+      email: user.email,
+      role: user.role?.name
+    }))
+  ];
 
   if (loading) {
     return (
@@ -175,13 +309,15 @@ export function PoolsTab({
                   Add Pool
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                   <DialogTitle>Create New Pool</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleAddSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Pool Name</Label>
+                    <Label htmlFor="name">
+                      Pool Name <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="name"
                       value={poolName}
@@ -191,11 +327,72 @@ export function PoolsTab({
                       autoFocus
                     />
                   </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="revenuePercentage">
+                      Revenue Percentage (%) <span className="text-red-500">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="revenuePercentage"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={revenuePercentage}
+                        onChange={(e) => setRevenuePercentage(e.target.value)}
+                        placeholder="Enter revenue percentage"
+                        disabled={submitting}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="poolOwner">
+                      Pool Owner <span className="text-red-500">*</span>
+                    </Label>
+                    <SearchableDropdown
+                      options={userOptions}
+                      value={poolOwner}
+                      onValueChange={setPoolOwner}
+                      placeholder="Select pool owner"
+                      searchPlaceholder="Search by name, email, or role..."
+                      emptyMessage={loadingUsers ? "Loading users..." : "No users found"}
+                      disabled={submitting || loadingUsers}
+                      allowClear
+                      onClear={() => setPoolOwner("")}
+                      triggerClassName="h-10 sm:h-11 text-sm sm:text-base"
+                      contentClassName="w-full sm:max-w-[var(--radix-popover-trigger-width)]"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="paymentInternal" className="text-base">
+                        Payment Internal
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Enable for internal payment processing
+                      </p>
+                    </div>
+                    <Switch
+                      id="paymentInternal"
+                      checked={paymentInternal}
+                      onCheckedChange={setPaymentInternal}
+                      disabled={submitting}
+                    />
+                  </div>
+
                   <div className="flex justify-end gap-2">
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setIsAddModalOpen(false)}
+                      onClick={() => {
+                        resetForm();
+                        setIsAddModalOpen(false);
+                      }}
                       disabled={submitting}
                     >
                       Cancel
@@ -227,6 +424,8 @@ export function PoolsTab({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {pools.map((pool) => {
                 const created = formatDate(pool.createdAt);
+                const ownerName = getPoolOwnerName(pool);
+                
                 return (
                   <Card 
                     key={pool._id} 
@@ -250,12 +449,21 @@ export function PoolsTab({
                           <h3 className="font-semibold text-lg truncate pr-2">
                             {pool.name}
                           </h3>
-                          <Badge 
-                            variant={pool.isActive ? "default" : "secondary"}
-                            className="mt-1"
-                          >
-                            {pool.isActive ? "Active" : "Inactive"}
-                          </Badge>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <Badge 
+                              variant={pool.isActive ? "default" : "secondary"}
+                            >
+                              {pool.isActive ? "Active" : "Inactive"}
+                            </Badge>
+                            <Badge variant="outline" className="bg-blue-50">
+                              <Percent className="w-3 h-3 mr-1" />
+                              {pool.revenue_percentage}%
+                            </Badge>
+                            <Badge variant="outline" className={pool.payment_internal ? "bg-green-50" : "bg-gray-50"}>
+                              <CreditCard className="w-3 h-3 mr-1" />
+                              {pool.payment_internal ? "Internal" : "External"}
+                            </Badge>
+                          </div>
                         </div>
                         <div className="flex items-center gap-1">
                           <Button
@@ -282,6 +490,15 @@ export function PoolsTab({
                         </div>
                       </div>
 
+                      {/* Pool Owner */}
+                      <div className="mt-3 p-3 bg-muted/30 rounded-lg">
+                        <div className="flex items-center gap-2 text-sm">
+                          <User className="w-4 h-4 text-muted-foreground" />
+                          <span className="font-medium">Owner:</span>
+                          <span className="text-muted-foreground truncate">{ownerName}</span>
+                        </div>
+                      </div>
+
                       {/* Creation Date and Time */}
                       <div className="space-y-1.5 mt-4 text-sm text-muted-foreground">
                         <div className="flex items-center gap-2">
@@ -294,7 +511,7 @@ export function PoolsTab({
                         </div>
                       </div>
 
-                      {/* ID for reference (optional - can be removed if not needed) */}
+                      {/* ID for reference */}
                       <div className="mt-3 text-xs text-muted-foreground/50 truncate">
                         ID: {pool._id.slice(-8)}
                       </div>
@@ -309,13 +526,15 @@ export function PoolsTab({
 
       {/* Edit Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Edit Pool</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleEditSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-name">Pool Name</Label>
+              <Label htmlFor="edit-name">
+                Pool Name <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="edit-name"
                 value={poolName}
@@ -325,14 +544,71 @@ export function PoolsTab({
                 autoFocus
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-revenuePercentage">
+                Revenue Percentage (%) <span className="text-red-500">*</span>
+              </Label>
+              <div className="relative">
+                <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="edit-revenuePercentage"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={revenuePercentage}
+                  onChange={(e) => setRevenuePercentage(e.target.value)}
+                  placeholder="Enter revenue percentage"
+                  disabled={submitting}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-poolOwner">
+                Pool Owner <span className="text-red-500">*</span>
+              </Label>
+              <SearchableDropdown
+                options={userOptions}
+                value={poolOwner}
+                onValueChange={setPoolOwner}
+                placeholder="Select pool owner"
+                searchPlaceholder="Search by name, email, or role..."
+                emptyMessage={loadingUsers ? "Loading users..." : "No users found"}
+                disabled={submitting || loadingUsers}
+                allowClear
+                onClear={() => setPoolOwner("")}
+                triggerClassName="h-10 sm:h-11 text-sm sm:text-base"
+                contentClassName="w-full sm:max-w-[var(--radix-popover-trigger-width)]"
+              />
+            </div>
+
+            <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="edit-paymentInternal" className="text-base">
+                  Payment Internal
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Enable for internal payment processing
+                </p>
+              </div>
+              <Switch
+                id="edit-paymentInternal"
+                checked={paymentInternal}
+                onCheckedChange={setPaymentInternal}
+                disabled={submitting}
+              />
+            </div>
+
             <div className="flex justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => {
+                  resetForm();
                   setIsEditModalOpen(false);
-                  setSelectedPool(null);
-                  setPoolName('');
                 }}
                 disabled={submitting}
               >

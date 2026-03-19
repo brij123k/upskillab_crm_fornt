@@ -17,6 +17,7 @@ import { Loader2, Users, Database } from 'lucide-react';
 import { PermissionsSelector } from './PermissionsSelector';
 import { UserType, DepartmentType, PoolType } from '@/types/user';
 import { SearchableDropdown } from './ui/searchable-dropdown';
+import { MultiSelect } from './ui/multi-select'; // Import the MultiSelect component
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
@@ -63,7 +64,7 @@ export function CreateProfileModal({
     education: '',
     salary: '',
     reportingSeniorId: '',
-    poolId: '', // Add poolId field
+    poolIds: [] as string[], // Change from poolId to poolIds array
     extraAccessControls: [] as Array<{ module: string; actions: string[] }>
   });
 
@@ -103,13 +104,13 @@ export function CreateProfileModal({
   const handleSubmit = async () => {
     if (!selectedUser) return;
     
-    // Prepare data to send
+    // Prepare data to send - send poolIds array instead of single poolId
     const dataToSend = {
       departmentId: profileForm.departmentId,
       education: profileForm.education,
       salary: profileForm.salary ? parseInt(profileForm.salary) : 0,
       reportingSeniorId: profileForm.reportingSeniorId || null,
-      poolId: profileForm.poolId || null, // Include poolId (send null if not selected)
+      poolIds: profileForm.poolIds, // Send the array of pool IDs
       extraAccessControls: profileForm.extraAccessControls.filter(
         control => control.actions.length > 0
       )
@@ -123,7 +124,7 @@ export function CreateProfileModal({
         education: '',
         salary: '',
         reportingSeniorId: '',
-        poolId: '',
+        poolIds: [],
         extraAccessControls: []
       });
     } catch (error) {
@@ -139,7 +140,7 @@ export function CreateProfileModal({
         education: '',
         salary: '',
         reportingSeniorId: '',
-        poolId: '',
+        poolIds: [],
         extraAccessControls: []
       });
       setDepartmentUsers([]);
@@ -205,48 +206,52 @@ export function CreateProfileModal({
             </Select>
           </div>
 
-          {/* Pool Selection - NEW */}
+          {/* Multi-Pool Selection - Updated for multiple pools */}
           <div className="grid gap-2">
-            <Label htmlFor="pool" className="flex items-center gap-2">
+            <Label className="flex items-center gap-2">
               <Database className="w-4 h-4" />
-              Pool
+              Pools
             </Label>
-            <Select 
-              value={profileForm.poolId} 
-              onValueChange={(value) => setProfileForm({...profileForm, poolId: value})}
-              disabled={creatingProfile || loadingPools}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select pool (optional)" />
-              </SelectTrigger>
-              <SelectContent>
-                {loadingPools ? (
-                  <div className="py-2 text-center">
-                    <Loader2 className="w-4 h-4 mx-auto animate-spin" />
-                  </div>
-                ) : (
-                  <>
-                    <SelectItem value="">No Pool</SelectItem>
-                    {pools
-                      .filter(pool => pool.isActive) // Only show active pools
-                      .map((pool) => (
-                        <SelectItem key={pool._id} value={pool._id}>
-                          <div className="flex items-center justify-between w-full">
-                            <span>{pool.name}</span>
-                            {pool.isActive && (
-                              <Badge variant="outline" className="ml-2 text-xs bg-green-50 text-green-700">
-                                Active
-                              </Badge>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                  </>
-                )}
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={pools
+                .filter(pool => pool.isActive)
+                .map(pool => ({
+                  value: pool._id,
+                  label: pool.name,
+                  disabled: !pool.isActive
+                }))}
+              selected={profileForm.poolIds}
+              onChange={(selectedValues) => setProfileForm({ 
+                ...profileForm, 
+                poolIds: selectedValues 
+              })}
+              placeholder="Select pools..."
+              loading={loadingPools}
+              disabled={creatingProfile}
+              emptyMessage="No active pools available"
+            />
+            
+            {/* Display selected pools as badges */}
+            {profileForm.poolIds.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {profileForm.poolIds.map((poolId) => {
+                  const pool = pools.find(p => p._id === poolId);
+                  return pool ? (
+                    <Badge 
+                      key={poolId} 
+                      variant="secondary" 
+                      className="text-xs bg-blue-50 text-blue-700 border-blue-200"
+                    >
+                      <Database className="w-3 h-3 mr-1" />
+                      {pool.name}
+                    </Badge>
+                  ) : null;
+                })}
+              </div>
+            )}
+            
             <p className="text-xs text-muted-foreground">
-              Assign user to a pool (optional)
+              Assign user to one or more pools (optional)
             </p>
           </div>
 

@@ -354,7 +354,7 @@ export function UsersPage() {
         education: data.education,
         salary: parseInt(data.salary) || 0,
         reportingSeniorId: data.reportingSeniorId,
-        poolId: data.poolId || null,
+        poolIds: data.poolIds || [],
         extraAccessControls: data.extraAccessControls.filter((control: any) => control.actions.length > 0)
       }, true);
 
@@ -423,7 +423,7 @@ export function UsersPage() {
         education: data.education,
         salary: parseInt(data.salary) || 0,
         reportingSeniorId: data.reportingSeniorId,
-        poolId: data.poolId || null,
+        poolIds: data.poolIds || [],
         extraAccessControls: data.extraAccessControls.filter((control: any) => control.actions.length > 0)
       }, true);
 
@@ -587,8 +587,6 @@ export function UsersPage() {
           </TabsTrigger>
         </TabsList>
       </Tabs>
-
-      {/* Users Tab */}
       {/* Users Tab */}
       {activeTab === 'users' && (
         <UsersTab
@@ -631,7 +629,9 @@ export function UsersPage() {
       {activeTab === 'pools' && (
         <PoolsTab
           pools={pools}
+          users={users}
           loading={loadingPools}
+          loadingUsers={loading}
           onAddPool={handleAddPool}
           onUpdatePool={handleUpdatePool}
           onToggleActive={handleTogglePoolActive}

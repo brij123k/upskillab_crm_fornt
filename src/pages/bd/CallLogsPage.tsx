@@ -223,7 +223,7 @@ export function CallLogsPage() {
     if (filters.group === 'true') {
       params.group = true;
     }
-
+    console.log(params,"1")
     return params;
   }, [filters, page, limit]);
 
@@ -232,6 +232,7 @@ export function CallLogsPage() {
     try {
       setLoading(true);
       const queryParams = buildQueryParams();
+      console.log(queryParams)
       const response = await getDataHandlerWithToken("CallLog", queryParams, null);
       if (response?.data) {
         setCallLogs(response.data);
