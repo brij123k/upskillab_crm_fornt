@@ -761,21 +761,32 @@ export function LeadsPage() {
     fetchLeadHistory(lead.leadId.toString());
   };
 
-  // Edit lead
-  const handleEditLead = (lead: LeadType) => {
-    setSelectedLead(lead);
-    setLeadForm({
-      name: lead.name,
-      phone: lead.phone,
-      email: lead.email,
-      source: lead.source,
-      stageId: lead.stageId._id,
-      source_campaign: '',
-      assignedTo: lead.assignedTo?._id,
-      poolId: typeof lead.poolId === 'object' ? lead.poolId._id : lead.poolId || ''
-    });
-    setEditLeadOpen(true);
-  };
+ // Edit lead
+const handleEditLead = (lead: LeadType) => {
+  setSelectedLead(lead);
+  
+  // Safely handle poolId which could be null, string, or object
+  let poolIdValue = '';
+  if (lead.poolId) {
+    if (typeof lead.poolId === 'object') {
+      poolIdValue = lead.poolId._id;
+    } else {
+      poolIdValue = lead.poolId;
+    }
+  }
+  
+  setLeadForm({
+    name: lead.name,
+    phone: lead.phone,
+    email: lead.email,
+    source: lead.source,
+    stageId: lead.stageId._id,
+    source_campaign: '',
+    assignedTo: lead.assignedTo?._id || '',
+    poolId: poolIdValue
+  });
+  setEditLeadOpen(true);
+};
 
   // Lead actions
   const leadActions = {

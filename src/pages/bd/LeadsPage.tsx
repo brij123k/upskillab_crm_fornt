@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DuplicateLeadsModal } from '@/components/modal/DuplicateLeadsModal';
-import { CopyCheck,MousePointer, PhoneCall,  } from 'lucide-react';
+import { CopyCheck, Database, MousePointer, PhoneCall, } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -78,6 +78,7 @@ import { hasPermission } from '@/utils/permissions';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 import { LeadHistoryModal } from '@/components/modal/LeadHistory';
 import { hasModulePermission } from '@/utils/modulePermissions';
+import { PoolType } from '@/types/user';
 
 interface LeadType {
   _id: string;
@@ -91,6 +92,10 @@ interface LeadType {
     name: string;
     order: number;
   };
+  poolId?: {
+    _id: string;
+    name: string;
+  } | string;
   status: 'active' | 'lost' | 'converted';
   healthScore: number;
   modifiedBy: string;
@@ -103,7 +108,7 @@ interface LeadType {
     _id: string;
     name: string;
     email: string;
-    employeeId:number;
+    employeeId: number;
   };
   reason: string;
 }
@@ -159,6 +164,7 @@ interface LeadForm {
   email: string;
   source: string;
   stageId: string;
+  poolId?: string;
   source_campaign?: string;
   assignedTo?: string;
   reason?: string;
@@ -170,6 +176,7 @@ interface BulkLead {
   email: string;
   source: string;
   stageId: string;
+  poolId?: string;
   source_campaign?: string;
   assignedTo?: string;
   reason?: string;
@@ -180,6 +187,7 @@ interface Filters {
   status: string;
   source: string;
   stageId: string;
+  poolId: string;
   assignedTo: string;
   modifiedBy: string;
   isActive: string;
@@ -211,8 +219,10 @@ export function BDLeadsPage() {
   const [limit, setLimit] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalLeads, setTotalLeads] = useState(0);
-const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
-const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [pools, setPools] = useState<PoolType[]>([]);
+  const [loadingPools, setLoadingPools] = useState(false);
   // Filters
   const [filters, setFilters] = useState<Filters>({
     search: '',
@@ -249,7 +259,7 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const permissions = JSON.parse(
     localStorage.getItem("permissions") || "[]"
   );
-  const user =JSON.parse(localStorage.getItem("user"));
+  const user = JSON.parse(localStorage.getItem("user"));
   // Form states
   const [leadForm, setLeadForm] = useState<LeadForm>({
     name: '',
@@ -297,6 +307,7 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
     if (filters.status && filters.status !== "all") params.status = filters.status;
     if (filters.source && filters.source !== "all") params.source = filters.source;
     if (filters.stageId && filters.stageId !== "all") params.stageId = filters.stageId;
+    if (filters.poolId && filters.poolId !== "all") params.poolId = filters.poolId;
     if (filters.assignedTo && filters.assignedTo !== "all") params.assignedTo = filters.assignedTo;
     if (filters.modifiedBy && filters.modifiedBy !== "all") params.modifiedBy = filters.modifiedBy;
 
@@ -360,10 +371,10 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
   };
 
   const handleViewLeadHistory = async (lead: LeadType) => {
-  setSelectedLead(lead);
-  await fetchLeadHistory(lead.leadId.toString());
-  setHistoryModalOpen(true);
-};
+    setSelectedLead(lead);
+    await fetchLeadHistory(lead.leadId.toString());
+    setHistoryModalOpen(true);
+  };
 
   // Fetch users
   const fetchUsers = async () => {
@@ -404,6 +415,25 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
     }
   };
 
+  // Fetch pools
+  const fetchPools = async () => {
+    try {
+      setLoadingPools(true);
+      const response = await getDataHandlerWithToken("getAllPools", null, null);
+      if (response) {
+        setPools(response);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch pools",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingPools(false);
+    }
+  };
+
   const handleStageSubmit = async (leadId: string, stageId: string) => {
     if (!selectedLead) return;
 
@@ -433,13 +463,14 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   // Initialize data
   useEffect(() => {
-    if(hasModulePermission(permissions, "leads")){
-    fetchLeads();
+    if (hasModulePermission(permissions, "leads")) {
+      fetchLeads();
     }
-    if(hasModulePermission(permissions, "user")){
+    if (hasModulePermission(permissions, "user")) {
       fetchUsers();
     }
     fetchStages();
+    fetchPools();
   }, [page, limit, filters]);
 
   // Reset selection when leads change
@@ -741,22 +772,22 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
   };
 
 
-  const sendNotify = async (leadId:number) => {
+  const sendNotify = async (leadId: number) => {
     const endpoint = ApiConfig.instantnotify(leadId)
-    try{
-      await postDataHandlerWithToken(endpoint,null,true)
+    try {
+      await postDataHandlerWithToken(endpoint, null, true)
       toast({
-      title:"Successfull",
-      description:"call Request sended to Your APP"
-    })
-    }catch(error){
-        toast({
+        title: "Successfull",
+        description: "call Request sended to Your APP"
+      })
+    } catch (error) {
+      toast({
         title: "Error",
         description: error.response?.data?.message || "Failed to send instant notify",
         variant: "destructive",
       });
       return false
-    }  
+    }
     return true
   }
   // View lead details
@@ -769,16 +800,41 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
   // Edit lead
   const handleEditLead = (lead: LeadType) => {
     setSelectedLead(lead);
+    let poolIdValue = '';
+    if (lead.poolId) {
+      if (typeof lead.poolId === 'object') {
+        poolIdValue = lead.poolId._id;
+      } else {
+        poolIdValue = lead.poolId;
+      }
+    }
     setLeadForm({
       name: lead.name,
       phone: lead.phone,
       email: lead.email,
       source: lead.source,
+      poolId: poolIdValue,
       stageId: lead.stageId._id,
       source_campaign: '',
       assignedTo: lead.assignedTo?._id
     });
     setEditLeadOpen(true);
+  };
+
+  // Helper function to safely get pool name
+  const getPoolName = (poolId: any): string => {
+    if (!poolId) return '';
+    return typeof poolId === 'object' ? poolId.name : 'Pool Assigned';
+  };
+
+  // Helper function to check if pool is active
+  const isPoolActive = (poolId: any): boolean => {
+    if (!poolId) return false;
+    if (typeof poolId === 'object' && poolId.isActive !== undefined) return poolId.isActive;
+
+    // Try to find pool in pools array
+    const foundPool = pools.find(p => p._id === (typeof poolId === 'object' ? poolId._id : poolId));
+    return foundPool?.isActive || false;
   };
 
   // Toggle lead selection
@@ -892,6 +948,7 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
       status: 'all',
       source: 'all',
       stageId: 'all',
+      poolId: 'all',
       assignedTo: 'all',
       modifiedBy: 'all',
       isActive: 'all',
@@ -1178,15 +1235,15 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
             )
           )}
 
-           {hasPermission(permissions, 'leads', 'update') && (
-    <Button
-      variant="outline"
-      onClick={() => setDuplicateModalOpen(true)}
-    >
-      <CopyCheck className="w-4 h-4 mr-2" />
-      Find Duplicates
-    </Button>
-  )}
+          {hasPermission(permissions, 'leads', 'update') && (
+            <Button
+              variant="outline"
+              onClick={() => setDuplicateModalOpen(true)}
+            >
+              <CopyCheck className="w-4 h-4 mr-2" />
+              Find Duplicates
+            </Button>
+          )}
 
           {hasPermission(permissions, 'leads', 'create') && (
             <>
@@ -1306,6 +1363,38 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
                                   placeholder="Campaign name"
                                   disabled={addingBulkLeads}
                                 />
+                              </div>
+                              {/* Add this after the Stage field in the bulk lead form */}
+                              <div className="space-y-2">
+                                <Label className="flex items-center gap-2">
+                                  <Database className="w-4 h-4" />
+                                  Pool
+                                </Label>
+                                <Select
+                                  value={lead.poolId || ""}
+                                  onValueChange={(value) => updateBulkLeadRow(index, 'poolId', value)}
+                                  disabled={addingBulkLeads || loadingPools}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select pool" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value=" ">No Pool</SelectItem>
+                                    {loadingPools ? (
+                                      <div className="py-2 text-center">
+                                        <Loader2 className="w-4 h-4 mx-auto animate-spin" />
+                                      </div>
+                                    ) : (
+                                      pools
+                                        .filter(pool => pool.isActive)
+                                        .map((pool) => (
+                                          <SelectItem key={pool._id} value={pool._id}>
+                                            {pool.name}
+                                          </SelectItem>
+                                        ))
+                                    )}
+                                  </SelectContent>
+                                </Select>
                               </div>
 
                               {/* Reason field - only shown when user is assigned */}
@@ -1470,6 +1559,37 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
                           disabled={addingLead}
                         />
                       </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="pool" className="flex items-center gap-2">
+                          <Database className="w-4 h-4" />
+                          Pool
+                        </Label>
+                        <Select
+                          value={leadForm.poolId || ""}
+                          onValueChange={(value) => setLeadForm({ ...leadForm, poolId: value })}
+                          disabled={addingLead || loadingPools}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select pool" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value=" ">No Pool</SelectItem>
+                            {loadingPools ? (
+                              <div className="py-2 text-center">
+                                <Loader2 className="w-4 h-4 mx-auto animate-spin" />
+                              </div>
+                            ) : (
+                              pools
+                                .filter(pool => pool.isActive)
+                                .map((pool) => (
+                                  <SelectItem key={pool._id} value={pool._id}>
+                                    {pool.name}
+                                  </SelectItem>
+                                ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
                   <DialogFooter>
@@ -1582,29 +1702,52 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
                   </SelectContent>
                 </Select>
               </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="space-y-2">
-  <Label>Stage</Label>
-  <Select
-    value={filters.stageId}
-    onValueChange={(value) => setFilters({ ...filters, stageId: value })}
-    disabled={loadingStages}
-  >
-    <SelectTrigger>
-      <SelectValue placeholder="All stages" />
-    </SelectTrigger>
-    <SelectContent position="popper" className="max-h-60 overflow-y-auto">
-      <SelectItem value="all">All Stages</SelectItem>
-      {stages.map((stage) => (
-        <SelectItem key={stage._id} value={stage._id}>
-          {stage.name}
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-</div>
-             
+                <Label>Stage</Label>
+                <Select
+                  value={filters.stageId}
+                  onValueChange={(value) => setFilters({ ...filters, stageId: value })}
+                  disabled={loadingStages}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All stages" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="max-h-60 overflow-y-auto">
+                    <SelectItem value="all">All Stages</SelectItem>
+                    {stages.map((stage) => (
+                      <SelectItem key={stage._id} value={stage._id}>
+                        {stage.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Pool</Label>
+                <Select
+                  value={filters.poolId || 'all'}
+                  onValueChange={(value) => setFilters({ ...filters, poolId: value })}
+                  disabled={loadingPools}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All pools" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Pools</SelectItem>
+                    {pools
+                      .filter(pool => pool.isActive)
+                      .map((pool) => (
+                        <SelectItem key={pool._id} value={pool._id}>
+                          {pool.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
 
               <div className="space-y-2">
                 <Label>Date Filter</Label>
@@ -1643,28 +1786,28 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
                   </SelectContent>
                 </Select>
               </div>
-              </div>
-              <div className="grid grid-cols-1 gap-4">
-               {hasPermission(permissions, 'user', 'read') && (
+            </div>
+            <div className="grid grid-cols-1 gap-4">
+              {hasPermission(permissions, 'user', 'read') && (
                 <div className="space-y-2">
                   <Label>Assigned To</Label>
                   <SearchableDropdown
-                  options={[
-                    { value: "all", label: "All Users" },
-                    ...users.map(user => ({
-                      value: user._id,
-                      label: user.name,
-                      role: user.role.name,
-                      empId: user.employeeId
-                    }))
-                  ]}
-                  value={filters.assignedTo}
-                  onValueChange={(value) => setFilters({ ...filters, assignedTo: value })}
-                  placeholder="All Users"
-                  searchPlaceholder="Search user..."
-                  emptyMessage="No users found"
-                  disabled={loadingUsers}
-                />
+                    options={[
+                      { value: "all", label: "All Users" },
+                      ...users.map(user => ({
+                        value: user._id,
+                        label: user.name,
+                        role: user.role.name,
+                        empId: user.employeeId
+                      }))
+                    ]}
+                    value={filters.assignedTo}
+                    onValueChange={(value) => setFilters({ ...filters, assignedTo: value })}
+                    placeholder="All Users"
+                    searchPlaceholder="Search user..."
+                    emptyMessage="No users found"
+                    disabled={loadingUsers}
+                  />
                 </div>
               )}
 
@@ -1814,6 +1957,7 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
                     <TableHead>Contact</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead>Stage</TableHead>
+                    <TableHead>Pool</TableHead>
                     <TableHead>Notify Now</TableHead>
                     <TableHead>Assigned To</TableHead>
                   </TableRow>
@@ -1826,7 +1970,7 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
                         isAssignmentMode && selectedLeads.includes(lead._id) && "bg-blue-50",
                         "cursor-pointer hover:bg-muted/50" // Add hover effect
                       )}
-                      
+
                     >
                       {isAssignmentMode && (
                         <TableCell onClick={(e) => e.stopPropagation()}>
@@ -1842,20 +1986,20 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
                         </TableCell>
                       )}
                       <TableCell
-                      onClick={() => {
-                        setSelectedLead(lead);
-                        setActionsModalOpen(true);
-                      }}
-                      className='flex justify-center items-center gap-4 border-2 rounded-2xl shadow-lg hover:bg-[#0000002c]'
-                      title="click Here"
+                        onClick={() => {
+                          setSelectedLead(lead);
+                          setActionsModalOpen(true);
+                        }}
+                        className='flex justify-center items-center gap-4 border-2 rounded-2xl shadow-lg hover:bg-[#0000002c]'
+                        title="click Here"
                       >
-                      <MousePointer className='h-3 w-3'/>
-                      <div>
-                        <div className="font-medium">{lead.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          ID: {lead.leadId}
+                        <MousePointer className='h-3 w-3' />
+                        <div>
+                          <div className="font-medium">{lead.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            ID: {lead.leadId}
 
-                        </div></div>
+                          </div></div>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
@@ -1875,10 +2019,28 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
                           {lead.stageId.name}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        {lead.poolId ? (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "flex items-center gap-1",
+                              typeof lead.poolId === 'object'
+                                ? "border-blue-200 bg-blue-50 text-blue-700"
+                                : "border-gray-200 bg-gray-50 text-gray-500"
+                            )}
+                          >
+                            <Database className="w-3 h-3" />
+                            {typeof lead.poolId === 'object' ? lead.poolId.name : 'Pool Assigned'}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
+                      </TableCell>
                       {/* <TableCell>{getStatusBadge(lead.status)}</TableCell> */}
                       <TableCell className='flex justify-center items-center'>
-                        <PhoneCall onClick={() =>sendNotify(lead.leadId)}/>
-                        </TableCell>
+                        <PhoneCall onClick={() => sendNotify(lead.leadId)} />
+                      </TableCell>
                       <TableCell>
                         {lead.assignedTo ? (
                           <div className="flex items-center gap-2">
@@ -2257,6 +2419,28 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
                       {getStatusBadge(selectedLead.status)}
                     </div>
                   </div>
+                  {/* Add this after the Stage field */}
+                  <div className="space-y-2">
+                    <Label>Pool</Label>
+                    <div className="p-2 bg-muted rounded-md">
+                      {selectedLead.poolId ? (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "flex items-center gap-1",
+                            typeof selectedLead.poolId === 'object'
+                              ? "border-blue-200 bg-blue-50 text-blue-700"
+                              : "border-gray-200 bg-gray-50 text-gray-500"
+                          )}
+                        >
+                          <Database className="w-3 h-3" />
+                          {typeof selectedLead.poolId === 'object' ? selectedLead.poolId.name : 'Pool Assigned'}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">Not assigned to any pool</span>
+                      )}
+                    </div>
+                  </div>
                   <div className="space-y-2">
                     <Label>Health Score</Label>
                     <div className="p-2 bg-muted rounded-md">{selectedLead.healthScore}</div>
@@ -2458,6 +2642,38 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
                   disabled={updatingLead}
                 />
               </div>
+
+              {/* Add this after the Campaign field */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-pool" className="flex items-center gap-2">
+                  <Database className="w-4 h-4" />
+                  Pool
+                </Label>
+                <Select
+                  value={leadForm.poolId || ""}
+                  onValueChange={(value) => setLeadForm({ ...leadForm, poolId: value })}
+                  disabled={updatingLead || loadingPools}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select pool" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingPools ? (
+                      <div className="py-2 text-center">
+                        <Loader2 className="w-4 h-4 mx-auto animate-spin" />
+                      </div>
+                    ) : (
+                      pools
+                        .filter(pool => pool.isActive)
+                        .map((pool) => (
+                          <SelectItem key={pool._id} value={pool._id}>
+                            {pool.name}
+                          </SelectItem>
+                        ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -2647,24 +2863,24 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
                       </div>
                     </Button>
                   )}
-{hasPermission(permissions, 'leads', 'read') && (
-  <Button
-    variant="outline"
-    onClick={() => {
-      setActionsModalOpen(false);
-      handleViewLeadHistory(selectedLead);
-    }}
-    className="h-auto py-4 justify-start"
-  >
-    <div className="flex items-center gap-3">
-      <FileText className="w-5 h-5" />
-      <div className="text-left">
-        <div className="font-medium">View History</div>
-        <div className="text-xs text-muted-foreground">View complete lead history</div>
-      </div>
-    </div>
-  </Button>
-)}
+                  {hasPermission(permissions, 'leads', 'read') && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setActionsModalOpen(false);
+                        handleViewLeadHistory(selectedLead);
+                      }}
+                      className="h-auto py-4 justify-start"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FileText className="w-5 h-5" />
+                        <div className="text-left">
+                          <div className="font-medium">View History</div>
+                          <div className="text-xs text-muted-foreground">View complete lead history</div>
+                        </div>
+                      </div>
+                    </Button>
+                  )}
                 </div>
 
                 <div className="pt-4 border-t">
@@ -2719,21 +2935,21 @@ const [historyModalOpen, setHistoryModalOpen] = useState(false);
       />
 
       <DuplicateLeadsModal
-  open={duplicateModalOpen}
-  onOpenChange={setDuplicateModalOpen}
-  onMergeSuccess={() => {
-    fetchLeads(); // Refresh leads after merge
-  }}
-/>
+        open={duplicateModalOpen}
+        onOpenChange={setDuplicateModalOpen}
+        onMergeSuccess={() => {
+          fetchLeads(); // Refresh leads after merge
+        }}
+      />
 
-<LeadHistoryModal
-  open={historyModalOpen}
-  onOpenChange={setHistoryModalOpen}
-  leadHistory={leadHistory}
-  loadingHistory={loadingHistory}
-  selectedLeadName={selectedLead?.name}
-  onRefresh={() => selectedLead && fetchLeadHistory(selectedLead.leadId.toString())}
-/>
+      <LeadHistoryModal
+        open={historyModalOpen}
+        onOpenChange={setHistoryModalOpen}
+        leadHistory={leadHistory}
+        loadingHistory={loadingHistory}
+        selectedLeadName={selectedLead?.name}
+        onRefresh={() => selectedLead && fetchLeadHistory(selectedLead.leadId.toString())}
+      />
     </div>
   );
 }
