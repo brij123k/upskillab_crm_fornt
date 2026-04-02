@@ -80,6 +80,31 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'update', label: 'Update Pool' },
     ]
   },
+  orders: {
+    id: 'orders',
+    label: 'Order Management',
+    actions: [
+      { id: 'create', label: 'Create Order' },
+      { id: 'read', label: 'View Order' },
+      { id: 'update', label: 'Update Order' },
+      { id: 'approve', label: 'Approve Order' },
+      { id: 'read_loans', label: 'Read Loans' },
+      { id: 'send_reminders', label: 'Send Reminders' },
+      { id: 'payment_link_generator', label: 'Generate Payment Link' },
+      { id: 'read_payment_history', label: 'Read Payment History' },
+    ]
+  },
+  loan_partner: {
+    id: 'loan_partner',
+    label: 'Loan Partner Management',
+    actions: [
+      { id: 'create', label: 'Create Loan Partner' },
+      { id: 'read', label: 'View Loan Partners' },
+      { id: 'update', label: 'Update Loan Partner' },
+      { id: 'approve', label: 'Approve Loan Partner' },
+      { id: 'toggle_status', label: 'Toggle Loan Partner Status' },
+    ]
+  },
   reports: {
     id: 'reports',
     label: 'Reports & Analytics',

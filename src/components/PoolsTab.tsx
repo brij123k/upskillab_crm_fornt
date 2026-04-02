@@ -456,8 +456,7 @@ export function PoolsTab({
                               {pool.isActive ? "Active" : "Inactive"}
                             </Badge>
                             <Badge variant="outline" className="bg-blue-50">
-                              <Percent className="w-3 h-3 mr-1" />
-                              {pool.revenue_percentage}%
+                              {pool.revenue_percentage}<Percent className="w-3 h-3 mr-1" />
                             </Badge>
                             <Badge variant="outline" className={pool.payment_internal ? "bg-green-50" : "bg-gray-50"}>
                               <CreditCard className="w-3 h-3 mr-1" />

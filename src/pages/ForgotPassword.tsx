@@ -28,15 +28,14 @@ export default function ForgotPassword() {
 
       if (res.message) {
         setSuccess(res.message);
-        // Store email in localStorage
         localStorage.setItem('resetEmail', email);
-        // Redirect to verify OTP page after 2 seconds
         setTimeout(() => {
           navigate('/verify-otp');
         }, 2000);
       }
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to send OTP. Please try again.');
+      console.log('Error sending OTP:', err);
+      setError(err?.message || 'Failed to send OTP. Please try again.');
     } finally {
       setIsLoading(false);
     }

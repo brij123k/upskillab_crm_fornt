@@ -22,10 +22,12 @@ import {
   CreditCard,
   PhoneCall,
   User,
+  ListOrdered,
 } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import { getUser } from "@/auth";
 import { hasModulePermission } from '@/utils/modulePermissions';
+import { hasPermission } from '@/utils/permissions';
 
 interface SidebarProps {
   panel: 'admin' | 'hr' | 'bd';
@@ -167,10 +169,28 @@ const bdNavItems = [
     module: 'meeting_logs' 
   },
   { 
+    icon: ListOrdered, 
+    label: 'Orders', 
+    path: '/bd/orders', 
+    module: 'orders' 
+  },
+  { 
     icon: CreditCard, 
     label: 'Payments', 
     path: '/bd/payments', 
     module: 'payments' 
+  },
+  { 
+    icon: CreditCard, 
+    label: 'Loan Management', 
+    path: '/bd/loan-management', 
+    module: 'loans' 
+  },
+  { 
+    icon: CreditCard, 
+    label: 'Subscription', 
+    path: '/bd/subscriptions', 
+    module: 'subscriptions' 
   },
   { 
     icon: BarChart3, 
@@ -227,7 +247,19 @@ export function Sidebar({ panel }: SidebarProps) {
     if (panel === 'bd' && module === 'bd_settings') {
       return true;
     }
-    
+    if (panel === 'bd' && module === 'payments') {
+      if(hasPermission(permissions, 'orders', 'read_payment_history')) {
+        return true;
+      }
+    }
+    if (panel === 'bd' && module === 'loans') {
+      if(hasPermission(permissions, 'orders', 'read_loans')) {
+        return true;
+      }
+    }
+    // if (panel === 'bd' && module === 'subscriptions') {
+    //   return true;
+    // }
     // Check module permission
     if (module) {
       return hasModulePermission(permissions, module);

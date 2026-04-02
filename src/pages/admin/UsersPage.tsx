@@ -7,7 +7,8 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { postDataHandlerWithToken, getDataHandlerWithToken, patchTokenDataHandler } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
-
+import { LoanPartnersTab, LoanPartnerType } from '@/components/LoanPartnersTab';
+import { HandCoins } from 'lucide-react'
 // Import components
 import { UsersTab } from '@/components/UsersTab';
 import { RolesTab } from '@/components/RolesTab';
@@ -31,9 +32,10 @@ export function UsersPage() {
   const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [loadingPools, setLoadingPools] = useState(false);
   const [loadingStages, setLoadingStages] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'departments' | 'pools' | 'stages'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'departments' | 'pools' | 'stages' | 'loanpartners'>('users');
   const [fetchingData, setFetchingData] = useState(false);
-
+  const [loanPartners, setLoanPartners] = useState<LoanPartnerType[]>([]);
+const [loadingLoanPartners, setLoadingLoanPartners] = useState(false);
   // Department Handlers
   const handleAddDepartment = async (departmentData: any) => {
     try {
@@ -286,27 +288,106 @@ export function UsersPage() {
       setLoadingStages(false);
     }
   };
-
-  const fetchAllData = async () => {
-    try {
-      setFetchingData(true);
-      await Promise.all([
-        fetchUsers(),
-        fetchRoles(),
-        fetchDepartments(),
-        fetchPools(),
-        fetchStages()
-      ]);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch data",
-        variant: "destructive",
-      });
-    } finally {
-      setFetchingData(false);
+const fetchLoanPartners = async () => {
+  try {
+    setLoadingLoanPartners(true);
+    const response = await getDataHandlerWithToken(ApiConfig.getLoanPartners, null, null,true);
+    if (response) {
+      setLoanPartners(response);
     }
-  };
+  } catch (error) {
+    toast({
+      title: "Error",
+      description: "Failed to fetch loan partners",
+      variant: "destructive",
+    });
+  } finally {
+    setLoadingLoanPartners(false);
+  }
+};
+
+// Add CRUD handlers for loan partners
+const handleAddLoanPartner = async (partnerData: { name: string; type: string; submissionCharge: number }) => {
+  try {
+    const response = await postDataHandlerWithToken('createLoanPartners', partnerData);
+    toast({
+      title: "Success",
+      description: response?.message || "Loan partner created successfully",
+    });
+    fetchLoanPartners();
+    return response;
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.response?.data?.message || "Failed to create loan partner",
+      variant: "destructive",
+    });
+    throw error;
+  }
+};
+
+const handleUpdateLoanPartner = async (partnerId: string, partnerData: { name: string; type: string; submissionCharge: number }) => {
+  try {
+    const endpoint = ApiConfig.updateLoanPartners(partnerId);
+    const response = await patchTokenDataHandler(endpoint, partnerData, true);
+    toast({
+      title: "Success",
+      description: response?.message || "Loan partner updated successfully",
+    });
+    fetchLoanPartners();
+    return response;
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.response?.data?.message || "Failed to update loan partner",
+      variant: "destructive",
+    });
+    throw error;
+  }
+};
+
+const handleToggleLoanPartnerActive = async (partnerId: string) => {
+  try {
+    const endpoint = ApiConfig.toggleLoanPartners(partnerId);
+    const response = await patchTokenDataHandler(endpoint, {}, true);
+    toast({
+      title: "Success",
+      description: response?.message || "Loan partner status updated successfully",
+    });
+    fetchLoanPartners();
+    return response;
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.response?.data?.message || "Failed to update loan partner status",
+      variant: "destructive",
+    });
+    throw error;
+  }
+};
+
+// Update fetchAllData to include loan partners
+const fetchAllData = async () => {
+  try {
+    setFetchingData(true);
+    await Promise.all([
+      fetchUsers(),
+      fetchRoles(),
+      fetchDepartments(),
+      fetchPools(),
+      fetchStages(),
+      fetchLoanPartners(), // Add this line
+    ]);
+  } catch (error) {
+    toast({
+      title: "Error",
+      description: "Failed to fetch data",
+      variant: "destructive",
+    });
+  } finally {
+    setFetchingData(false);
+  }
+};
 
   useEffect(() => {
     fetchAllData();
@@ -585,6 +666,10 @@ export function UsersPage() {
             <GitBranch className="w-4 h-4" />
             Stages
           </TabsTrigger>
+          <TabsTrigger value="loanpartners" className="flex items-center gap-2">
+  <HandCoins className="w-4 h-4" />
+  Loan Partners
+</TabsTrigger>
         </TabsList>
       </Tabs>
       {/* Users Tab */}
@@ -651,6 +736,19 @@ export function UsersPage() {
           fetchingData={fetchingData}
         />
       )}
+
+      {activeTab === 'loanpartners' && (
+  <LoanPartnersTab
+    loanPartners={loanPartners}
+    loading={loadingLoanPartners}
+    fetchingData={fetchingData}
+    onAddLoanPartner={handleAddLoanPartner}
+    onUpdateLoanPartner={handleUpdateLoanPartner}
+    onToggleActive={handleToggleLoanPartnerActive}
+    onRefresh={fetchLoanPartners}
+  />
+)}
+
     </div>
   );
 }

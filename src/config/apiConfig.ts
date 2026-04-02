@@ -1,5 +1,5 @@
-const url = "http://localhost:3000"
-// const url = "https://crm.upskillab.in"
+// const url = "http://localhost:3000"
+const url = "https://crm.upskillab.in"
 const ApiConfig = {
   url,
   login:`${url}/users/login`,
@@ -54,10 +54,27 @@ const ApiConfig = {
   notification:`${url}/notifications`,
   notificationUnreadCount:`${url}/notifications/unread-count`,
   readNotification:(id)=>`${url}/notifications/${id}/read`,
-  readAllNotification:`${url}/notifications/read-all`
+  readAllNotification:`${url}/notifications/read-all`,
 
-  // uploadFiles: `${url}/file`,
-  // categoryByCode: (code:string) => `${url}/category/code/${code}`,
+
+  // order management
+  Order:`${url}/order`,
+  getOrderById:(orderId:string)=>`${url}/order/${orderId}`,
+  updateOrder:(orderId:string)=>`${url}/order/${orderId}`,
+  toggleOrder:(orderId:string)=>`${url}/order/approve/${orderId}`,
+
+  getLoanPartners:`${url}/loan-partner`,
+  createLoanPartners:`${url}/loan-partner`,
+  updateLoanPartners:(loanPartnerId:string)=>`${url}/loan-partner/${loanPartnerId}`,
+  toggleLoanPartners:(loanPartnerId:string)=>`${url}/loan-partner/toggle/${loanPartnerId}`,
+  createPaymentLink:`${url}/payment/create-link`,
+  getPaymentHistory:`${url}/payment`,
+  getPaymentbyOrderId:(orderId:string)=>`${url}/payment/by-order-id/${orderId}`,
+  createSubscription:`${url}/payment/create-subscription`,
+  getLoanHistory:`${url}/order/loan/loan-emi`,
+  sendLoanReminder:(emiId:string)=>`${url}/order/loan/reminder/${emiId}`,
+  updateLoanStatus:(emiId:string)=>`${url}/order/loan/loan-emi/${emiId}`,
+
 };
 
 export default ApiConfig;

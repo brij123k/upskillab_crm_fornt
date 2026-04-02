@@ -26,6 +26,9 @@ import DashboardRedirect from "@/DashboardRedirect";
 import { VerifyOTP } from "@/pages/VerifyOTP";
 import { ResetPassword } from "@/pages/ResetPassword";
 import { MeetingLogsPage } from "./pages/bd/MeetingLogsPage";
+import { OrderManagementPage } from "./pages/bd/OrderManagementPage";
+import { PaymentHistoryPage } from "./pages/bd/PaymentHistoryPage";
+import { LoanManagementPage } from "./pages/bd/LoanManagementPage";
 
 // Placeholder
 const PlaceholderPage = ({ title }: { title: string }) => (
@@ -105,7 +108,10 @@ const AppRoutes = () => {
           <Route path="tasks" element={<PlaceholderPage title="Tasks & Follow-ups" />} />
           <Route path="calls" element={<CallLogsPage/>} />
           <Route path="meetings" element={<MeetingLogsPage />} />
-          <Route path="payments" element={<PlaceholderPage title="Payments" />} />
+          <Route path="orders" element={<OrderManagementPage />} />
+          <Route path="payments" element={<PaymentHistoryPage />} />
+          <Route path="loan-management" element={<LoanManagementPage />} />
+          <Route path="subscriptions" element={<PlaceholderPage title="BD Subscriptions" />} />
           <Route path="reports" element={<PlaceholderPage title="BD Reports" />} />
           <Route path="settings" element={<PlaceholderPage title="BD Settings" />} />
         </Route>
