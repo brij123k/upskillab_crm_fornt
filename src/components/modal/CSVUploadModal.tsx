@@ -14,6 +14,7 @@ interface CSVUploadModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   users: Array<{ _id: string; name: string; email: string; role?: { name: string }; employeeId?: string }>;
+  pools: Array<{ _id: string; name: string }>;
   onUploadSuccess: () => void;
 }
 
@@ -33,6 +34,7 @@ export function CSVUploadModal({
   open,
   onOpenChange,
   users,
+  pools,
   onUploadSuccess
 }: CSVUploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
@@ -41,7 +43,8 @@ export function CSVUploadModal({
   const [parsing, setParsing] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [bulkReason, setBulkReason] = useState<string>('');
-
+  const [selectedPoolId, setSelectedPoolId] = useState<string>('');
+  const [currentError, setCurrentError] = useState<string>('');
   const downloadCSVTemplate = () => {
     const headers = ['name', 'phone', 'email', 'source', 'source_campaign'];
     const example = ['John Doe', '1234567890', 'john@example.com', 'manual', 'Summer Campaign'];
@@ -204,6 +207,7 @@ export function CSVUploadModal({
       // Process leads one by one
       let successCount = 0;
       let errorCount = 0;
+      let error = '';
 
       for (const lead of validLeads) {
         try {
@@ -215,6 +219,7 @@ export function CSVUploadModal({
             stageId: '696cadcadcbcf508621922e6',
             source_campaign: lead.source_campaign || undefined,
             assignedTo: selectedUserId || lead.assignedTo || undefined,
+            poolId : selectedPoolId ? selectedPoolId : undefined,
             reason: selectedUserId ? bulkReason : (lead.reason || undefined)
           };
 
@@ -229,13 +234,14 @@ export function CSVUploadModal({
           successCount++;
         } catch (error) {
           errorCount++;
-          console.error('Failed to upload lead:', error);
+          console.error('Failed to upload lead:', error.message);
+          setCurrentError(error.message);
         }
       }
 
       toast({
         title: 'Upload Complete',
-        description: `Successfully uploaded ${successCount} leads. ${errorCount} failed.`,
+        description: `Successfully uploaded ${successCount} leads. ${errorCount} failed`,
       });
 
       // Reset and close
@@ -370,10 +376,36 @@ export function CSVUploadModal({
                     contentClassName="w-full max-w-[var(--radix-popover-trigger-width)]"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>Assign To Pool (Optional)</Label>
+                  <SearchableDropdown
+                    options={[
+                      { value: "", label: "Not assigned" },
+                      ...pools.map(pool => ({
+                        value: pool._id,
+                        label: pool.name,
+                      }))
+                    ]}
+                    value={selectedPoolId}
+                    onValueChange={setSelectedPoolId}
+                    placeholder="Select pool to assign all leads"
+                    searchPlaceholder="Search by name..."
+                    emptyMessage="No pools found"
+                    disabled={uploading}
+                    allowClear
+                    onClear={() => {
+                      setSelectedPoolId("");
+                      setBulkReason("");
+                    }}
+                    triggerClassName="h-10 text-sm"
+                    contentClassName="w-full max-w-[var(--radix-popover-trigger-width)]"
+                  />
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  This will assign all leads to the selected user
+                  This will assign all leads to the selected pool
                 </p>
               </div>
+              
 
               {/* Bulk Reason Field - Only shown when user is selected */}
               {selectedUserId && selectedUserId.trim() !== "" && (

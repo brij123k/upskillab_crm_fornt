@@ -2095,6 +2095,7 @@ const handleEditLead = (lead: LeadType) => {
         open={csvUploadOpen}
         onOpenChange={setCsvUploadOpen}
         users={users}
+        pools={pools}
         onUploadSuccess={() => {
           setCsvUploadOpen(false);
           fetchLeads();

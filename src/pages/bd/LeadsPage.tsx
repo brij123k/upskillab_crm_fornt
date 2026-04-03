@@ -230,6 +230,7 @@ export function BDLeadsPage() {
     source: 'all',
     stageId: 'all',
     assignedTo: 'all',
+    poolId: 'all',
     modifiedBy: 'all',
     isActive: 'all',
     sort: 'new',
@@ -273,7 +274,7 @@ export function BDLeadsPage() {
   });
 
   const [bulkLeads, setBulkLeads] = useState<BulkLead[]>([
-    { name: '', phone: '', email: '', source: 'manual', stageId: '696cadcadcbcf508621922e6', assignedTo: '', reason: '' }
+    { name: '', phone: '', email: '', source: 'manual', stageId: '696cadcadcbcf508621922e6', assignedTo: '', poolId: '', reason: '' }
   ]);
 
   // Progress tracking
@@ -2148,6 +2149,7 @@ export function BDLeadsPage() {
         open={csvUploadOpen}
         onOpenChange={setCsvUploadOpen}
         users={users}
+        pools={pools}
         onUploadSuccess={() => {
           setCsvUploadOpen(false);
           fetchLeads();
