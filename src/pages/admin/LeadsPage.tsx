@@ -440,20 +440,33 @@ export function LeadsPage() {
   }, [page, limit, filters]);
 
   // Reset selection when leads change
-  useEffect(() => {
+useEffect(() => {
+  if (!isAssignmentMode) {
     setSelectedLeads([]);
     setSelectAll(false);
-  }, [leads]);
+  }
+}, [leads]);
+
+const handleSelectAll = () => {
+  if (selectAll) {
+    // Uncheck: remove current page leads from selection
+    const currentPageIds = new Set(leads.map(l => l._id));
+    setSelectedLeads(prev => prev.filter(id => !currentPageIds.has(id)));
+    setSelectAll(false);
+  } else {
+    setSelectAll(true);
+  }
+};
 
   // Handle select all
-  useEffect(() => {
-    if (selectAll) {
-      const allLeadIds = leads.map(lead => lead._id);
-      setSelectedLeads(allLeadIds);
-    } else {
-      setSelectedLeads([]);
-    }
-  }, [selectAll, leads]);
+useEffect(() => {
+  if (selectAll) {
+    const currentPageIds = leads.map(lead => lead._id);
+    // Add current page leads to existing selections
+    setSelectedLeads(prev => Array.from(new Set([...prev, ...currentPageIds])));
+  }
+  // Don't clear on selectAll = false here, let the checkbox handler do it
+}, [selectAll, leads]);
 
   // Add new lead
   const handleAddLead = async () => {
@@ -1902,7 +1915,7 @@ const handleEditLead = (lead: LeadType) => {
                   <input
                     type="checkbox"
                     checked={selectAll}
-                    onChange={() => setSelectAll(!selectAll)}
+                    onChange={handleSelectAll}
                     className="h-4 w-4"
                   />
                 </div>
@@ -2645,6 +2658,8 @@ const handleEditLead = (lead: LeadType) => {
                       <SelectItem value="manual" className="text-sm sm:text-base">Manual</SelectItem>
                       <SelectItem value="facebook" className="text-sm sm:text-base">Facebook</SelectItem>
                       <SelectItem value="google" className="text-sm sm:text-base">Google</SelectItem>
+                      <SelectItem value="positive" className="text-sm sm:text-base">Positive</SelectItem>
+                      <SelectItem value="refurbished" className="text-sm sm:text-base">Refurbished</SelectItem>
                       <SelectItem value="api" className="text-sm sm:text-base">API</SelectItem>
                     </SelectContent>
                   </Select>

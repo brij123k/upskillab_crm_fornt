@@ -1327,6 +1327,8 @@ export function BDLeadsPage() {
                                     <SelectItem value="manual">Manual</SelectItem>
                                     <SelectItem value="facebook">Facebook</SelectItem>
                                     <SelectItem value="google">Google</SelectItem>
+                                     <SelectItem value="positive">Positive</SelectItem>
+                                    <SelectItem value="refurbished">Refurbished</SelectItem>
                                     <SelectItem value="api">API</SelectItem>
                                   </SelectContent>
                                 </Select>
@@ -1546,6 +1548,8 @@ export function BDLeadsPage() {
                             <SelectItem value="manual">Manual</SelectItem>
                             <SelectItem value="facebook">Facebook</SelectItem>
                             <SelectItem value="google">Google</SelectItem>
+                            <SelectItem value="positive">Positive</SelectItem>
+                            <SelectItem value="refurbished">Refurbished</SelectItem>
                             <SelectItem value="api">API</SelectItem>
                           </SelectContent>
                         </Select>
@@ -1699,6 +1703,8 @@ export function BDLeadsPage() {
                     <SelectItem value="manual">Manual</SelectItem>
                     <SelectItem value="facebook">Facebook</SelectItem>
                     <SelectItem value="google">Google</SelectItem>
+                    <SelectItem value="positive">Positive</SelectItem>
+                                    <SelectItem value="refurbished">Refurbished</SelectItem>
                     <SelectItem value="api">API</SelectItem>
                   </SelectContent>
                 </Select>
@@ -2630,6 +2636,8 @@ export function BDLeadsPage() {
                     <SelectItem value="manual">Manual</SelectItem>
                     <SelectItem value="facebook">Facebook</SelectItem>
                     <SelectItem value="google">Google</SelectItem>
+                    <SelectItem value="positive">Positive</SelectItem>
+                    <SelectItem value="refurbished">Refurbished</SelectItem>
                     <SelectItem value="api">API</SelectItem>
                   </SelectContent>
                 </Select>
