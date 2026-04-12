@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DuplicateLeadsModal } from '@/components/modal/DuplicateLeadsModal';
-import { CopyCheck, Database, MousePointer, PhoneCall, } from 'lucide-react';
+import { CopyCheck, Database, MousePointer, PhoneCall,AlarmClock } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -2066,7 +2066,7 @@ export function BDLeadsPage() {
                       </TableCell>
                       {/* <TableCell>{getStatusBadge(lead.status)}</TableCell> */}
                       <TableCell>
-                        <PhoneCall onClick={() => sendNotify(lead.leadId)} />
+                        <AlarmClock onClick={() => sendNotify(lead.leadId)} />
                       </TableCell>
                       <TableCell>
                         <PhoneCall onClick={() => callNow(lead.leadId)} />
