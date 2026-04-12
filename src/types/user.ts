@@ -11,6 +11,7 @@ export interface UserType {
   createdAt: string;
   updatedAt: string;
   lastLoginAt?: string;
+  IVREnabled?: boolean;
   profile?: ProfileType;
 }
 

@@ -791,6 +791,25 @@ export function BDLeadsPage() {
     }
     return true
   }
+
+  const callNow = async (leadId: number) => {
+    // const endpoint = ApiConfig.callToLead()
+    try {
+      await postDataHandlerWithToken(ApiConfig.callToLead, {leadId}, true)
+      toast({
+        title: "Successfull",
+        description: "call Request sended To You Phone"
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to Call IVR Failed",
+        variant: "destructive",
+      });
+      return false
+    }
+    return true
+  }
   // View lead details
   const handleViewLead = (lead: LeadType) => {
     setSelectedLead(lead);
@@ -1966,6 +1985,7 @@ export function BDLeadsPage() {
                     <TableHead>Stage</TableHead>
                     <TableHead>Pool</TableHead>
                     <TableHead>Notify Now</TableHead>
+                    <TableHead>Call Now</TableHead>
                     <TableHead>Assigned To</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -2045,8 +2065,11 @@ export function BDLeadsPage() {
                         )}
                       </TableCell>
                       {/* <TableCell>{getStatusBadge(lead.status)}</TableCell> */}
-                      <TableCell className='flex justify-center items-center'>
+                      <TableCell>
                         <PhoneCall onClick={() => sendNotify(lead.leadId)} />
+                      </TableCell>
+                      <TableCell>
+                        <PhoneCall onClick={() => callNow(lead.leadId)} />
                       </TableCell>
                       <TableCell>
                         {lead.assignedTo ? (

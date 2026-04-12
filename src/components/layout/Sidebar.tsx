@@ -28,7 +28,12 @@ import logo from '@/assets/logo.png';
 import { getUser } from "@/auth";
 import { hasModulePermission } from '@/utils/modulePermissions';
 import { hasPermission } from '@/utils/permissions';
-
+import { connectCallSocket, disconnectCallSocket } from '@/config/callSocket';
+import { useToast } from '@/components/ui/use-toast';
+import { CallFeedbackModal } from '../CallFeedbackModal';
+import { postDataHandlerWithToken } from '@/config/services';
+import { useEffect, useState } from 'react';
+import ApiConfig from '@/config/apiConfig';
 interface SidebarProps {
   panel: 'admin' | 'hr' | 'bd';
 }
@@ -208,14 +213,73 @@ const bdNavItems = [
 
 export function Sidebar({ panel }: SidebarProps) {
   const location = useLocation();
-  
-  // Get permissions from localStorage
+  const { toast } = useToast();
+    const [isCallFeedbackModalOpen, setIsCallFeedbackModalOpen] = useState(false);
+  const [currentCallData, setCurrentCallData] = useState<any>(null);
   const permissions = JSON.parse(
     localStorage.getItem("permissions") || "[]"
   );
 
   const user = getUser();
   
+  const handleCallCompleted = (data: any) => {
+    
+    // Set the call data and open modal
+    setCurrentCallData(data);
+    setIsCallFeedbackModalOpen(true);
+  };
+  // Connect to socket when component mounts
+  useEffect(() => {
+    // Connect to call socket and set up listener
+    const socket = connectCallSocket(handleCallCompleted);
+
+    // Cleanup on component unmount
+    return () => {
+      disconnectCallSocket();
+    };
+  }, []); // Empty dependency array
+
+  // Function to handle feedback submission
+  const handleFeedbackSubmit = async (feedbackData: {
+    stageId: string;
+    outcome: string;
+    remark: string;
+  }) => {
+    try {
+      // Make API call to submit feedback
+      const payload = {
+        callId:currentCallData.callId,
+        stageId: feedbackData.stageId,
+        outcome: feedbackData.outcome,
+        remark: feedbackData.remark,
+      };
+      
+      // Adjust this API endpoint as per your backend
+      const response = await postDataHandlerWithToken(
+        ApiConfig.updateCallLog,
+        payload, 
+        true
+      );
+      
+      if (response) {
+        toast({
+          title: "Success",
+          description: "Call feedback submitted successfully",
+          variant: "default",
+        });
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit call feedback",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
   // Get nav items based on panel
   const getNavItems = () => {
     switch(panel) {
@@ -269,6 +333,7 @@ export function Sidebar({ panel }: SidebarProps) {
   };
 
   return (
+    <>
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 sidebar-gradient border-r border-sidebar-border">
       <div className="flex h-full flex-col">
         {/* Logo */}
@@ -328,5 +393,16 @@ export function Sidebar({ panel }: SidebarProps) {
         </div>
       </div>
     </aside>
+    <CallFeedbackModal
+        open={isCallFeedbackModalOpen}
+        onOpenChange={() => {
+          setIsCallFeedbackModalOpen(false);
+          setCurrentCallData(null);
+        }}
+        callData={currentCallData}
+        onSubmit={handleFeedbackSubmit}
+      />
+    </>
+
   );
 }

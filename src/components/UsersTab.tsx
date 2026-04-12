@@ -19,6 +19,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Phone } from 'lucide-react';
+import { AssignIVRModal } from './AssignIVRModal';
 import {
   Dialog,
   DialogContent,
@@ -108,6 +110,9 @@ export function UsersTab({
   const [departmentUsers, setDepartmentUsers] = useState<DepartmentUser[]>([]);
   const [loadingDepartmentUsers, setLoadingDepartmentUsers] = useState(false);
 
+  const [ivrModalOpen, setIvrModalOpen] = useState(false);
+  const [selectedIVRUser, setSelectedIVRUser] = useState<UserType | null>(null);
+
   // Form states
   const [editUserForm, setEditUserForm] = useState({
     name: '',
@@ -133,21 +138,21 @@ export function UsersTab({
     const statusMatch = filters.status === 'all' || user.status === filters.status;
 
     // Pool filter
-let poolMatch = true;
-if (filters.pool !== 'all') {
-  if (filters.pool === 'none') {
-    // Check if user has no pools assigned
-    poolMatch = !user.profile?.poolIds || user.profile.poolIds.length === 0;
-  } else {
-    // Get all pool IDs that the user belongs to
-    const userPoolIds = user.profile?.poolIds?.map(poolId => 
-      typeof poolId === 'object' ? poolId._id : poolId
-    ) || [];
-    
-    // Check if the selected pool ID is in the user's pool IDs array
-    poolMatch = userPoolIds.includes(filters.pool);
-  }
-}
+    let poolMatch = true;
+    if (filters.pool !== 'all') {
+      if (filters.pool === 'none') {
+        // Check if user has no pools assigned
+        poolMatch = !user.profile?.poolIds || user.profile.poolIds.length === 0;
+      } else {
+        // Get all pool IDs that the user belongs to
+        const userPoolIds = user.profile?.poolIds?.map(poolId =>
+          typeof poolId === 'object' ? poolId._id : poolId
+        ) || [];
+
+        // Check if the selected pool ID is in the user's pool IDs array
+        poolMatch = userPoolIds.includes(filters.pool);
+      }
+    }
 
     return searchMatch && roleMatch && statusMatch && poolMatch;
   });
@@ -221,22 +226,22 @@ if (filters.pool !== 'all') {
   };
 
   // Helper function to get pool IDs from either poolIds array or single poolId
-const getPoolIdsToDisplay = (poolData: any): string[] => {
-  if (!poolData) return [];
-  
-  // If it's an array (multiple pools)
-  if (Array.isArray(poolData)) {
-    return poolData.map(pool => 
-      typeof pool === 'object' ? pool._id : pool
-    );
-  }
-  
-  // If it's a single pool (for backward compatibility)
-  const singlePoolId = typeof poolData === 'object' 
-    ? poolData._id 
-    : poolData;
-  return singlePoolId ? [singlePoolId] : [];
-};
+  const getPoolIdsToDisplay = (poolData: any): string[] => {
+    if (!poolData) return [];
+
+    // If it's an array (multiple pools)
+    if (Array.isArray(poolData)) {
+      return poolData.map(pool =>
+        typeof pool === 'object' ? pool._id : pool
+      );
+    }
+
+    // If it's a single pool (for backward compatibility)
+    const singlePoolId = typeof poolData === 'object'
+      ? poolData._id
+      : poolData;
+    return singlePoolId ? [singlePoolId] : [];
+  };
 
   // Helper functions
   const getInitials = (name: string) => {
@@ -263,6 +268,11 @@ const getPoolIdsToDisplay = (poolData: any): string[] => {
       search: ''
     });
     setSearchQuery('');
+  };
+
+  const handleAssignIVR = (user: UserType) => {
+    setSelectedIVRUser(user);
+    setIvrModalOpen(true);
   };
 
   const handleUpdateUser = async () => {
@@ -645,6 +655,18 @@ const getPoolIdsToDisplay = (poolData: any): string[] => {
                               Change Status
                             </DropdownMenuItem>
                             <DropdownMenuItem
+                              onClick={() => handleAssignIVR(user)}
+                              disabled={togglingBlock === user._id || user.IVREnabled === true}
+                              className={cn(user.IVREnabled === true && "opacity-50 cursor-not-allowed")}
+                            >
+                              <Phone className="mr-2 h-4 w-4" />
+                              {user.IVREnabled ? (
+                                <span className="text-green-600">IVR Enabled</span>
+                              ) : (
+                                "Assign IVR Access"
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
                               onClick={() => handleToggleBlock(user._id)}
                               disabled={togglingBlock === user._id}
                             >
@@ -687,536 +709,88 @@ const getPoolIdsToDisplay = (poolData: any): string[] => {
       </Card>
 
       {/* Edit User Modal */}
-     {/* Edit User Modal */}
-<Dialog open={editUserOpen} onOpenChange={setEditUserOpen}>
-  <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-    {selectedUser && (
-      <>
-        <DialogHeader>
-          <DialogTitle>Edit User: {selectedUser.name}</DialogTitle>
-          <DialogDescription>
-            Update user information and permissions.
-          </DialogDescription>
-        </DialogHeader>
+      <Dialog open={editUserOpen} onOpenChange={setEditUserOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          {selectedUser && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Edit User: {selectedUser.name}</DialogTitle>
+                <DialogDescription>
+                  Update user information and permissions.
+                </DialogDescription>
+              </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Basic Information */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Name *</Label>
-              <Input
-                value={editUserForm.name}
-                onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
-                placeholder="John Doe"
-                disabled={updatingUser}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Email *</Label>
-              <Input
-                type="email"
-                value={editUserForm.email}
-                onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
-                placeholder="john@company.com"
-                disabled={updatingUser}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Phone Number *</Label>
-              <Input
-                value={editUserForm.number}
-                onChange={(e) => setEditUserForm({ ...editUserForm, number: e.target.value })}
-                placeholder="1234567890"
-                disabled={updatingUser}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Role *</Label>
-              <Select
-                value={editUserForm.role}
-                onValueChange={(value) => setEditUserForm({ ...editUserForm, role: value })}
-                disabled={updatingUser}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((role) => (
-                    <SelectItem key={role._id} value={role._id}>
-                      {role.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Current Role Permissions Display */}
-          {selectedUser.role.permissions && selectedUser.role.permissions.length > 0 && (
-            <div className="space-y-3 border rounded-lg p-4">
-              <h4 className="font-medium text-sm">Current Role Permissions</h4>
-              <p className="text-xs text-muted-foreground mb-3">
-                These permissions come from the user's role ({selectedUser.role.name}) and cannot be edited here.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {selectedUser.role.permissions.map((perm, idx) => (
-                  <div key={idx} className="text-xs">
-                    <Badge variant="outline" className="mb-1">
-                      {perm.module}
-                    </Badge>
-                    <div className="flex flex-wrap gap-1 ml-2">
-                      {perm.actions.map((action, actionIdx) => (
-                        <Badge key={actionIdx} variant="secondary" className="text-xs">
-                          {action}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Profile Details - Only if user has a profile */}
-          {selectedUser.profile && (
-            <div className="space-y-4 border-t pt-4">
-              <h4 className="font-medium">Profile Details</h4>
-              
-              {/* Department Selection */}
-              <div className="space-y-2">
-                <Label>Department</Label>
-                <Select
-                  value={editUserForm.departmentId}
-                  onValueChange={(value) => {
-                    setEditUserForm({ 
-                      ...editUserForm, 
-                      departmentId: value,
-                      reportingSeniorId: '' // Reset reporting senior when department changes
-                    });
-                    // Fetch users for the selected department
-                    if (value) {
-                      fetchDepartmentUsers(value);
-                    }
-                  }}
-                  disabled={updatingUser}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept._id} value={dept._id}>
-                        {dept.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Multi-Pool Selection - Updated for multiple pools */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Database className="w-4 h-4" />
-                  Pools
-                </Label>
-                <MultiSelect
-                  options={pools
-                    .filter(pool => pool.isActive)
-                    .map(pool => ({
-                      value: pool._id,
-                      label: pool.name,
-                      disabled: !pool.isActive
-                    }))}
-                  selected={editUserForm.poolIds}
-                  onChange={(selectedValues) => setEditUserForm({ 
-                    ...editUserForm, 
-                    poolIds: selectedValues 
-                  })}
-                  placeholder="Select pools..."
-                  loading={loadingPools}
-                  disabled={updatingUser}
-                  emptyMessage="No active pools available"
-                />
-                
-                {/* Display selected pools as badges */}
-                {editUserForm.poolIds.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {editUserForm.poolIds.map((poolId) => {
-                      const pool = pools.find(p => p._id === poolId);
-                      return pool ? (
-                        <Badge 
-                          key={poolId} 
-                          variant="secondary" 
-                          className="text-xs bg-blue-50 text-blue-700 border-blue-200"
-                        >
-                          <Database className="w-3 h-3 mr-1" />
-                          {pool.name}
-                        </Badge>
-                      ) : null;
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Salary */}
-              <div className="space-y-2">
-                <Label>Salary</Label>
-                <Input
-                  type="number"
-                  value={editUserForm.salary}
-                  onChange={(e) => setEditUserForm({ ...editUserForm, salary: e.target.value })}
-                  placeholder="e.g., 50000"
-                  disabled={updatingUser}
-                />
-              </div>
-
-              {/* Education */}
-              <div className="space-y-2">
-                <Label>Education</Label>
-                <Input
-                  value={editUserForm.education}
-                  onChange={(e) => setEditUserForm({ ...editUserForm, education: e.target.value })}
-                  placeholder="e.g., Bachelor's in Computer Science"
-                  disabled={updatingUser}
-                />
-              </div>
-
-              {/* Reporting Senior */}
-              <div className="space-y-2">
-                <Label>Reporting Senior</Label>
-                {!editUserForm.departmentId ? (
-                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                    <p className="text-sm text-yellow-800">
-                      Please select a department first to see available seniors
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <SearchableDropdown
-                      options={[
-                        { value: "", label: "Select reporting senior..." },
-                        ...departmentUsers.map(user => ({
-                          value: user.userId._id,
-                          label: user.userId.name,
-                          empId: user.userId.employeeId,
-                          email: user.userId.email,
-                          role: user.userId.role?.name
-                        }))
-                      ]}
-                      value={editUserForm.reportingSeniorId}
-                      onValueChange={(value) => setEditUserForm({ ...editUserForm, reportingSeniorId: value })}
-                      placeholder="Select reporting senior"
-                      searchPlaceholder="Search by name, email, or role..."
-                      emptyMessage={loadingDepartmentUsers ? "Loading users..." : "No users found in this department"}
-                      disabled={updatingUser || loadingDepartmentUsers || departmentUsers.length === 0}
-                      allowClear
-                      onClear={() => setEditUserForm({ ...editUserForm, reportingSeniorId: "" })}
-                      triggerClassName="h-10 sm:h-11 text-sm sm:text-base"
-                      contentClassName="w-full sm:max-w-[var(--radix-popover-trigger-width)]"
+              <div className="space-y-4 py-4">
+                {/* Basic Information */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Name *</Label>
+                    <Input
+                      value={editUserForm.name}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
+                      placeholder="John Doe"
+                      disabled={updatingUser}
                     />
-                    
-                    {/* Show loading state */}
-                    {loadingDepartmentUsers && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Loading department users...
-                      </div>
-                    )}
-                    
-                    {/* Show user count */}
-                    {!loadingDepartmentUsers && departmentUsers.length > 0 && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                        <Users className="w-3 h-3" />
-                        {departmentUsers.length} user{departmentUsers.length !== 1 ? 's' : ''} available
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email *</Label>
+                    <Input
+                      type="email"
+                      value={editUserForm.email}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
+                      placeholder="john@company.com"
+                      disabled={updatingUser}
+                    />
+                  </div>
+                </div>
 
-          {/* Extra Access Controls */}
-          <div className="space-y-4 border-t pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-medium">Extra Access Controls</h4>
-                <p className="text-sm text-muted-foreground">
-                  Grant additional permissions beyond the user's role
-                </p>
-              </div>
-              {editUserForm.extraAccessControls.length > 0 && (
-                <Badge variant="outline">
-                  {editUserForm.extraAccessControls.length} modules
-                </Badge>
-              )}
-            </div>
-
-            {selectedUser.profile?.extraAccessControls && selectedUser.profile.extraAccessControls.length > 0 && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-700">
-                  <strong>Current extra access controls:</strong> User already has {selectedUser.profile.extraAccessControls.length} extra permission module(s).
-                </p>
-              </div>
-            )}
-
-            <PermissionsSelector
-              permissions={editUserForm.extraAccessControls}
-              onChange={(perms) => setEditUserForm({ ...editUserForm, extraAccessControls: perms })}
-              disabled={updatingUser}
-              title=""
-              description="Select modules and actions to add extra permissions"
-            />
-
-            {editUserForm.extraAccessControls.length > 0 && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                <h5 className="text-sm font-medium text-green-800 mb-2">Selected Extra Permissions:</h5>
-                <div className="space-y-2">
-                  {editUserForm.extraAccessControls.map((control, idx) => (
-                    <div key={idx} className="text-sm">
-                      <div className="font-medium text-green-700">
-                        {control.module.charAt(0).toUpperCase() + control.module.slice(1)}:
-                      </div>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {control.actions.map((action, actionIdx) => (
-                          <Badge key={actionIdx} variant="secondary" className="text-xs bg-green-100 text-green-800">
-                            {action}
-                          </Badge>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Phone Number *</Label>
+                    <Input
+                      value={editUserForm.number}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, number: e.target.value })}
+                      placeholder="1234567890"
+                      disabled={updatingUser}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Role *</Label>
+                    <Select
+                      value={editUserForm.role}
+                      onValueChange={(value) => setEditUserForm({ ...editUserForm, role: value })}
+                      disabled={updatingUser}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {roles.map((role) => (
+                          <SelectItem key={role._id} value={role._id}>
+                            {role.name}
+                          </SelectItem>
                         ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <DialogFooter className="gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setEditUserOpen(false)}
-            disabled={updatingUser}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleUpdateUser}
-            disabled={updatingUser}
-            className="min-w-[120px]"
-          >
-            {updatingUser ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Updating...
-              </>
-            ) : (
-              'Update User'
-            )}
-          </Button>
-        </DialogFooter>
-      </>
-    )}
-  </DialogContent>
-</Dialog>
-
-
-      {/* Profile Modal */}
-<Dialog open={profileModalOpen} onOpenChange={setProfileModalOpen}>
-  <DialogContent className="sm:max-w-[550px] max-h-[90vh] h-auto overflow-hidden flex flex-col p-0">
-    {selectedUser && (
-      <>
-        {/* Fixed Header */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
-          <DialogTitle className="text-lg sm:text-xl">User Profile</DialogTitle>
-          <DialogDescription className="text-sm sm:text-base">
-            Profile details for {selectedUser.name}
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="space-y-6">
-            {/* User Basic Info - Avatar and Name */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-primary/10 flex items-center justify-center mx-auto sm:mx-0">
-                <span className="text-3xl sm:text-4xl font-medium text-primary">
-                  {getInitials(selectedUser.name)}
-                </span>
-              </div>
-              <div className="text-center sm:text-left">
-                <h3 className="text-xl sm:text-2xl font-semibold">{selectedUser.name}</h3>
-                <p className="text-sm sm:text-base text-muted-foreground">{selectedUser.email}</p>
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2">
-                  <Badge variant="outline" className="text-xs">
-                    ID: {selectedUser.employeeId}
-                  </Badge>
-                  <Badge 
-                    variant="outline" 
-                    className={cn(
-                      "text-xs",
-                      selectedUser.status === 'active' && 'border-green-500 text-green-700 bg-green-50',
-                      selectedUser.status === 'inactive' && 'border-gray-500 text-gray-700 bg-gray-50',
-                      selectedUser.status === 'probation' && 'border-yellow-500 text-yellow-700 bg-yellow-50',
-                      selectedUser.status === 'resigned' && 'border-red-500 text-red-700 bg-red-50'
-                    )}
-                  >
-                    {selectedUser.status}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-
-            {/* User Details Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/30 p-4 rounded-lg">
-              <div>
-                <Label className="text-xs text-muted-foreground">Phone Number</Label>
-                <p className="text-sm font-medium mt-1">{selectedUser.number || 'N/A'}</p>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Role</Label>
-                <p className="text-sm font-medium mt-1">
-                  {selectedUser.role.name}
-                  {selectedUser.role.isSuperAdmin && (
-                    <Badge variant="secondary" className="ml-2 text-xs bg-purple-100 text-purple-800">
-                      Super Admin
-                    </Badge>
-                  )}
-                </p>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Dashboard Access</Label>
-                <p className="text-sm font-medium mt-1">
-                  {selectedUser.isDashboardEnabled ? (
-                    <span className="text-green-600">Enabled</span>
-                  ) : (
-                    <span className="text-red-600">Disabled</span>
-                  )}
-                </p>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Member Since</Label>
-                <p className="text-sm font-medium mt-1">{formatDate(selectedUser.createdAt)}</p>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Last Login</Label>
-                <p className="text-sm font-medium mt-1">
-                  {selectedUser.lastLoginAt ? formatDate(selectedUser.lastLoginAt) : 'Never'}
-                </p>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Account Status</Label>
-                <div className="mt-1">
-                  {selectedUser.isBlocked ? (
-                    <Badge variant="destructive" className="text-xs">Blocked</Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-xs border-green-500 text-green-700">Active</Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Profile Details Section */}
-            {selectedUser.profile ? (
-              <div className="space-y-4 border rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-base">Profile Details</h4>
-                  <Badge variant="outline" className="text-xs">
-                    Profile Created: {formatDate(selectedUser.profile.createdAt)}
-                  </Badge>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-muted/20 p-3 rounded-md">
-                    <Label className="text-xs text-muted-foreground">Department</Label>
-                    <p className="text-sm font-medium mt-1">{selectedUser.profile.departmentId?.name || 'N/A'}</p>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="bg-muted/20 p-3 rounded-md">
-                    <Label className="text-xs text-muted-foreground">Education</Label>
-                    <p className="text-sm font-medium mt-1">{selectedUser.profile.education || 'N/A'}</p>
-                  </div>
-                  <div className="bg-muted/20 p-3 rounded-md">
-                    <Label className="text-xs text-muted-foreground">Salary</Label>
-                    <p className="text-sm font-medium mt-1">
-                      {selectedUser.profile.salary ? `₹${selectedUser.profile.salary.toLocaleString()}` : 'N/A'}
+                </div>
+
+                {/* Current Role Permissions Display */}
+                {selectedUser.role.permissions && selectedUser.role.permissions.length > 0 && (
+                  <div className="space-y-3 border rounded-lg p-4">
+                    <h4 className="font-medium text-sm">Current Role Permissions</h4>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      These permissions come from the user's role ({selectedUser.role.name}) and cannot be edited here.
                     </p>
-                  </div>
-                  
-                  {/* Multi-Pool Information - Updated for multiple pools */}
-                  {(selectedUser.profile.poolIds) && (
-                    <div className="bg-muted/20 p-3 rounded-md col-span-2">
-                      <Label className="text-xs text-muted-foreground flex items-center gap-1 mb-2">
-                        <Database className="w-3 h-3" />
-                        Pools
-                      </Label>
-                      <div className="flex flex-wrap gap-2">
-                        {getPoolIdsToDisplay(selectedUser.profile.poolIds || selectedUser.profile.poolId).map((poolId, index) => {
-                          const poolName = getPoolName(poolId);
-                          const poolActive = isPoolActive(poolId);
-                          return (
-                            <Badge 
-                              key={index}
-                              variant="outline" 
-                              className={cn(
-                                "flex items-center gap-1",
-                                poolActive
-                                  ? "bg-blue-50 text-blue-700 border-blue-200"
-                                  : "bg-gray-50 text-gray-500 border-gray-200"
-                              )}
-                            >
-                              <Database className="w-3 h-3" />
-                              {poolName}
-                            </Badge>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="bg-muted/20 p-3 rounded-md col-span-2">
-                    <Label className="text-xs text-muted-foreground">Reporting Senior</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      {selectedUser.profile.reportingSeniorId ? (
-                        <>
-                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-xs font-medium">
-                              {selectedUser.profile.reportingSeniorId.name?.charAt(0) || 'S'}
-                            </span>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">{selectedUser.profile.reportingSeniorId.name}</p>
-                          </div>
-                        </>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">No reporting senior assigned</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Extra Access Controls */}
-                {selectedUser.profile.extraAccessControls && selectedUser.profile.extraAccessControls.length > 0 && (
-                  <div className="border-t pt-4 mt-2">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-medium text-sm">Extra Access Controls</h4>
-                      <Badge variant="secondary" className="text-xs">
-                        {selectedUser.profile.extraAccessControls.length} modules
-                      </Badge>
-                    </div>
-                    <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
-                      {selectedUser.profile.extraAccessControls.map((control, idx) => (
-                        <div key={idx} className="bg-blue-50/50 p-3 rounded-md border border-blue-100">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-medium text-blue-700 uppercase tracking-wider">
-                              {control.module}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {control.actions.map((action, actionIdx) => (
-                              <Badge key={actionIdx} variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                    <div className="flex flex-wrap gap-2">
+                      {selectedUser.role.permissions.map((perm, idx) => (
+                        <div key={idx} className="text-xs">
+                          <Badge variant="outline" className="mb-1">
+                            {perm.module}
+                          </Badge>
+                          <div className="flex flex-wrap gap-1 ml-2">
+                            {perm.actions.map((action, actionIdx) => (
+                              <Badge key={actionIdx} variant="secondary" className="text-xs">
                                 {action}
                               </Badge>
                             ))}
@@ -1226,70 +800,517 @@ const getPoolIdsToDisplay = (poolData: any): string[] => {
                     </div>
                   </div>
                 )}
-              </div>
-            ) : (
-              <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                <User className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                <h4 className="text-base font-medium mb-1">No Profile Found</h4>
-                <p className="text-sm text-muted-foreground mb-4">
-                  This user doesn't have a profile yet. Create one to add department, salary, and other details.
-                </p>
-                <Button 
-                  onClick={() => {
-                    setProfileModalOpen(false);
-                    setProfileCreateModalOpen(true);
-                  }}
-                  className="w-full sm:w-auto"
-                >
-                  <User className="w-4 h-4 mr-2" />
-                  Create Profile
-                </Button>
-              </div>
-            )}
 
-            {/* Role Permissions Summary */}
-            {selectedUser.role.permissions && selectedUser.role.permissions.length > 0 && (
-              <div className="border rounded-lg p-4 bg-muted/10">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium text-sm">Role Permissions</h4>
-                  <Badge variant="outline" className="text-xs">
-                    {selectedUser.role.name}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mb-2">
-                  This user has {selectedUser.role.permissions.reduce((acc, p) => acc + p.actions.length, 0)} permissions across {selectedUser.role.permissions.length} modules
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {selectedUser.role.permissions.slice(0, 3).map((perm, idx) => (
-                    <Badge key={idx} variant="outline" className="text-xs bg-background">
-                      {perm.module} ({perm.actions.length})
-                    </Badge>
-                  ))}
-                  {selectedUser.role.permissions.length > 3 && (
-                    <Badge variant="outline" className="text-xs">
-                      +{selectedUser.role.permissions.length - 3} more
-                    </Badge>
+                {/* Profile Details - Only if user has a profile */}
+                {selectedUser.profile && (
+                  <div className="space-y-4 border-t pt-4">
+                    <h4 className="font-medium">Profile Details</h4>
+
+                    {/* Department Selection */}
+                    <div className="space-y-2">
+                      <Label>Department</Label>
+                      <Select
+                        value={editUserForm.departmentId}
+                        onValueChange={(value) => {
+                          setEditUserForm({
+                            ...editUserForm,
+                            departmentId: value,
+                            reportingSeniorId: '' // Reset reporting senior when department changes
+                          });
+                          // Fetch users for the selected department
+                          if (value) {
+                            fetchDepartmentUsers(value);
+                          }
+                        }}
+                        disabled={updatingUser}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {departments.map((dept) => (
+                            <SelectItem key={dept._id} value={dept._id}>
+                              {dept.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Multi-Pool Selection - Updated for multiple pools */}
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        <Database className="w-4 h-4" />
+                        Pools
+                      </Label>
+                      <MultiSelect
+                        options={pools
+                          .filter(pool => pool.isActive)
+                          .map(pool => ({
+                            value: pool._id,
+                            label: pool.name,
+                            disabled: !pool.isActive
+                          }))}
+                        selected={editUserForm.poolIds}
+                        onChange={(selectedValues) => setEditUserForm({
+                          ...editUserForm,
+                          poolIds: selectedValues
+                        })}
+                        placeholder="Select pools..."
+                        loading={loadingPools}
+                        disabled={updatingUser}
+                        emptyMessage="No active pools available"
+                      />
+
+                      {/* Display selected pools as badges */}
+                      {editUserForm.poolIds.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {editUserForm.poolIds.map((poolId) => {
+                            const pool = pools.find(p => p._id === poolId);
+                            return pool ? (
+                              <Badge
+                                key={poolId}
+                                variant="secondary"
+                                className="text-xs bg-blue-50 text-blue-700 border-blue-200"
+                              >
+                                <Database className="w-3 h-3 mr-1" />
+                                {pool.name}
+                              </Badge>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Salary */}
+                    <div className="space-y-2">
+                      <Label>Salary</Label>
+                      <Input
+                        type="number"
+                        value={editUserForm.salary}
+                        onChange={(e) => setEditUserForm({ ...editUserForm, salary: e.target.value })}
+                        placeholder="e.g., 50000"
+                        disabled={updatingUser}
+                      />
+                    </div>
+
+                    {/* Education */}
+                    <div className="space-y-2">
+                      <Label>Education</Label>
+                      <Input
+                        value={editUserForm.education}
+                        onChange={(e) => setEditUserForm({ ...editUserForm, education: e.target.value })}
+                        placeholder="e.g., Bachelor's in Computer Science"
+                        disabled={updatingUser}
+                      />
+                    </div>
+
+                    {/* Reporting Senior */}
+                    <div className="space-y-2">
+                      <Label>Reporting Senior</Label>
+                      {!editUserForm.departmentId ? (
+                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                          <p className="text-sm text-yellow-800">
+                            Please select a department first to see available seniors
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <SearchableDropdown
+                            options={[
+                              { value: "", label: "Select reporting senior..." },
+                              ...departmentUsers.map(user => ({
+                                value: user.userId._id,
+                                label: user.userId.name,
+                                empId: user.userId.employeeId,
+                                email: user.userId.email,
+                                role: user.userId.role?.name
+                              }))
+                            ]}
+                            value={editUserForm.reportingSeniorId}
+                            onValueChange={(value) => setEditUserForm({ ...editUserForm, reportingSeniorId: value })}
+                            placeholder="Select reporting senior"
+                            searchPlaceholder="Search by name, email, or role..."
+                            emptyMessage={loadingDepartmentUsers ? "Loading users..." : "No users found in this department"}
+                            disabled={updatingUser || loadingDepartmentUsers || departmentUsers.length === 0}
+                            allowClear
+                            onClear={() => setEditUserForm({ ...editUserForm, reportingSeniorId: "" })}
+                            triggerClassName="h-10 sm:h-11 text-sm sm:text-base"
+                            contentClassName="w-full sm:max-w-[var(--radix-popover-trigger-width)]"
+                          />
+
+                          {/* Show loading state */}
+                          {loadingDepartmentUsers && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              Loading department users...
+                            </div>
+                          )}
+
+                          {/* Show user count */}
+                          {!loadingDepartmentUsers && departmentUsers.length > 0 && (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                              <Users className="w-3 h-3" />
+                              {departmentUsers.length} user{departmentUsers.length !== 1 ? 's' : ''} available
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Extra Access Controls */}
+                <div className="space-y-4 border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Extra Access Controls</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Grant additional permissions beyond the user's role
+                      </p>
+                    </div>
+                    {editUserForm.extraAccessControls.length > 0 && (
+                      <Badge variant="outline">
+                        {editUserForm.extraAccessControls.length} modules
+                      </Badge>
+                    )}
+                  </div>
+
+                  {selectedUser.profile?.extraAccessControls && selectedUser.profile.extraAccessControls.length > 0 && (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-700">
+                        <strong>Current extra access controls:</strong> User already has {selectedUser.profile.extraAccessControls.length} extra permission module(s).
+                      </p>
+                    </div>
+                  )}
+
+                  <PermissionsSelector
+                    permissions={editUserForm.extraAccessControls}
+                    onChange={(perms) => setEditUserForm({ ...editUserForm, extraAccessControls: perms })}
+                    disabled={updatingUser}
+                    title=""
+                    description="Select modules and actions to add extra permissions"
+                  />
+
+                  {editUserForm.extraAccessControls.length > 0 && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <h5 className="text-sm font-medium text-green-800 mb-2">Selected Extra Permissions:</h5>
+                      <div className="space-y-2">
+                        {editUserForm.extraAccessControls.map((control, idx) => (
+                          <div key={idx} className="text-sm">
+                            <div className="font-medium text-green-700">
+                              {control.module.charAt(0).toUpperCase() + control.module.slice(1)}:
+                            </div>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {control.actions.map((action, actionIdx) => (
+                                <Badge key={actionIdx} variant="secondary" className="text-xs bg-green-100 text-green-800">
+                                  {action}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* Fixed Footer */}
-        <DialogFooter className="px-6 py-4 border-t shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <Button 
-            variant="outline" 
-            onClick={() => setProfileModalOpen(false)}
-            className="w-full sm:w-auto"
-          >
-            Close
-          </Button>
-        </DialogFooter>
-      </>
-    )}
-  </DialogContent>
-</Dialog>
+              <DialogFooter className="gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setEditUserOpen(false)}
+                  disabled={updatingUser}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpdateUser}
+                  disabled={updatingUser}
+                  className="min-w-[120px]"
+                >
+                  {updatingUser ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Update User'
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+
+      {/* Profile Modal */}
+      <Dialog open={profileModalOpen} onOpenChange={setProfileModalOpen}>
+        <DialogContent className="sm:max-w-[550px] max-h-[90vh] h-auto overflow-hidden flex flex-col p-0">
+          {selectedUser && (
+            <>
+              {/* Fixed Header */}
+              <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+                <DialogTitle className="text-lg sm:text-xl">User Profile</DialogTitle>
+                <DialogDescription className="text-sm sm:text-base">
+                  Profile details for {selectedUser.name}
+                </DialogDescription>
+              </DialogHeader>
+
+              {/* Scrollable Content Area */}
+              <div className="flex-1 overflow-y-auto px-6 py-4">
+                <div className="space-y-6">
+                  {/* User Basic Info - Avatar and Name */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-primary/10 flex items-center justify-center mx-auto sm:mx-0">
+                      <span className="text-3xl sm:text-4xl font-medium text-primary">
+                        {getInitials(selectedUser.name)}
+                      </span>
+                    </div>
+                    <div className="text-center sm:text-left">
+                      <h3 className="text-xl sm:text-2xl font-semibold">{selectedUser.name}</h3>
+                      <p className="text-sm sm:text-base text-muted-foreground">{selectedUser.email}</p>
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2">
+                        <Badge variant="outline" className="text-xs">
+                          ID: {selectedUser.employeeId}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-xs",
+                            selectedUser.status === 'active' && 'border-green-500 text-green-700 bg-green-50',
+                            selectedUser.status === 'inactive' && 'border-gray-500 text-gray-700 bg-gray-50',
+                            selectedUser.status === 'probation' && 'border-yellow-500 text-yellow-700 bg-yellow-50',
+                            selectedUser.status === 'resigned' && 'border-red-500 text-red-700 bg-red-50'
+                          )}
+                        >
+                          {selectedUser.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* User Details Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/30 p-4 rounded-lg">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Phone Number</Label>
+                      <p className="text-sm font-medium mt-1">{selectedUser.number || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Role</Label>
+                      <p className="text-sm font-medium mt-1">
+                        {selectedUser.role.name}
+                        {selectedUser.role.isSuperAdmin && (
+                          <Badge variant="secondary" className="ml-2 text-xs bg-purple-100 text-purple-800">
+                            Super Admin
+                          </Badge>
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Dashboard Access</Label>
+                      <p className="text-sm font-medium mt-1">
+                        {selectedUser.isDashboardEnabled ? (
+                          <span className="text-green-600">Enabled</span>
+                        ) : (
+                          <span className="text-red-600">Disabled</span>
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Member Since</Label>
+                      <p className="text-sm font-medium mt-1">{formatDate(selectedUser.createdAt)}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Last Login</Label>
+                      <p className="text-sm font-medium mt-1">
+                        {selectedUser.lastLoginAt ? formatDate(selectedUser.lastLoginAt) : 'Never'}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Account Status</Label>
+                      <div className="mt-1">
+                        {selectedUser.isBlocked ? (
+                          <Badge variant="destructive" className="text-xs">Blocked</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs border-green-500 text-green-700">Active</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Profile Details Section */}
+                  {selectedUser.profile ? (
+                    <div className="space-y-4 border rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-base">Profile Details</h4>
+                        <Badge variant="outline" className="text-xs">
+                          Profile Created: {formatDate(selectedUser.profile.createdAt)}
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="bg-muted/20 p-3 rounded-md">
+                          <Label className="text-xs text-muted-foreground">Department</Label>
+                          <p className="text-sm font-medium mt-1">{selectedUser.profile.departmentId?.name || 'N/A'}</p>
+                        </div>
+                        <div className="bg-muted/20 p-3 rounded-md">
+                          <Label className="text-xs text-muted-foreground">Education</Label>
+                          <p className="text-sm font-medium mt-1">{selectedUser.profile.education || 'N/A'}</p>
+                        </div>
+                        <div className="bg-muted/20 p-3 rounded-md">
+                          <Label className="text-xs text-muted-foreground">Salary</Label>
+                          <p className="text-sm font-medium mt-1">
+                            {selectedUser.profile.salary ? `₹${selectedUser.profile.salary.toLocaleString()}` : 'N/A'}
+                          </p>
+                        </div>
+
+                        {/* Multi-Pool Information - Updated for multiple pools */}
+                        {(selectedUser.profile.poolIds) && (
+                          <div className="bg-muted/20 p-3 rounded-md col-span-2">
+                            <Label className="text-xs text-muted-foreground flex items-center gap-1 mb-2">
+                              <Database className="w-3 h-3" />
+                              Pools
+                            </Label>
+                            <div className="flex flex-wrap gap-2">
+                              {getPoolIdsToDisplay(selectedUser.profile.poolIds || selectedUser.profile.poolId).map((poolId, index) => {
+                                const poolName = getPoolName(poolId);
+                                const poolActive = isPoolActive(poolId);
+                                return (
+                                  <Badge
+                                    key={index}
+                                    variant="outline"
+                                    className={cn(
+                                      "flex items-center gap-1",
+                                      poolActive
+                                        ? "bg-blue-50 text-blue-700 border-blue-200"
+                                        : "bg-gray-50 text-gray-500 border-gray-200"
+                                    )}
+                                  >
+                                    <Database className="w-3 h-3" />
+                                    {poolName}
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="bg-muted/20 p-3 rounded-md col-span-2">
+                          <Label className="text-xs text-muted-foreground">Reporting Senior</Label>
+                          <div className="flex items-center gap-2 mt-1">
+                            {selectedUser.profile.reportingSeniorId ? (
+                              <>
+                                <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+                                  <span className="text-xs font-medium">
+                                    {selectedUser.profile.reportingSeniorId.name?.charAt(0) || 'S'}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">{selectedUser.profile.reportingSeniorId.name}</p>
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">No reporting senior assigned</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Extra Access Controls */}
+                      {selectedUser.profile.extraAccessControls && selectedUser.profile.extraAccessControls.length > 0 && (
+                        <div className="border-t pt-4 mt-2">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="font-medium text-sm">Extra Access Controls</h4>
+                            <Badge variant="secondary" className="text-xs">
+                              {selectedUser.profile.extraAccessControls.length} modules
+                            </Badge>
+                          </div>
+                          <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
+                            {selectedUser.profile.extraAccessControls.map((control, idx) => (
+                              <div key={idx} className="bg-blue-50/50 p-3 rounded-md border border-blue-100">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-xs font-medium text-blue-700 uppercase tracking-wider">
+                                    {control.module}
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  {control.actions.map((action, actionIdx) => (
+                                    <Badge key={actionIdx} variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                                      {action}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                      <User className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                      <h4 className="text-base font-medium mb-1">No Profile Found</h4>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        This user doesn't have a profile yet. Create one to add department, salary, and other details.
+                      </p>
+                      <Button
+                        onClick={() => {
+                          setProfileModalOpen(false);
+                          setProfileCreateModalOpen(true);
+                        }}
+                        className="w-full sm:w-auto"
+                      >
+                        <User className="w-4 h-4 mr-2" />
+                        Create Profile
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Role Permissions Summary */}
+                  {selectedUser.role.permissions && selectedUser.role.permissions.length > 0 && (
+                    <div className="border rounded-lg p-4 bg-muted/10">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium text-sm">Role Permissions</h4>
+                        <Badge variant="outline" className="text-xs">
+                          {selectedUser.role.name}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        This user has {selectedUser.role.permissions.reduce((acc, p) => acc + p.actions.length, 0)} permissions across {selectedUser.role.permissions.length} modules
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedUser.role.permissions.slice(0, 3).map((perm, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs bg-background">
+                            {perm.module} ({perm.actions.length})
+                          </Badge>
+                        ))}
+                        {selectedUser.role.permissions.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{selectedUser.role.permissions.length - 3} more
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Fixed Footer */}
+              <DialogFooter className="px-6 py-4 border-t shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                <Button
+                  variant="outline"
+                  onClick={() => setProfileModalOpen(false)}
+                  className="w-full sm:w-auto"
+                >
+                  Close
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Status Update Modal */}
       <Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
@@ -1374,6 +1395,15 @@ const getPoolIdsToDisplay = (poolData: any): string[] => {
         creatingProfile={creatingProfile}
         onSubmit={handleCreateProfile}
       />
+
+      <AssignIVRModal
+  open={ivrModalOpen}
+  onOpenChange={setIvrModalOpen}
+  user={selectedIVRUser}
+  onSuccess={() => {
+    onRefresh();
+  }}
+/>
     </div>
   );
 }

@@ -75,6 +75,13 @@ const ApiConfig = {
   sendLoanReminder:(emiId:string)=>`${url}/order/loan/reminder/${emiId}`,
   updateLoanStatus:(emiId:string)=>`${url}/order/loan/loan-emi/${emiId}`,
 
+
+  // IVR section
+  getMynumbers:`${url}/IVR/myNumbers`,
+  createIVRUser:`${url}/users/IVR`,
+  callToLead:`${url}/IVR/click-to-call`,
+  updateCallLog:`${url}/IVR/submit-call-log`,
+
 };
 
 export default ApiConfig;

@@ -223,7 +223,7 @@ export function CallLogsPage() {
     if (filters.group === 'true') {
       params.group = true;
     }
-    console.log(params,"1")
+    console.log(params, "1")
     return params;
   }, [filters, page, limit]);
 
@@ -309,12 +309,12 @@ export function CallLogsPage() {
 
   // Initialize data
   useEffect(() => {
-    if(hasModulePermission(permissions, "user")){
-          fetchUsers();
-        }
+    if (hasModulePermission(permissions, "user")) {
+      fetchUsers();
+    }
     fetchCallLogs();
-    if(hasModulePermission(permissions, "leads")){
-    fetchLeads();
+    if (hasModulePermission(permissions, "leads")) {
+      fetchLeads();
     }
     fetchStages();
   }, []);
@@ -1265,6 +1265,51 @@ export function CallLogsPage() {
             {selectedCallLog ? (
               <div className="space-y-6">
                 {/* Main Info Section */}
+                {/* Recording Section - New */}
+                {selectedCallLog.recording_url && (
+                  <div className="bg-muted/30 p-3 sm:p-4 rounded-lg">
+                    <h3 className="font-medium text-sm text-muted-foreground mb-3 flex items-center gap-2">
+                      <Phone className="w-4 h-4" />
+                      Call Recording
+                    </h3>
+                    <div className="bg-background border border-border rounded-lg p-3 sm:p-4">
+                      <audio controls className="w-full">
+                        <source src={selectedCallLog.recording_url} type="audio/mpeg" />
+                        <source src={selectedCallLog.recording_url} type="audio/wav" />
+                        Your browser does not support the audio element.
+                      </audio>
+                      <div className="mt-2 flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground">
+                          Click play to listen to the call recording
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.open(selectedCallLog.recording_url, '_blank')}
+                          className="text-xs"
+                        >
+                          Open in new tab
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!selectedCallLog.recording_url && (
+                  <div className="bg-muted/30 p-3 sm:p-4 rounded-lg">
+                    <h3 className="font-medium text-sm text-muted-foreground mb-3 flex items-center gap-2">
+                      <Phone className="w-4 h-4" />
+                      Call Recording
+                    </h3>
+                    <div className="bg-background border border-border rounded-lg p-4 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <AlertCircle className="w-8 h-8 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">No recording available for this call</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Left Column - Basic Info */}
                   <div className="space-y-4">
