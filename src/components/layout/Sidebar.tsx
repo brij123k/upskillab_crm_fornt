@@ -28,9 +28,11 @@ import logo from '@/assets/logo.png';
 import { getUser } from "@/auth";
 import { hasModulePermission } from '@/utils/modulePermissions';
 import { hasPermission } from '@/utils/permissions';
-import { connectCallSocket, disconnectCallSocket } from '@/config/callSocket';
+import { connectCallSocket, disconnectCallSocket, returnCallSocket, UnknownCallSocket } from '@/config/callSocket';
 import { useToast } from '@/components/ui/use-toast';
 import { CallFeedbackModal } from '../CallFeedbackModal';
+import { ReturnCallModal } from '../ReturnCallModal';
+
 import { postDataHandlerWithToken } from '@/config/services';
 import { useEffect, useState } from 'react';
 import ApiConfig from '@/config/apiConfig';
@@ -216,23 +218,41 @@ export function Sidebar({ panel }: SidebarProps) {
   const { toast } = useToast();
     const [isCallFeedbackModalOpen, setIsCallFeedbackModalOpen] = useState(false);
   const [currentCallData, setCurrentCallData] = useState<any>(null);
+
+  const [isCallBackModalOpen, setIsCallBackModalOpen] = useState(false);
+const [currentCallBack, setCurrentCallBack] = useState<any>(null);
+  const [isUnknownCallModalOpen,setIsunknownCallModalOpen] = useState(false)
+  const [currentUnknownCall, setCurrentunknownCallBack] = useState<any>(null);
+
   const permissions = JSON.parse(
     localStorage.getItem("permissions") || "[]"
   );
 
   const user = getUser();
   
-  const handleCallCompleted = (data: any) => {
-    
+  const handleCallCompleted = (data: any) => {   
     // Set the call data and open modal
+    setCurrentCallBack(null);
+    setIsCallBackModalOpen(false)
     setCurrentCallData(data);
     setIsCallFeedbackModalOpen(true);
   };
+
+  const handleReturnCall =(data:any)=>{
+    setCurrentCallBack(data);
+    setIsCallBackModalOpen(true)
+  } 
+
+  const handleUnknownCall =(data:any)=>{
+    setCurrentunknownCallBack(data);
+    setIsunknownCallModalOpen(true)
+  } 
   // Connect to socket when component mounts
   useEffect(() => {
     // Connect to call socket and set up listener
-    const socket = connectCallSocket(handleCallCompleted);
-
+    connectCallSocket(handleCallCompleted);
+    returnCallSocket(handleReturnCall);
+    UnknownCallSocket(handleUnknownCall);
     // Cleanup on component unmount
     return () => {
       disconnectCallSocket();
@@ -402,6 +422,15 @@ export function Sidebar({ panel }: SidebarProps) {
         callData={currentCallData}
         onSubmit={handleFeedbackSubmit}
       />
+
+      <ReturnCallModal
+      open={isCallBackModalOpen}
+      onOpenChange={() => {
+        setIsCallBackModalOpen(false);
+        setCurrentCallBack(null);
+      }}
+      callData={currentCallBack}
+    />
     </>
 
   );
