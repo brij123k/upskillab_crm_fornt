@@ -4,97 +4,50 @@ import { getToken } from '@/auth';
 
 let callSocket: Socket | null = null;
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'https://crm.upskillab.in';
-// const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const SOCKET_URL ='https://crm.upskillab.in';
+// const SOCKET_URL ='http://localhost:3000';
+export function connectCallSocket(handlers: {
+  onCallCompleted?: (data: any) => void;
+  onCallBackReceived?: (data: any) => void;
+  onUnknownCall?: (data: any) => void;
+}) {
+  if (!callSocket) {
+    const token = getToken();
 
-export function connectCallSocket(
-  onCallCompleted: (data: any) => void,
-) {
-  if (callSocket?.connected) {
-    return callSocket;
+    callSocket = io(SOCKET_URL, {
+      auth: { token },
+      transports: ['websocket'],
+    });
+
+    callSocket.on('connect', () => {
+      console.log('🟢 Socket connected');
+    });
+
+    callSocket.on('disconnect', () => {
+      console.log('🔴 Socket disconnected');
+    });
+
+    callSocket.on('connect_error', (error) => {
+      console.error('Socket error:', error);
+    });
   }
 
-  const token = getToken();
+  // ✅ Always attach listeners (even if already connected)
 
-  callSocket = io(SOCKET_URL, { 
-    auth: { token },
-    transports: ['websocket'],
-  });
-
-  callSocket.on('call-completed', onCallCompleted);
-
-  callSocket.on('connect', () => {
-    // console.log('Call socket connected');
-  });
-
-  callSocket.on('disconnect', () => {
-    // console.log('Call socket disconnected');
-  });
-
-  callSocket.on('connect_error', (error) => {
-    console.error('Call socket connection error:', error);
-  });
-
-  return callSocket;
-}
-export function returnCallSocket(
-  onreturnCallCompleted: (data: any) => void,
-) {
-  if (callSocket?.connected) {
-    return callSocket;
+  if (handlers.onCallCompleted) {
+    callSocket.off('call-completed'); // prevent duplicate
+    callSocket.on('call-completed', handlers.onCallCompleted);
   }
 
-  const token = getToken();
-
-  callSocket = io(SOCKET_URL, { 
-    auth: { token },
-    transports: ['websocket'],
-  });
-
-  callSocket.on('callBack-received', onreturnCallCompleted);
-
-  callSocket.on('connect', () => {
-    // console.log('Call socket connected');
-  });
-
-  callSocket.on('disconnect', () => {
-    // console.log('Call socket disconnected');
-  });
-
-  callSocket.on('connect_error', (error) => {
-    console.error('Call socket connection error:', error);
-  });
-
-  return callSocket;
-}
-
-export function UnknownCallSocket(
-  onUnknownCallCompleted: (data: any) => void,
-) {
-  if (callSocket?.connected) {
-    return callSocket;
+  if (handlers.onCallBackReceived) {
+    callSocket.off('callBack-received');
+    callSocket.on('callBack-received', handlers.onCallBackReceived);
   }
 
-  const token = getToken();
-
-  callSocket = io(SOCKET_URL, { 
-    auth: { token },
-    transports: ['websocket'],
-  });
-
-  callSocket.on('Unknow-call', onUnknownCallCompleted);
-
-  callSocket.on('connect', () => {
-    // console.log('Call socket connected');
-  });
-
-  callSocket.on('disconnect', () => {
-    // console.log('Call socket disconnected');
-  });
-
-  callSocket.on('connect_error', (error) => {
-    console.error('Call socket connection error:', error);
-  });
+  if (handlers.onUnknownCall) {
+    callSocket.off('Unknow-call');
+    callSocket.on('Unknow-call', handlers.onUnknownCall);
+  }
 
   return callSocket;
 }

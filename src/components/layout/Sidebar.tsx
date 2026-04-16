@@ -248,16 +248,23 @@ const [currentCallBack, setCurrentCallBack] = useState<any>(null);
     setIsunknownCallModalOpen(true)
   } 
   // Connect to socket when component mounts
-  useEffect(() => {
-    // Connect to call socket and set up listener
-    connectCallSocket(handleCallCompleted);
-    returnCallSocket(handleReturnCall);
-    UnknownCallSocket(handleUnknownCall);
-    // Cleanup on component unmount
-    return () => {
-      disconnectCallSocket();
-    };
-  }, []); // Empty dependency array
+useEffect(() => {
+  const socket = connectCallSocket({
+    onCallCompleted: (data)=>{
+      handleCallCompleted(data)
+    },
+    onCallBackReceived: (data) => {
+      handleReturnCall(data)
+    },
+    onUnknownCall: (data) => {
+      handleUnknownCall(data);
+    },
+  });
+
+  return () => {
+    disconnectCallSocket();
+  };
+}, []); // Empty dependency array
 
   // Function to handle feedback submission
   const handleFeedbackSubmit = async (feedbackData: {
