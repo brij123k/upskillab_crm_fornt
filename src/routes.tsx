@@ -28,8 +28,7 @@ import { ResetPassword } from "@/pages/ResetPassword";
 import { MeetingLogsPage } from "./pages/bd/MeetingLogsPage";
 import { OrderManagementPage } from "./pages/bd/OrderManagementPage";
 import { PaymentHistoryPage } from "./pages/bd/PaymentHistoryPage";
-import { LoanManagementPage } from "./pages/bd/LoanManagementPage";
-
+import { LoanManagementPage } from "./pages/bd/LoanManagementPage";import { ReportsPage } from '@/pages/reports/ReportsPage';
 // Placeholder
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-[60vh]">
@@ -70,7 +69,7 @@ const AppRoutes = () => {
           <Route path="users" element={<UsersPage />} />
           <Route path="leads" element={<LeadsPage />} />
           <Route path="finance" element={<PlaceholderPage title="Finance" />} />
-          <Route path="reports" element={<PlaceholderPage title="Reports & Analytics" />} />
+          <Route path="reports" element={<ReportsPage />} />
           <Route path="security" element={<PlaceholderPage title="Security & Audit" />} />
           <Route path="settings" element={<PlaceholderPage title="System Settings" />} />
         </Route>
@@ -112,7 +111,7 @@ const AppRoutes = () => {
           <Route path="payments" element={<PaymentHistoryPage />} />
           <Route path="loan-management" element={<LoanManagementPage />} />
           <Route path="subscriptions" element={<PlaceholderPage title="BD Subscriptions" />} />
-          <Route path="reports" element={<PlaceholderPage title="BD Reports" />} />
+          <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<PlaceholderPage title="BD Settings" />} />
         </Route>
 

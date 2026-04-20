@@ -75,6 +75,15 @@ const ApiConfig = {
   sendLoanReminder:(emiId:string)=>`${url}/order/loan/reminder/${emiId}`,
   updateLoanStatus:(emiId:string)=>`${url}/order/loan/loan-emi/${emiId}`,
 
+  stageSummery:`${url}/leads/report/stage-summary`,
+  allEmpStages:`${url}/leads/report/all-employees-stages`,
+  poolWiseStages:`${url}/order/report/pool-wise-data`,
+  employeePoolRevenueReport:`${url}/order/report/employee-pool-revenue`,
+  employeePoolUtilizationReport:`${url}/order/report/employee-pool-utilization`,
+  consultantPerforment:`${url}/order/report/consultant-performance`,
+  employeePoolDailyUtilizationReport:`${url}/call-logs/report/employee-pool-daily-utilization`,
+  
+  sourceCampaignWiseLeadRevenueReport:`${url}/order/report/source-campaign-wise-lead-revenue`,
 
   // IVR section
   getMynumbers:`${url}/IVR/myNumbers`,
