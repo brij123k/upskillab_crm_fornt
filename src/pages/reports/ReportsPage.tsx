@@ -37,7 +37,8 @@ const REPORTS = [
     description: 'Lead stage breakdown by employee',
     icon: Users,
     color: 'from-blue-500 to-cyan-500',
-    filters: ['date', 'counsellorId'],
+    filters: ['date'],
+    // filters: ['date', 'counsellorId'],
   },
   {
     id: 'pool-stages',
@@ -57,7 +58,8 @@ const REPORTS = [
     description: 'Revenue breakdown by employee and pool',
     icon: IndianRupee,
     color: 'from-yellow-500 to-orange-500',
-    filters: ['date', 'poolId', 'counsellorId'],
+    // filters: ['date', 'poolId', 'counsellorId'],
+    filters: ['date'],
   },
   {
     id: 'utilization',
@@ -67,7 +69,8 @@ const REPORTS = [
     description: 'Employee performance metrics',
     icon: PhoneCall,
     color: 'from-red-500 to-rose-500',
-    filters: ['date', 'poolId'],
+    filters: ['date'],
+    // filters: ['date', 'poolId'],
   },
   {
     id: 'consultant-performance',
@@ -77,7 +80,8 @@ const REPORTS = [
     description: 'Revenue and achievement metrics',
     icon: Award,
     color: 'from-indigo-500 to-violet-500',
-    filters: ['date', 'counsellorId'],
+    filters: ['date'],
+    // filters: ['date', 'counsellorId'],
   },
 //   {
 //     id: 'daily-utilization',
