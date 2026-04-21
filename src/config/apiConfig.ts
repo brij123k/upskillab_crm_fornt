@@ -1,5 +1,5 @@
-// const url = "http://localhost:3000"
-const url = "https://crm.upskillab.in"
+const url = "http://localhost:3000"
+// const url = "https://crm.upskillab.in"
 const ApiConfig = {
   url,
   login:`${url}/users/login`,
@@ -77,7 +77,7 @@ const ApiConfig = {
 
   stageSummery:`${url}/leads/report/stage-summary`,
   allEmpStages:`${url}/leads/report/all-employees-stages`,
-  poolWiseStages:`${url}/order/report/pool-wise-data`,
+  poolWiseStages:`${url}/leads/report/pool-wise-data`,
   employeePoolRevenueReport:`${url}/order/report/employee-pool-revenue`,
   employeePoolUtilizationReport:`${url}/order/report/employee-pool-utilization`,
   consultantPerforment:`${url}/order/report/consultant-performance`,

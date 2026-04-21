@@ -28,7 +28,8 @@ import { ResetPassword } from "@/pages/ResetPassword";
 import { MeetingLogsPage } from "./pages/bd/MeetingLogsPage";
 import { OrderManagementPage } from "./pages/bd/OrderManagementPage";
 import { PaymentHistoryPage } from "./pages/bd/PaymentHistoryPage";
-import { LoanManagementPage } from "./pages/bd/LoanManagementPage";import { ReportsPage } from '@/pages/reports/ReportsPage';
+import { LoanManagementPage } from "./pages/bd/LoanManagementPage";
+import { ReportsPage } from '@/pages/reports/ReportsPage';
 // Placeholder
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-[60vh]">
