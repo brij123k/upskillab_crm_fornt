@@ -26,14 +26,23 @@ import {
 } from '@/components/reports';
 
 const REPORTS = [
-  { id: 'stage-summary', name: 'Stages', endpoint: ApiConfig.stageSummery, icon: PieChart,hasFilter:true, filters: ['date'], component: StageSummaryReport },
-  { id: 'employee-stages', name: 'Employees', endpoint: ApiConfig.allEmpStages, icon: Users,hasFilter:false, component: EmployeeStagesReport },
-  { id: 'pool-stages', name: 'Pools', endpoint: ApiConfig.poolWiseStages, icon: Building2,hasFilter:true, filters: ['date'], component: PoolStagesReport },
-  { id: 'pool-revenue', name: 'Revenue', endpoint: ApiConfig.employeePoolRevenueReport, icon: IndianRupee,hasFilter:true, filters: ['date'], component: PoolRevenueReport },
-  { id: 'utilization', name: 'Utilization', endpoint: ApiConfig.employeePoolUtilizationReport, icon: PhoneCall,hasFilter:true, filters: ['date'], component: UtilizationReport },
-  { id: 'consultant-performance', name: 'Consultants', endpoint: ApiConfig.consultantPerforment, icon: Award,hasFilter:true, filters: ['date'], component: ConsultantPerformanceReport },
-  { id: 'daily-utilization', name: 'Daily Calls', endpoint: ApiConfig.employeePoolDailyUtilizationReport, icon: Calendar,hasFilter:true, filters: ['date', 'poolId'], component: DailyUtilizationReport },
+  { id: 'stage-summary', name: 'Stages', endpoint: ApiConfig.stageSummery, icon: PieChart, hasFilter: true, filters: ['date'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: StageSummaryReport },
+  { id: 'employee-stages', name: 'Employees', endpoint: ApiConfig.allEmpStages, icon: Users, hasFilter: false, component: EmployeeStagesReport },
+  { id: 'pool-stages', name: 'Pools', endpoint: ApiConfig.poolWiseStages, icon: Building2, hasFilter: true, filters: ['date'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: PoolStagesReport },
+  { id: 'pool-revenue', name: 'Revenue', endpoint: ApiConfig.employeePoolRevenueReport, icon: IndianRupee, hasFilter: true, filters: ['date'], dateFilterOptions: ['month', 'custom'], component: PoolRevenueReport },
+  { id: 'utilization', name: 'Utilization', endpoint: ApiConfig.employeePoolUtilizationReport, icon: PhoneCall, hasFilter: true, filters: ['date'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: UtilizationReport },
+  { id: 'consultant-performance', name: 'Consultants', endpoint: ApiConfig.consultantPerforment, icon: Award, hasFilter: true, filters: ['date'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: ConsultantPerformanceReport },
+  { id: 'daily-utilization', name: 'Daily Calls', endpoint: ApiConfig.employeePoolDailyUtilizationReport, icon: Calendar, hasFilter: true, filters: ['date', 'poolId'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: DailyUtilizationReport },
 ];
+
+// Date filter options mapping
+const dateFilterLabels: Record<string, string> = {
+  today: 'Today',
+  week: 'This Week',
+  month: 'This Month',
+  year: 'This Year',
+  custom: 'Custom Range'
+};
 
 export function ReportsPage() {
   const { toast } = useToast();
@@ -51,6 +60,16 @@ export function ReportsPage() {
   const currentReport = REPORTS.find(r => r.id === activeReport) || REPORTS[0];
   const CurrentComponent = currentReport.component;
 
+  // Reset date range when switching to revenue tab
+  useEffect(() => {
+    if (currentReport.id === 'pool-revenue') {
+      // For revenue tab, default to 'month' if current selection is not allowed
+      if (!currentReport.dateFilterOptions.includes(dateRange)) {
+        setDateRange('month');
+      }
+    }
+  }, [activeReport]);
+
   useEffect(() => {
     fetchPools();
   }, [activeReport]);
@@ -64,17 +83,57 @@ export function ReportsPage() {
     }
   };
 
+  // Validate date range (max 30 days)
+  const validateDateRange = (from: string, to: string): boolean => {
+    if (!from || !to) return true;
+    
+    const fromDateObj = new Date(from);
+    const toDateObj = new Date(to);
+    const diffTime = Math.abs(toDateObj.getTime() - fromDateObj.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays > 30) {
+      toast({ 
+        title: 'Date range too large', 
+        description: 'Maximum 30 days allowed. Please select a smaller range.',
+        variant: 'destructive' 
+      });
+      return false;
+    }
+    return true;
+  };
+
   const fetchReport = async () => {
     setLoading(true);
     try {
       const params: any = {};
+      
+      // For custom date range, validate first
       if (dateRange === 'custom') {
-        if (fromDate) params.fromDate = fromDate;
-        if (toDate) params.toDate = toDate;
-      } else{
+        if (fromDate && toDate) {
+          if (!validateDateRange(fromDate, toDate)) {
+            setLoading(false);
+            return;
+          }
+          params.fromDate = fromDate;
+          params.toDate = toDate;
+        } else if (fromDate || toDate) {
+          // If only one date is selected, show error
+          toast({ 
+            title: 'Invalid date range', 
+            description: 'Please select both from and to dates',
+            variant: 'destructive' 
+          });
+          setLoading(false);
+          return;
+        }
+      } else {
         params.dateFilter = dateRange;
       }
-      if (!poolId ==" " && currentReport.filters.includes('poolId')) params.poolId = poolId;
+      
+      if (poolId && poolId !== " " && currentReport.filters?.includes('poolId')) {
+        params.poolId = poolId;
+      }
       
       const response = await getDataHandlerWithToken(currentReport.endpoint, params, null, true);
       setReportData(response?.data || response);
@@ -99,7 +158,18 @@ export function ReportsPage() {
         emp.stages.map((s: any) => ({ employee: emp.employeeName, stage: s.leadStage, count: s.count }))
       );
     } else if (currentReport.id === 'pool-stages' && reportData.poolWiseData) csvData = reportData.poolWiseData;
-    else if (currentReport.id === 'utilization' && reportData.employees) csvData = reportData.employees;
+    else if (currentReport.id === 'pool-revenue' && reportData.employees) {
+      csvData = reportData.employees.flatMap((emp: any) =>
+        emp.pools?.flatMap((pool: any) =>
+          pool.revenueByMonth?.map((rev: any) => ({
+            employee: emp.employeeName,
+            pool: pool.poolName,
+            month: rev.month,
+            revenue: rev.revenue
+          }))
+        )
+      );
+    } else if (currentReport.id === 'utilization' && reportData.employees) csvData = reportData.employees;
     else if (currentReport.id === 'consultant-performance' && Array.isArray(reportData)) csvData = reportData;
     else csvData = [reportData];
     
@@ -121,17 +191,26 @@ export function ReportsPage() {
     URL.revokeObjectURL(url);
     toast({ title: 'Exported!' });
   };
- useEffect(() => {
-    if (!currentReport.hasFilters) {
+  
+  useEffect(() => {
+    if (!currentReport.hasFilter) {
       fetchReport();
     }
   }, [activeReport]);
   
   useEffect(() => {
-  fetchReport();
-}, [dateRange, fromDate, toDate, poolId]);
+    if (currentReport.hasFilter) {
+      fetchReport();
+    }
+  }, [dateRange, fromDate, toDate, poolId]);
 
-  const hasFilters = dateRange !== 'today' || (dateRange === 'custom' && (fromDate || toDate)) || poolId;
+  // Check if any filters are active
+  const hasFilters = () => {
+    if (dateRange !== 'month') return true;
+    if (dateRange === 'custom' && (fromDate || toDate)) return true;
+    if (poolId && poolId !== " ") return true;
+    return false;
+  };
 
   return (
     <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
@@ -168,59 +247,77 @@ export function ReportsPage() {
         </TabsList>
 
         <TabsContent value={activeReport} className="space-y-3">
-          {/* Filter Bar */}
+          {/* Filter Bar - Only show for reports that have filters */}
           {currentReport.hasFilter && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button 
-              variant={showFilters ? "default" : "outline"} 
-              size="sm" 
-              onClick={() => setShowFilters(!showFilters)}
-              className="gap-1 h-8 text-xs"
-            >
-              <Filter className="h-3 w-3" />
-              Filters
-              {hasFilters && <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">•</Badge>}
-            </Button>
-            
-            {showFilters && (
-              <div className="flex flex-wrap items-center gap-2">
-                <Select value={dateRange} onValueChange={setDateRange}>
-                  <SelectTrigger className="h-8 w-[110px] text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="today" className="text-xs">Today</SelectItem>
-                    <SelectItem value="week" className="text-xs">This Week</SelectItem>
-                    <SelectItem value="month" className="text-xs">This Month</SelectItem>
-                    <SelectItem value="year" className="text-xs">This Year</SelectItem>
-                    <SelectItem value="custom" className="text-xs">Custom</SelectItem>
-                  </SelectContent>
-                </Select>
-                
-                {dateRange === 'custom' && (
-                  <>
-                    <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-8 w-[130px] text-xs" />
-                    <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-8 w-[130px] text-xs" />
-                  </>
-                )}
-                
-                {currentReport.filters.includes('poolId') && pools.length > 0 && (
-                  <Select value={poolId} onValueChange={setPoolId}>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button 
+                variant={showFilters ? "default" : "outline"} 
+                size="sm" 
+                onClick={() => setShowFilters(!showFilters)}
+                className="gap-1 h-8 text-xs"
+              >
+                <Filter className="h-3 w-3" />
+                Filters
+                {hasFilters() && <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">•</Badge>}
+              </Button>
+              
+              {showFilters && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Date Range Selector with dynamic options based on report */}
+                  <Select value={dateRange} onValueChange={setDateRange}>
                     <SelectTrigger className="h-8 w-[130px] text-xs">
-                      <SelectValue placeholder="All Pools" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value=" " className="text-xs">All Pools</SelectItem>
-                      {pools.map((p: any) => (
-                        <SelectItem key={p._id} value={p._id} className="text-xs">{p.name || p.title}</SelectItem>
+                      {currentReport.dateFilterOptions.map((option) => (
+                        <SelectItem key={option} value={option} className="text-xs">
+                          {dateFilterLabels[option]}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                )}
-             
-              </div>
-            )}
-          </div>
+                  
+                  {/* Custom Date Range Inputs */}
+                  {dateRange === 'custom' && (
+                    <>
+                      <Input 
+                        type="date" 
+                        value={fromDate} 
+                        onChange={(e) => setFromDate(e.target.value)} 
+                        className="h-8 w-[130px] text-xs" 
+                      />
+                      <Input 
+                        type="date" 
+                        value={toDate} 
+                        onChange={(e) => setToDate(e.target.value)} 
+                        className="h-8 w-[130px] text-xs" 
+                      />
+                      {/* Show max days warning for revenue tab */}
+                      {currentReport.id === 'pool-revenue' && (fromDate || toDate) && (
+                        <span className="text-[10px] text-muted-foreground">
+                          Max 30 days
+                        </span>
+                      )}
+                    </>
+                  )}
+                  
+                  {/* Pool Filter */}
+                  {currentReport.filters?.includes('poolId') && pools.length > 0 && (
+                    <Select value={poolId} onValueChange={setPoolId}>
+                      <SelectTrigger className="h-8 w-[130px] text-xs">
+                        <SelectValue placeholder="All Pools" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value=" " className="text-xs">All Pools</SelectItem>
+                        {pools.map((p: any) => (
+                          <SelectItem key={p._id} value={p._id} className="text-xs">{p.name || p.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Report Content */}
