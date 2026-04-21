@@ -71,7 +71,7 @@ export function ReportsPage() {
       if (dateRange === 'custom') {
         if (fromDate) params.fromDate = fromDate;
         if (toDate) params.toDate = toDate;
-      } else if (dateRange !== 'month') {
+      } else{
         params.dateFilter = dateRange;
       }
       if (!poolId ==" " && currentReport.filters.includes('poolId')) params.poolId = poolId;
@@ -131,7 +131,7 @@ export function ReportsPage() {
   fetchReport();
 }, [dateRange, fromDate, toDate, poolId]);
 
-  const hasFilters = dateRange !== 'month' || (dateRange === 'custom' && (fromDate || toDate)) || poolId;
+  const hasFilters = dateRange !== 'today' || (dateRange === 'custom' && (fromDate || toDate)) || poolId;
 
   return (
     <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
