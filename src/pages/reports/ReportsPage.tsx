@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -35,7 +35,6 @@ const REPORTS = [
   { id: 'daily-utilization', name: 'Daily Calls', endpoint: ApiConfig.employeePoolDailyUtilizationReport, icon: Calendar, hasFilter: true, filters: ['date', 'poolId'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: DailyUtilizationReport },
 ];
 
-// Date filter options mapping
 const dateFilterLabels: Record<string, string> = {
   today: 'Today',
   week: 'This Week',
@@ -46,6 +45,8 @@ const dateFilterLabels: Record<string, string> = {
 
 export function ReportsPage() {
   const { toast } = useToast();
+  
+  // State
   const [activeReport, setActiveReport] = useState(REPORTS[0].id);
   const [showFilters, setShowFilters] = useState(false);
   const [dateRange, setDateRange] = useState('today');
@@ -60,36 +61,30 @@ export function ReportsPage() {
   const currentReport = REPORTS.find(r => r.id === activeReport) || REPORTS[0];
   const CurrentComponent = currentReport.component;
 
-  // Reset date range when switching to revenue tab
-  useEffect(() => {
-    if (currentReport.id === 'pool-revenue') {
-      // For revenue tab, default to 'month' if current selection is not allowed
-      if (!currentReport.dateFilterOptions.includes(dateRange)) {
-        setDateRange('month');
-      }
-    }
-  }, [activeReport]);
+  // Get default date range for a report
+  const getDefaultDateRange = useCallback((reportId: string) => {
+    const report = REPORTS.find(r => r.id === reportId);
+    if (!report?.hasFilter || !report.dateFilterOptions?.length) return 'today';
+    return report.dateFilterOptions.includes('today') ? 'today' : report.dateFilterOptions[0];
+  }, []);
 
-  useEffect(() => {
-    fetchPools();
-  }, [activeReport]);
-
-  const fetchPools = async () => {
+  // Fetch pools
+  const fetchPools = useCallback(async () => {
     try {
       const res = await getDataHandlerWithToken('getAllPools', null, null);
       setPools(res?.data || res || []);
     } catch (error) {
       console.error('Failed to load pools');
     }
-  };
+  }, []);
 
   // Validate date range (max 30 days)
-  const validateDateRange = (from: string, to: string): boolean => {
+  const validateDateRange = useCallback((from: string, to: string): boolean => {
     if (!from || !to) return true;
     
-    const fromDateObj = new Date(from);
-    const toDateObj = new Date(to);
-    const diffTime = Math.abs(toDateObj.getTime() - fromDateObj.getTime());
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    const diffTime = Math.abs(toDate.getTime() - fromDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
     if (diffDays > 30) {
@@ -101,14 +96,14 @@ export function ReportsPage() {
       return false;
     }
     return true;
-  };
+  }, [toast]);
 
-  const fetchReport = async () => {
+  // Fetch report data
+  const fetchReport = useCallback(async () => {
     setLoading(true);
     try {
       const params: any = {};
       
-      // For custom date range, validate first
       if (dateRange === 'custom') {
         if (fromDate && toDate) {
           if (!validateDateRange(fromDate, toDate)) {
@@ -117,15 +112,6 @@ export function ReportsPage() {
           }
           params.fromDate = fromDate;
           params.toDate = toDate;
-        } else if (fromDate || toDate) {
-          // If only one date is selected, show error
-          toast({ 
-            title: 'Invalid date range', 
-            description: 'Please select both from and to dates',
-            variant: 'destructive' 
-          });
-          setLoading(false);
-          return;
         }
       } else {
         params.dateFilter = dateRange;
@@ -143,9 +129,10 @@ export function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRange, fromDate, toDate, poolId, currentReport, validateDateRange, toast]);
 
-  const handleExport = () => {
+  // Export to CSV
+  const handleExport = useCallback(() => {
     if (!reportData) {
       toast({ title: 'No data to export' });
       return;
@@ -190,23 +177,70 @@ export function ReportsPage() {
     a.click();
     URL.revokeObjectURL(url);
     toast({ title: 'Exported!' });
-  };
-  
-  useEffect(() => {
-    if (!currentReport.hasFilter) {
-      fetchReport();
+  }, [reportData, currentReport.id, toast]);
+
+  // Handle report change
+  const handleReportChange = useCallback((reportId: string) => {
+    setActiveReport(reportId);
+    setShowFilters(false);
+    setDateRange(getDefaultDateRange(reportId));
+    setFromDate('');
+    setToDate('');
+    setPoolId('');
+    setSearchTerm('');
+    setReportData(null);
+  }, [getDefaultDateRange]);
+
+  // Handle date range change
+  const handleDateRangeChange = useCallback((value: string) => {
+    setDateRange(value);
+    if (value !== 'custom') {
+      setFromDate('');
+      setToDate('');
     }
-  }, [activeReport]);
-  
+  }, []);
+
+  // Handle from date change
+  const handleFromDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFromDate(value);
+    if (toDate && value > toDate) {
+      setToDate(value);
+    }
+  }, [toDate]);
+
+  // Handle to date change
+  const handleToDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setToDate(value);
+    if (fromDate && value < fromDate) {
+      setFromDate(value);
+    }
+  }, [fromDate]);
+
+  // Handle pool change
+  const handlePoolChange = useCallback((value: string) => {
+    setPoolId(value);
+  }, []);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchPools();
+  }, [fetchPools]);
+
+  // Fetch report when dependencies change
   useEffect(() => {
     if (currentReport.hasFilter) {
       fetchReport();
+    } else {
+      fetchReport();
     }
-  }, [dateRange, fromDate, toDate, poolId]);
+  }, [activeReport, dateRange, fromDate, toDate, poolId, fetchReport, currentReport.hasFilter]);
 
-  // Check if any filters are active
-  const hasFilters = () => {
-    if (dateRange !== 'month') return true;
+  // Check if filters are active
+  const hasFiltersActive = () => {
+    const defaultRange = getDefaultDateRange(activeReport);
+    if (dateRange !== defaultRange) return true;
     if (dateRange === 'custom' && (fromDate || toDate)) return true;
     if (poolId && poolId !== " ") return true;
     return false;
@@ -233,7 +267,7 @@ export function ReportsPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeReport} onValueChange={setActiveReport} className="space-y-3">
+      <Tabs value={activeReport} onValueChange={handleReportChange} className="space-y-3">
         <TabsList className="flex flex-wrap h-auto gap-1 p-1">
           {REPORTS.map((report) => {
             const Icon = report.icon;
@@ -247,7 +281,7 @@ export function ReportsPage() {
         </TabsList>
 
         <TabsContent value={activeReport} className="space-y-3">
-          {/* Filter Bar - Only show for reports that have filters */}
+          {/* Filter Bar */}
           {currentReport.hasFilter && (
             <div className="flex flex-wrap items-center gap-2">
               <Button 
@@ -258,43 +292,50 @@ export function ReportsPage() {
               >
                 <Filter className="h-3 w-3" />
                 Filters
-                {hasFilters() && <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">•</Badge>}
+                {hasFiltersActive() && <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">•</Badge>}
               </Button>
               
               {showFilters && (
                 <div className="flex flex-wrap items-center gap-2">
-                  {/* Date Range Selector with dynamic options based on report */}
-                  <Select value={dateRange} onValueChange={setDateRange}>
-                    <SelectTrigger className="h-8 w-[130px] text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {currentReport.dateFilterOptions.map((option) => (
-                        <SelectItem key={option} value={option} className="text-xs">
-                          {dateFilterLabels[option]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {/* Date Range Select */}
+                  <div className="w-[130px]">
+                    <Select value={dateRange} onValueChange={handleDateRangeChange}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currentReport.dateFilterOptions.map((option) => (
+                          <SelectItem key={option} value={option} className="text-xs">
+                            {dateFilterLabels[option]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   
-                  {/* Custom Date Range Inputs */}
+                  {/* Custom Date Range */}
                   {dateRange === 'custom' && (
                     <>
-                      <Input 
-                        type="date" 
-                        value={fromDate} 
-                        onChange={(e) => setFromDate(e.target.value)} 
-                        className="h-8 w-[130px] text-xs" 
-                      />
-                      <Input 
-                        type="date" 
-                        value={toDate} 
-                        onChange={(e) => setToDate(e.target.value)} 
-                        className="h-8 w-[130px] text-xs" 
-                      />
-                      {/* Show max days warning for revenue tab */}
+                      <div className="relative w-[130px]">
+                        <input
+                          type="date"
+                          value={fromDate}
+                          onChange={handleFromDateChange}
+                          className="w-full h-8 px-2 text-xs border rounded-md bg-background cursor-pointer"
+                          style={{ fontFamily: 'inherit' }}
+                        />
+                      </div>
+                      <div className="relative w-[130px]">
+                        <input
+                          type="date"
+                          value={toDate}
+                          onChange={handleToDateChange}
+                          className="w-full h-8 px-2 text-xs border rounded-md bg-background cursor-pointer"
+                          style={{ fontFamily: 'inherit' }}
+                        />
+                      </div>
                       {currentReport.id === 'pool-revenue' && (fromDate || toDate) && (
-                        <span className="text-[10px] text-muted-foreground">
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                           Max 30 days
                         </span>
                       )}
@@ -303,17 +344,21 @@ export function ReportsPage() {
                   
                   {/* Pool Filter */}
                   {currentReport.filters?.includes('poolId') && pools.length > 0 && (
-                    <Select value={poolId} onValueChange={setPoolId}>
-                      <SelectTrigger className="h-8 w-[130px] text-xs">
-                        <SelectValue placeholder="All Pools" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value=" " className="text-xs">All Pools</SelectItem>
-                        {pools.map((p: any) => (
-                          <SelectItem key={p._id} value={p._id} className="text-xs">{p.name || p.title}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="w-[130px]">
+                      <Select value={poolId} onValueChange={handlePoolChange}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="All Pools" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value=" " className="text-xs">All Pools</SelectItem>
+                          {pools.map((p: any) => (
+                            <SelectItem key={p._id} value={p._id} className="text-xs">
+                              {p.name || p.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   )}
                 </div>
               )}
