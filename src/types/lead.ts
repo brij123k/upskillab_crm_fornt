@@ -4,6 +4,8 @@ export interface LeadType {
   name: string;
   phone: string;
   email: string;
+  city: string;
+  state: string;
   source: string;
   stageId: {
     _id: string;

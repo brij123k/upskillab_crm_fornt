@@ -86,6 +86,8 @@ interface LeadType {
   name: string;
   phone: string;
   email: string;
+  city: string;
+  state: string;
   source: string;
   stageId: {
     _id: string;
@@ -162,6 +164,8 @@ interface LeadForm {
   name: string;
   phone: string;
   email: string;
+  city: string;
+  state: string;
   source: string;
   stageId: string;
   poolId?: string;
@@ -174,6 +178,8 @@ interface BulkLead {
   name: string;
   phone: string;
   email: string;
+  city: string;
+  state: string;
   source: string;
   stageId: string;
   poolId?: string;
@@ -188,6 +194,7 @@ interface Filters {
   source: string;
   stageId: string;
   poolId: string;
+  location: string;
   assignedTo: string;
   modifiedBy: string;
   isActive: string;
@@ -195,6 +202,9 @@ interface Filters {
   dateFilter: string;
   fromDate: string;
   toDate: string;
+  assignedDateFilter: string;
+  assignedDateFrom: string;
+  assignedDateTo: string;
 }
 
 interface ProgressItem {
@@ -231,12 +241,16 @@ export function BDLeadsPage() {
     stageId: 'all',
     assignedTo: 'all',
     poolId: 'all',
+    location: '',
     modifiedBy: 'all',
     isActive: 'all',
     sort: 'new',
     dateFilter: 'all',
     fromDate: '',
-    toDate: ''
+    toDate: '',
+    assignedDateFilter: 'all',
+    assignedDateFrom: '',
+    assignedDateTo: ''
   });
 
   // Modal states
@@ -266,6 +280,8 @@ export function BDLeadsPage() {
     name: '',
     phone: '',
     email: '',
+    city: '',
+    state: '',
     source: 'manual',
     stageId: '696cadcadcbcf508621922e6',
     source_campaign: '',
@@ -274,7 +290,7 @@ export function BDLeadsPage() {
   });
 
   const [bulkLeads, setBulkLeads] = useState<BulkLead[]>([
-    { name: '', phone: '', email: '', source: 'manual', stageId: '696cadcadcbcf508621922e6', assignedTo: '', poolId: '', reason: '' }
+    { name: '', phone: '', email: '', city: '', state: '', source: 'manual', stageId: '696cadcadcbcf508621922e6', assignedTo: '', poolId: '', reason: '' }
   ]);
 
   // Progress tracking
@@ -309,6 +325,7 @@ export function BDLeadsPage() {
     if (filters.source && filters.source !== "all") params.source = filters.source;
     if (filters.stageId && filters.stageId !== "all") params.stageId = filters.stageId;
     if (filters.poolId && filters.poolId !== "all") params.poolId = filters.poolId;
+    if (filters.location) params.location = filters.location;
     if (filters.assignedTo && filters.assignedTo !== "all") params.assignedTo = filters.assignedTo;
     if (filters.modifiedBy && filters.modifiedBy !== "all") params.modifiedBy = filters.modifiedBy;
 
@@ -325,6 +342,9 @@ export function BDLeadsPage() {
 
     if (filters.fromDate && filters.fromDate !== "all") params.fromDate = filters.fromDate;
     if (filters.toDate && filters.toDate !== "all") params.toDate = filters.toDate;
+    if (filters.assignedDateFilter && filters.assignedDateFilter !== "all") params.assignedDateFilter = filters.assignedDateFilter;
+    if (filters.assignedDateFrom && filters.assignedDateFrom !== "all") params.assignedDateFrom = filters.assignedDateFrom;
+    if (filters.assignedDateTo && filters.assignedDateTo !== "all") params.assignedDateTo = filters.assignedDateTo;
 
     return params;
   };
@@ -512,6 +532,8 @@ export function BDLeadsPage() {
         name: '',
         phone: '',
         email: '',
+        city: '',
+        state: '',
         source: 'manual',
         stageId: '696cadcadcbcf508621922e6',
         source_campaign: '',
@@ -533,7 +555,7 @@ export function BDLeadsPage() {
   const isBulkLeadFormValid = () => {
     // Check if there's at least one valid lead
     const validLeads = bulkLeads.filter(lead =>
-      lead.name && lead.phone && lead.email && lead.stageId
+      lead.name && lead.phone && lead.email && lead.city && lead.state && lead.poolId && lead.stageId
     );
 
     if (validLeads.length === 0) return false;
@@ -556,7 +578,7 @@ export function BDLeadsPage() {
       setProgressModalOpen(true);
 
       const validLeads = bulkLeads.filter(lead =>
-        lead.name && lead.phone && lead.email && lead.stageId
+        lead.name && lead.phone && lead.email && lead.city && lead.state && lead.poolId && lead.stageId
       );
 
       if (validLeads.length === 0) {
@@ -612,6 +634,9 @@ export function BDLeadsPage() {
             dataToSend.reason = dataToSend.reason || "Bulk lead creation assignment";
           }
 
+          dataToSend.city = dataToSend.city || "N/A";
+          dataToSend.state = dataToSend.state || "N/A";
+
           await postDataHandlerWithToken("createNewLead", dataToSend);
 
           // Update progress to success
@@ -637,7 +662,7 @@ export function BDLeadsPage() {
 
       // Reset form after delay
       setTimeout(() => {
-        setBulkLeads([{ name: '', phone: '', email: '', source: 'manual', stageId: '696cadcadcbcf508621922e6', assignedTo: '', reason: '' }]);
+        setBulkLeads([{ name: '', phone: '', email: '', source: 'manual', city: '', state: '', stageId: '696cadcadcbcf508621922e6', assignedTo: '', reason: '' }]);
         setBulkLeadOpen(false);
         setProgressModalOpen(false);
         fetchLeads();
@@ -832,6 +857,8 @@ export function BDLeadsPage() {
       name: lead.name,
       phone: lead.phone,
       email: lead.email,
+      city: lead.city || '',
+      state: lead.state || '',
       source: lead.source,
       poolId: poolIdValue,
       stageId: lead.stageId._id,
@@ -868,7 +895,7 @@ export function BDLeadsPage() {
 
   // Add bulk lead row
   const addBulkLeadRow = () => {
-    setBulkLeads([...bulkLeads, { name: '', phone: '', email: '', source: 'manual', stageId: '696cadcadcbcf508621922e6', assignedTo: '', reason: '' }]);
+    setBulkLeads([...bulkLeads, { name: '', phone: '', email: '', city: '', state: '', source: 'manual', stageId: '696cadcadcbcf508621922e6', assignedTo: '', reason: '' }]);
   };
 
   // Remove bulk lead row
@@ -893,8 +920,6 @@ export function BDLeadsPage() {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
     });
   };
 
@@ -969,13 +994,17 @@ export function BDLeadsPage() {
       source: 'all',
       stageId: 'all',
       poolId: 'all',
+      location: '',
       assignedTo: 'all',
       modifiedBy: 'all',
       isActive: 'all',
       sort: 'new',
       dateFilter: 'all',
       fromDate: '',
-      toDate: ''
+      toDate: '',
+      assignedDateFilter: 'all',
+      assignedDateFrom: '',
+      assignedDateTo: ''
     });
     setPage(1);
   };
@@ -991,7 +1020,7 @@ export function BDLeadsPage() {
 
   // Download CSV template
   const downloadCSVTemplate = () => {
-    const csvContent = "name,phone,email,source,source_campaign\nJohn Doe,1234567890,john@example.com,source,Summer Campaign";
+    const csvContent = "name,phone,email,city,state,source,source_campaign\nJohn Doe,1234567890,john@example.com,Lucknow,Uttar Pradesh,source,Summer Campaign";
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1021,12 +1050,15 @@ export function BDLeadsPage() {
         "Name",
         "Phone",
         "Email",
+        "City",
+        "State",
         "Source",
         "Stage",
         "Status",
         "Health Score",
         "Assigned To",
         "Assigned Email",
+        "Assigned Employee ID",
         "Created At",
         "Last Modified",
         "Is Active"
@@ -1038,6 +1070,8 @@ export function BDLeadsPage() {
         `"${lead.name.replace(/"/g, '""')}"`,
         lead.phone,
         lead.email,
+        lead.city || "N/A",
+        lead.state || "N/A",
         lead.source,
         lead.stageId?.name || "",
         lead.status,
@@ -1045,7 +1079,6 @@ export function BDLeadsPage() {
         lead.assignedTo?.name || "",
         lead.assignedTo?.email || "",
         lead.assignedTo?.employeeId || "",
-        lead.reason || "",
         new Date(lead.createdAt).toLocaleString(),
         new Date(lead.modifiedAt).toLocaleString(),
         lead.isActive ? "Yes" : "No"
@@ -1099,6 +1132,7 @@ export function BDLeadsPage() {
       if (filters.status && filters.status !== "all") queryParams.status = filters.status;
       if (filters.source && filters.source !== "all") queryParams.source = filters.source;
       if (filters.stageId && filters.stageId !== "all") queryParams.stageId = filters.stageId;
+      if (filters.location) queryParams.location = filters.location;
       if (filters.assignedTo && filters.assignedTo !== "all") queryParams.assignedTo = filters.assignedTo;
       if (filters.modifiedBy && filters.modifiedBy !== "all") queryParams.modifiedBy = filters.modifiedBy;
 
@@ -1115,6 +1149,9 @@ export function BDLeadsPage() {
 
       if (filters.fromDate && filters.fromDate !== "all") queryParams.fromDate = filters.fromDate;
       if (filters.toDate && filters.toDate !== "all") queryParams.toDate = filters.toDate;
+      if (filters.assignedDateFilter && filters.assignedDateFilter !== "all") queryParams.assignedDateFilter = filters.assignedDateFilter;
+      if (filters.assignedDateFrom && filters.assignedDateFrom !== "all") queryParams.assignedDateFrom = filters.assignedDateFrom;
+      if (filters.assignedDateTo && filters.assignedDateTo !== "all") queryParams.assignedDateTo = filters.assignedDateTo;
 
       // Fetch all data without pagination
       queryParams.page = 1;
@@ -1140,12 +1177,15 @@ export function BDLeadsPage() {
         "Name",
         "Phone",
         "Email",
+        "City",
+        "State",
         "Source",
         "Stage",
         "Status",
         "Health Score",
         "Assigned To",
         "Assigned Email",
+        "Assigned Employee ID",
         "Created At",
         "Last Modified",
         "Is Active"
@@ -1157,6 +1197,8 @@ export function BDLeadsPage() {
         `"${lead.name.replace(/"/g, '""')}"`,
         lead.phone,
         lead.email,
+        lead.city || "N/A",
+        lead.state || "N/A",
         lead.source,
         lead.stageId?.name || "",
         lead.status,
@@ -1212,12 +1254,12 @@ export function BDLeadsPage() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in bg-transparent">
+    <div className="space-y-4 animate-fade-in bg-transparent">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Lead Management</h1>
-          <p className="text-muted-foreground">Manage and track all leads in your pipeline</p>
+          <h1 className="text-xl font-semibold text-foreground">Lead Management</h1>
+          <p className="text-xs text-muted-foreground">Lead list, filters, and quick actions.</p>
         </div>
         <div className="flex items-center gap-2">
           {hasPermission(permissions, 'leads', 'assign') && (
@@ -1333,6 +1375,24 @@ export function BDLeadsPage() {
                                 />
                               </div>
                               <div className="space-y-2">
+                                <Label>City *</Label>
+                                <Input
+                                  value={lead.city}
+                                  onChange={(e) => updateBulkLeadRow(index, 'city', e.target.value)}
+                                  placeholder="Enter city"
+                                  disabled={addingBulkLeads}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>State *</Label>
+                                <Input
+                                  value={lead.state}
+                                  onChange={(e) => updateBulkLeadRow(index, 'state', e.target.value)}
+                                  placeholder="Enter state"
+                                  disabled={addingBulkLeads}
+                                />
+                              </div>
+                              <div className="space-y-2">
                                 <Label>Source *</Label>
                                 <Select
                                   value={lead.source}
@@ -1401,7 +1461,6 @@ export function BDLeadsPage() {
                                     <SelectValue placeholder="Select pool" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value=" ">No Pool</SelectItem>
                                     {loadingPools ? (
                                       <div className="py-2 text-center">
                                         <Loader2 className="w-4 h-4 mx-auto animate-spin" />
@@ -1554,6 +1613,28 @@ export function BDLeadsPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
+                        <Label htmlFor="city">City *</Label>
+                        <Input
+                          id="city"
+                          value={leadForm.city}
+                          onChange={(e) => setLeadForm({ ...leadForm, city: e.target.value })}
+                          placeholder="Enter city"
+                          disabled={addingLead}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="state">State *</Label>
+                        <Input
+                          id="state"
+                          value={leadForm.state}
+                          onChange={(e) => setLeadForm({ ...leadForm, state: e.target.value })}
+                          placeholder="Enter state"
+                          disabled={addingLead}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
                         <Label htmlFor="source">Source *</Label>
                         <Select
                           value={leadForm.source}
@@ -1597,7 +1678,6 @@ export function BDLeadsPage() {
                             <SelectValue placeholder="Select pool" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value=" ">No Pool</SelectItem>
                             {loadingPools ? (
                               <div className="py-2 text-center">
                                 <Loader2 className="w-4 h-4 mx-auto animate-spin" />
@@ -1620,7 +1700,7 @@ export function BDLeadsPage() {
                     <Button variant="outline" onClick={() => setNewLeadOpen(false)} disabled={addingLead}>
                       Cancel
                     </Button>
-                    <Button onClick={handleAddLead} disabled={addingLead}>
+                    <Button onClick={handleAddLead} disabled={addingLead || !leadForm.name || !leadForm.phone || !leadForm.email || !leadForm.city || !leadForm.state || !leadForm.poolId || !leadForm.stageId}>
                       {addingLead ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1675,7 +1755,7 @@ export function BDLeadsPage() {
       {/* Filters - Collapsible */}
       {showFilters && (
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Search</Label>
@@ -1752,6 +1832,18 @@ export function BDLeadsPage() {
               </div>
 
               <div className="space-y-2">
+                <Label>Location</Label>
+                <div className="grid grid-cols-1 gap-2">
+                  
+                  <Input
+                    placeholder="Location"
+                    value={filters.location}
+                    onChange={(e) => setFilters({ ...filters, location: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
                 <Label>Pool</Label>
                 <Select
                   value={filters.poolId || 'all'}
@@ -1780,6 +1872,26 @@ export function BDLeadsPage() {
                 <Select
                   value={filters.dateFilter}
                   onValueChange={(value) => setFilters({ ...filters, dateFilter: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">This Week</SelectItem>
+                    <SelectItem value="month">This Month</SelectItem>
+                    <SelectItem value="year">This Year</SelectItem>
+                    <SelectItem value="custom">Custom Range</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Assigned Date</Label>
+                <Select
+                  value={filters.assignedDateFilter}
+                  onValueChange={(value) => setFilters({ ...filters, assignedDateFilter: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select period" />
@@ -1857,6 +1969,26 @@ export function BDLeadsPage() {
                   </div>
                 </>
               )}
+              {filters.assignedDateFilter === 'custom' && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Assigned From Date</Label>
+                    <Input
+                      type="date"
+                      value={filters.assignedDateFrom}
+                      onChange={(e) => setFilters({ ...filters, assignedDateFrom: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Assigned To Date</Label>
+                    <Input
+                      type="date"
+                      value={filters.assignedDateTo}
+                      onChange={(e) => setFilters({ ...filters, assignedDateTo: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1866,7 +1998,7 @@ export function BDLeadsPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">
+            <CardTitle className="text-base">
               All Leads ({totalLeads})
               {loading && (
                 <span className="ml-2 text-sm text-muted-foreground">
@@ -1964,7 +2096,7 @@ export function BDLeadsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="text-xs [&_th]:py-2 [&_td]:py-2">
                 <TableHeader>
                   <TableRow>
                     {isAssignmentMode && (
@@ -1981,9 +2113,11 @@ export function BDLeadsPage() {
                     )}
                     <TableHead>Lead</TableHead>
                     <TableHead>Contact</TableHead>
+                    <TableHead>Location</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead>Stage</TableHead>
                     <TableHead>Pool</TableHead>
+                    <TableHead>Created At</TableHead>
                     <TableHead>Notify Now</TableHead>
                     <TableHead>Call Now</TableHead>
                     <TableHead>Assigned To</TableHead>
@@ -2040,6 +2174,12 @@ export function BDLeadsPage() {
                           </div>
                         </div>
                       </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          <div>{lead.city || 'N/A'}</div>
+                          <div className="text-xs text-muted-foreground">{lead.state || 'N/A'}</div>
+                        </div>
+                      </TableCell>
                       <TableCell>{getSourceBadge(lead.source)}</TableCell>
                       <TableCell>
                         <Badge variant="outline">
@@ -2064,6 +2204,7 @@ export function BDLeadsPage() {
                           <span className="text-muted-foreground text-sm">—</span>
                         )}
                       </TableCell>
+                      <TableCell>{formatDate(lead.createdAt)}</TableCell>
                       {/* <TableCell>{getStatusBadge(lead.status)}</TableCell> */}
                       <TableCell>
                         <AlarmClock onClick={() => sendNotify(lead.leadId)} />
@@ -2633,20 +2774,42 @@ export function BDLeadsPage() {
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
-              <Input
-                id="edit-email"
-                type="email"
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Email</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
                 value={leadForm.email}
                 onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })}
                 placeholder="john@company.com"
-                disabled={updatingLead}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-source">Source</Label>
+                  disabled={updatingLead}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-city">City *</Label>
+                  <Input
+                    id="edit-city"
+                    value={leadForm.city}
+                    onChange={(e) => setLeadForm({ ...leadForm, city: e.target.value })}
+                    placeholder="Enter city"
+                    disabled={updatingLead}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-state">State *</Label>
+                  <Input
+                    id="edit-state"
+                    value={leadForm.state}
+                    onChange={(e) => setLeadForm({ ...leadForm, state: e.target.value })}
+                    placeholder="Enter state"
+                    disabled={updatingLead}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-source">Source</Label>
                 <Select
                   value={leadForm.source}
                   onValueChange={(value) => setLeadForm({ ...leadForm, source: value })}
@@ -2713,7 +2876,7 @@ export function BDLeadsPage() {
             <Button variant="outline" onClick={() => setEditLeadOpen(false)} disabled={updatingLead}>
               Cancel
             </Button>
-            <Button onClick={handleUpdateLead} disabled={updatingLead}>
+            <Button onClick={handleUpdateLead} disabled={updatingLead || !leadForm.name || !leadForm.phone || !leadForm.email || !leadForm.city || !leadForm.state || !leadForm.stageId}>
               {updatingLead ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

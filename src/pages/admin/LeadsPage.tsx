@@ -88,6 +88,8 @@ interface LeadType {
   name: string;
   phone: string;
   email: string;
+  city: string;
+  state: string;
   source: string;
   stageId: {
     _id: string;
@@ -167,6 +169,8 @@ interface LeadForm {
   name: string;
   phone: string;
   email: string;
+  city: string;
+  state: string;
   source: string;
   stageId: string;
   source_campaign?: string;
@@ -178,6 +182,8 @@ interface BulkLead {
   name: string;
   phone: string;
   email: string;
+  city: string;
+  state: string;
   source: string;
   stageId: string;
   source_campaign?: string;
@@ -191,6 +197,7 @@ interface Filters {
   source: string;
   stageId: string;
   poolId: string;
+  location:string;
   assignedTo: string;
   modifiedBy: string;
   isActive: string;
@@ -198,6 +205,9 @@ interface Filters {
   dateFilter: string;
   fromDate: string;
   toDate: string;
+  assignedDateFilter: string;
+  assignedDateFrom: string;
+  assignedDateTo: string;
 }
 
 interface ProgressItem {
@@ -230,12 +240,16 @@ export function LeadsPage() {
     stageId: 'all',
     assignedTo: 'all',
     poolId: 'all',
+    location:'',
     modifiedBy: 'all',
     isActive: 'all',
     sort: 'new',
     dateFilter: 'all',
     fromDate: '',
-    toDate: ''
+    toDate: '',
+    assignedDateFilter: 'all',
+    assignedDateFrom: '',
+    assignedDateTo: ''
   });
 
   // Modal states
@@ -263,6 +277,8 @@ export function LeadsPage() {
     name: '',
     phone: '',
     email: '',
+    city: '',
+    state: '',
     source: 'manual',
     stageId: '',
     source_campaign: '',
@@ -271,7 +287,7 @@ export function LeadsPage() {
   });
 
   const [bulkLeads, setBulkLeads] = useState<BulkLead[]>([
-    { name: '', phone: '', email: '', source: 'manual', stageId: '', assignedTo: '', poolId: '' }
+    { name: '', phone: '', email: '', city: '', state: '', source: 'manual', stageId: '', assignedTo: '', poolId: '' }
   ]);
 
   // Progress tracking
@@ -307,6 +323,7 @@ export function LeadsPage() {
     if (filters.source && filters.source !== "all") params.source = filters.source;
     if (filters.stageId && filters.stageId !== "all") params.stageId = filters.stageId;
     if (filters.poolId && filters.poolId !== "all") params.poolId = filters.poolId;
+    if (filters.location) params.location = filters.location;
     if (filters.assignedTo && filters.assignedTo !== "all") params.assignedTo = filters.assignedTo;
     if (filters.modifiedBy && filters.modifiedBy !== "all") params.modifiedBy = filters.modifiedBy;
 
@@ -323,6 +340,9 @@ export function LeadsPage() {
 
     if (filters.fromDate && filters.fromDate !== "all") params.fromDate = filters.fromDate;
     if (filters.toDate && filters.toDate !== "all") params.toDate = filters.toDate;
+    if (filters.assignedDateFilter && filters.assignedDateFilter !== "all") params.assignedDateFilter = filters.assignedDateFilter;
+    if (filters.assignedDateFrom && filters.assignedDateFrom !== "all") params.assignedDateFrom = filters.assignedDateFrom;
+    if (filters.assignedDateTo && filters.assignedDateTo !== "all") params.assignedDateTo = filters.assignedDateTo;
 
     return params;
   };
@@ -494,6 +514,8 @@ useEffect(() => {
         name: '',
         phone: '',
         email: '',
+        city: '',
+        state: '',
         source: 'manual',
         stageId: stages[0]?._id || '',
         source_campaign: '',
@@ -520,7 +542,7 @@ useEffect(() => {
       setProgressModalOpen(true);
 
       const validLeads = bulkLeads.filter(lead =>
-        lead.name && lead.phone && lead.email && lead.stageId
+        lead.name && lead.phone && lead.email && lead.city && lead.state && lead.stageId
       );
 
       if (validLeads.length === 0) {
@@ -583,7 +605,7 @@ useEffect(() => {
 
       // Reset form after delay
       setTimeout(() => {
-        setBulkLeads([{ name: '', phone: '', email: '', source: 'manual', stageId: stages[0]?._id || '', assignedTo: '' }]);
+        setBulkLeads([{ name: '', phone: '', email: '', city: '', state: '', source: 'manual', stageId: stages[0]?._id || '', assignedTo: '' }]);
         setBulkLeadOpen(false);
         setProgressModalOpen(false);
         fetchLeads();
@@ -792,6 +814,8 @@ const handleEditLead = (lead: LeadType) => {
     name: lead.name,
     phone: lead.phone,
     email: lead.email,
+    city: lead.city || '',
+    state: lead.state || '',
     source: lead.source,
     stageId: lead.stageId._id,
     source_campaign: '',
@@ -842,7 +866,7 @@ const handleEditLead = (lead: LeadType) => {
 
   // Add bulk lead row
   const addBulkLeadRow = () => {
-    setBulkLeads([...bulkLeads, { name: '', phone: '', email: '', source: 'manual', stageId: stages[0]?._id || '', assignedTo: '' }]);
+    setBulkLeads([...bulkLeads, { name: '', phone: '', email: '', city: '', state: '', source: 'manual', stageId: stages[0]?._id || '', assignedTo: '' }]);
   };
 
   // Remove bulk lead row
@@ -867,8 +891,6 @@ const handleEditLead = (lead: LeadType) => {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
     });
   };
 
@@ -943,13 +965,17 @@ const handleEditLead = (lead: LeadType) => {
       source: 'all',
       stageId: 'all',
       poolId: 'all',
+      location:'',
       assignedTo: 'all',
       modifiedBy: 'all',
       isActive: 'all',
       sort: 'new',
       dateFilter: 'all',
       fromDate: '',
-      toDate: ''
+      toDate: '',
+      assignedDateFilter: 'all',
+      assignedDateFrom: '',
+      assignedDateTo: ''
     });
     setPage(1);
   };
@@ -965,7 +991,7 @@ const handleEditLead = (lead: LeadType) => {
 
   // Download CSV template
   const downloadCSVTemplate = () => {
-    const csvContent = "name,phone,email,source,source_campaign\nJohn Doe,1234567890,john@example.com,source,Summer Campaign";
+    const csvContent = "name,phone,email,city,state,source,source_campaign\nJohn Doe,1234567890,john@example.com,Lucknow,Uttar Pradesh,manual,Summer Campaign";
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -995,6 +1021,8 @@ const handleEditLead = (lead: LeadType) => {
         "Name",
         "Phone",
         "Email",
+        "City",
+        "State",
         "Source",
         "Stage",
         "Pool",
@@ -1002,6 +1030,7 @@ const handleEditLead = (lead: LeadType) => {
         "Health Score",
         "Assigned To",
         "Assigned Email",
+        "Assigned Employee ID",
         "Created At",
         "Last Modified",
         "Is Active"
@@ -1013,8 +1042,11 @@ const handleEditLead = (lead: LeadType) => {
         `"${lead.name.replace(/"/g, '""')}"`,
         lead.phone,
         lead.email,
+        lead.city || "N/A",
+        lead.state || "N/A",
         lead.source,
         lead.stageId?.name || "",
+        typeof lead.poolId === 'object' ? lead.poolId.name : (lead.poolId || ""),
         lead.status,
         lead.healthScore,
         lead.assignedTo?.name || "",
@@ -1073,6 +1105,7 @@ const handleEditLead = (lead: LeadType) => {
       if (filters.status && filters.status !== "all") queryParams.status = filters.status;
       if (filters.source && filters.source !== "all") queryParams.source = filters.source;
       if (filters.stageId && filters.stageId !== "all") queryParams.stageId = filters.stageId;
+      if (filters.location) queryParams.location = filters.location;
       if (filters.assignedTo && filters.assignedTo !== "all") queryParams.assignedTo = filters.assignedTo;
       if (filters.modifiedBy && filters.modifiedBy !== "all") queryParams.modifiedBy = filters.modifiedBy;
 
@@ -1089,6 +1122,9 @@ const handleEditLead = (lead: LeadType) => {
 
       if (filters.fromDate && filters.fromDate !== "all") queryParams.fromDate = filters.fromDate;
       if (filters.toDate && filters.toDate !== "all") queryParams.toDate = filters.toDate;
+      if (filters.assignedDateFilter && filters.assignedDateFilter !== "all") queryParams.assignedDateFilter = filters.assignedDateFilter;
+      if (filters.assignedDateFrom && filters.assignedDateFrom !== "all") queryParams.assignedDateFrom = filters.assignedDateFrom;
+      if (filters.assignedDateTo && filters.assignedDateTo !== "all") queryParams.assignedDateTo = filters.assignedDateTo;
 
       // Fetch all data without pagination
       queryParams.page = 1;
@@ -1114,12 +1150,16 @@ const handleEditLead = (lead: LeadType) => {
         "Name",
         "Phone",
         "Email",
+        "City",
+        "State",
         "Source",
         "Stage",
+        "Pool",
         "Status",
         "Health Score",
         "Assigned To",
         "Assigned Email",
+        "Assigned Employee ID",
         "Created At",
         "Last Modified",
         "Is Active"
@@ -1131,6 +1171,8 @@ const handleEditLead = (lead: LeadType) => {
         `"${lead.name.replace(/"/g, '""')}"`,
         lead.phone,
         lead.email,
+        lead.city || "N/A",
+        lead.state || "N/A",
         lead.source,
         lead.stageId?.name || "",
         typeof lead.poolId === 'object' ? lead.poolId.name : (lead.poolId || ""),
@@ -1187,12 +1229,12 @@ const handleEditLead = (lead: LeadType) => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in bg-transparent">
+    <div className="space-y-4 animate-fade-in bg-transparent">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Lead Management</h1>
-          <p className="text-muted-foreground">Manage and track all leads in your pipeline</p>
+          <h1 className="text-xl font-semibold text-foreground">Lead Management</h1>
+          <p className="text-xs text-muted-foreground">Lead list, filters, and quick actions.</p>
         </div>
         <div className="flex items-center gap-2">
           {isAssignmentMode ? (
@@ -1287,18 +1329,36 @@ const handleEditLead = (lead: LeadType) => {
                             disabled={addingBulkLeads}
                           />
                         </div>
-                        <div className="space-y-2">
-                          <Label>Email *</Label>
-                          <Input
-                            type="email"
-                            value={lead.email}
+                              <div className="space-y-2">
+                                <Label>Email *</Label>
+                                <Input
+                                  type="email"
+                                  value={lead.email}
                             onChange={(e) => updateBulkLeadRow(index, 'email', e.target.value)}
                             placeholder="john@company.com"
-                            disabled={addingBulkLeads}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Source *</Label>
+                                  disabled={addingBulkLeads}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>City *</Label>
+                                <Input
+                                  value={lead.city}
+                                  onChange={(e) => updateBulkLeadRow(index, 'city', e.target.value)}
+                                  placeholder="Enter city"
+                                  disabled={addingBulkLeads}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>State *</Label>
+                                <Input
+                                  value={lead.state}
+                                  onChange={(e) => updateBulkLeadRow(index, 'state', e.target.value)}
+                                  placeholder="Enter state"
+                                  disabled={addingBulkLeads}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Source *</Label>
                           <Select
                             value={lead.source}
                             onValueChange={(value) => updateBulkLeadRow(index, 'source', value)}
@@ -1523,6 +1583,31 @@ const handleEditLead = (lead: LeadType) => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
+                      <Label htmlFor="city" className="text-sm sm:text-base">City *</Label>
+                      <Input
+                        id="city"
+                        value={leadForm.city}
+                        onChange={(e) => setLeadForm({ ...leadForm, city: e.target.value })}
+                        placeholder="Enter city"
+                        disabled={addingLead}
+                        className="h-10 sm:h-11 text-sm sm:text-base"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="state" className="text-sm sm:text-base">State *</Label>
+                      <Input
+                        id="state"
+                        value={leadForm.state}
+                        onChange={(e) => setLeadForm({ ...leadForm, state: e.target.value })}
+                        placeholder="Enter state"
+                        disabled={addingLead}
+                        className="h-10 sm:h-11 text-sm sm:text-base"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
                       <Label htmlFor="source" className="text-sm sm:text-base">Source *</Label>
                       <Select
                         value={leadForm.source}
@@ -1655,7 +1740,7 @@ const handleEditLead = (lead: LeadType) => {
                 </Button>
                 <Button
                   onClick={handleAddLead}
-                  disabled={addingLead || !leadForm.name || !leadForm.phone || !leadForm.email || !leadForm.stageId}
+                  disabled={addingLead || !leadForm.name || !leadForm.phone || !leadForm.email || !leadForm.city || !leadForm.state || !leadForm.stageId}
                   className="h-10 sm:h-11 text-sm sm:text-base px-4 sm:px-6"
                 >
                   {addingLead ? (
@@ -1786,6 +1871,16 @@ const handleEditLead = (lead: LeadType) => {
                 </Select>
               </div>
               <div className="space-y-2">
+                <Label>Location</Label>
+                <div className="grid grid-cols-1 gap-2">
+                  <Input
+                    placeholder="location"
+                    value={filters.location}
+                    onChange={(e) => setFilters({ ...filters, location: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
                 <Label>Sort By</Label>
                 <Select
                   value={filters.sort}
@@ -1802,28 +1897,9 @@ const handleEditLead = (lead: LeadType) => {
                   </SelectContent>
                 </Select>
               </div>
-
-
-              <div className="space-y-2">
-                <Label>Date Filter</Label>
-                <Select
-                  value={filters.dateFilter}
-                  onValueChange={(value) => setFilters({ ...filters, dateFilter: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select period" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Time</SelectItem>
-                    <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="week">This Week</SelectItem>
-                    <SelectItem value="month">This Month</SelectItem>
-                    <SelectItem value="year">This Year</SelectItem>
-                    <SelectItem value="custom">Custom Range</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
-            </div>
+            
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Assigned To</Label>
@@ -1868,7 +1944,47 @@ const handleEditLead = (lead: LeadType) => {
                 </Select>
               </div>
             </div>
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Date Filter</Label>
+                <Select
+                  value={filters.dateFilter}
+                  onValueChange={(value) => setFilters({ ...filters, dateFilter: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">This Week</SelectItem>
+                    <SelectItem value="month">This Month</SelectItem>
+                    <SelectItem value="year">This Year</SelectItem>
+                    <SelectItem value="custom">Custom Range</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Assigned Date</Label>
+                <Select
+                  value={filters.assignedDateFilter}
+                  onValueChange={(value) => setFilters({ ...filters, assignedDateFilter: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">This Week</SelectItem>
+                    <SelectItem value="month">This Month</SelectItem>
+                    <SelectItem value="year">This Year</SelectItem>
+                    <SelectItem value="custom">Custom Range</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              </div>
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mt-4'>
               {filters.dateFilter === 'custom' && (
                 <>
                   <div className="space-y-2">
@@ -1885,6 +2001,28 @@ const handleEditLead = (lead: LeadType) => {
                       type="date"
                       value={filters.toDate}
                       onChange={(e) => setFilters({ ...filters, toDate: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mt-4'>
+              {filters.assignedDateFilter === 'custom' && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Assigned From Date</Label>
+                    <Input
+                      type="date"
+                      value={filters.assignedDateFrom}
+                      onChange={(e) => setFilters({ ...filters, assignedDateFrom: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Assigned To Date</Label>
+                    <Input
+                      type="date"
+                      value={filters.assignedDateTo}
+                      onChange={(e) => setFilters({ ...filters, assignedDateTo: e.target.value })}
                     />
                   </div>
                 </>
@@ -1923,10 +2061,12 @@ const handleEditLead = (lead: LeadType) => {
             )}
             <TableHead>Lead</TableHead>
             <TableHead>Contact</TableHead>
+            <TableHead>Location</TableHead>
             <TableHead>Source</TableHead>
             <TableHead>Stage</TableHead>
             <TableHead>Pool</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Created At</TableHead>
             <TableHead>Assigned To</TableHead>
             {/* REMOVED: Actions column header */}
           </TableRow>
@@ -1975,6 +2115,12 @@ const handleEditLead = (lead: LeadType) => {
                   </div>
                 </div>
               </TableCell>
+              <TableCell>
+                <div className="text-sm">
+                  <div>{lead.city || 'N/A'}</div>
+                  <div className="text-xs text-muted-foreground">{lead.state || 'N/A'}</div>
+                </div>
+              </TableCell>
               <TableCell>{getSourceBadge(lead.source)}</TableCell>
               <TableCell>
                 <Badge variant="outline" className="flex items-center gap-1">
@@ -2001,6 +2147,7 @@ const handleEditLead = (lead: LeadType) => {
                 )}
               </TableCell>
               <TableCell>{getStatusBadge(lead.status)}</TableCell>
+              <TableCell>{formatDate(lead.createdAt)}</TableCell>
               <TableCell>
                 {lead.assignedTo ? (
                   <div className="flex items-center gap-2">
@@ -2642,6 +2789,31 @@ const handleEditLead = (lead: LeadType) => {
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-city" className="text-sm sm:text-base">City *</Label>
+                  <Input
+                    id="edit-city"
+                    value={leadForm.city}
+                    onChange={(e) => setLeadForm({ ...leadForm, city: e.target.value })}
+                    placeholder="Enter city"
+                    disabled={updatingLead}
+                    className="h-10 sm:h-11 text-sm sm:text-base"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-state" className="text-sm sm:text-base">State *</Label>
+                  <Input
+                    id="edit-state"
+                    value={leadForm.state}
+                    onChange={(e) => setLeadForm({ ...leadForm, state: e.target.value })}
+                    placeholder="Enter state"
+                    disabled={updatingLead}
+                    className="h-10 sm:h-11 text-sm sm:text-base"
+                  />
+                </div>
+              </div>
+
               {/* Source and Campaign - Stack on mobile, side-by-side on larger screens */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -2753,7 +2925,7 @@ const handleEditLead = (lead: LeadType) => {
               </Button>
               <Button
                 onClick={handleUpdateLead}
-                disabled={updatingLead || !leadForm.name || !leadForm.phone || !leadForm.email || !leadForm.stageId}
+                disabled={updatingLead || !leadForm.name || !leadForm.phone || !leadForm.email || !leadForm.city || !leadForm.state || !leadForm.stageId}
                 className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base px-4 sm:px-6"
               >
                 {updatingLead ? (

@@ -22,6 +22,8 @@ interface CSVLead {
   name: string;
   phone: string;
   email: string;
+  city: string;
+  state: string;
   source: string;
   source_campaign?: string;
   assignedTo?: string;
@@ -46,8 +48,8 @@ export function CSVUploadModal({
   const [selectedPoolId, setSelectedPoolId] = useState<string>('');
   const [currentError, setCurrentError] = useState<string>('');
   const downloadCSVTemplate = () => {
-    const headers = ['name', 'phone', 'email', 'source', 'source_campaign'];
-    const example = ['John Doe', '1234567890', 'john@example.com', 'manual', 'Summer Campaign'];
+    const headers = ['name', 'phone', 'email', 'city', 'state', 'source', 'source_campaign'];
+    const example = ['John Doe', '1234567890', 'john@example.com', 'Lucknow', 'Uttar Pradesh', 'manual', 'Summer Campaign'];
     const csvContent = [headers, example].map(row => row.join(',')).join('\n');
     
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -112,16 +114,23 @@ export function CSVUploadModal({
 
         // Parse data rows
         const leads: CSVLead[] = [];
+        const getCellValue = (values: string[], headerName: string, fallback = '') => {
+          const index = headers.indexOf(headerName);
+          return index >= 0 ? (values[index] ?? '').trim() || fallback : fallback;
+        };
+
         for (let i = 1; i < lines.length; i++) {
           if (!lines[i]?.trim()) continue;
           
           const values = lines[i].split(',').map(v => v.trim());
           const lead: CSVLead = {
-            name: values[headers.indexOf('name')] || '',
-            phone: values[headers.indexOf('phone')] || '',
-            email: values[headers.indexOf('email')] || '',
-            source: (values[headers.indexOf('source')]).toLowerCase() || 'manual',
-            source_campaign: values[headers.indexOf('source_campaign')] || '',
+            name: getCellValue(values, 'name'),
+            phone: getCellValue(values, 'phone'),
+            email: getCellValue(values, 'email'),
+            city: getCellValue(values, 'city', 'N/A'),
+            state: getCellValue(values, 'state', 'N/A'),
+            source: getCellValue(values, 'source', 'manual').toLowerCase() || 'manual',
+            source_campaign: getCellValue(values, 'source_campaign'),
             isValid: true,
             errors: []
           };
@@ -131,7 +140,6 @@ export function CSVUploadModal({
           if (!lead.name) errors.push('Name is required');
           if (!lead.phone) errors.push('Phone is required');
           if (!lead.email) errors.push('Email is required');
-          
           // Validate email format
           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
           if (lead.email && !emailRegex.test(lead.email)) {
@@ -191,6 +199,15 @@ export function CSVUploadModal({
       return;
     }
 
+    if (!selectedPoolId.trim()) {
+      toast({
+        title: 'Pool Required',
+        description: 'Please select a pool before uploading leads',
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Validate bulk assignment
     if (selectedUserId && selectedUserId.trim() !== "" && !bulkReason.trim()) {
       toast({
@@ -215,6 +232,8 @@ export function CSVUploadModal({
             name: lead.name,
             phone: lead.phone,
             email: lead.email,
+            city: lead.city || 'N/A',
+            state: lead.state || 'N/A',
             source: (lead.source).toLowerCase() || 'manual',
             stageId: '696cadcadcbcf508621922e6',
             source_campaign: lead.source_campaign || undefined,
@@ -278,7 +297,7 @@ export function CSVUploadModal({
 
         <div className="space-y-6 py-4">
           {/* File Upload Section */}
-          <div className="space-y-4">
+              <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-medium">1. Download Template</h3>
@@ -347,7 +366,7 @@ export function CSVUploadModal({
             {/* Bulk Assignment (Optional) */}
             <div className="space-y-4">
               <div className="space-y-2">
-                <h3 className="font-medium">3. Optional: Assign All Leads</h3>
+                <h3 className="font-medium">3. Select Pool and Optional Assignment</h3>
                 <div className="space-y-2">
                   <Label>Assign To (Optional)</Label>
                   <SearchableDropdown
@@ -377,7 +396,7 @@ export function CSVUploadModal({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Assign To Pool (Optional)</Label>
+                  <Label>Assign To Pool *</Label>
                   <SearchableDropdown
                     options={[
                       { value: "", label: "Not assigned" },
@@ -388,7 +407,7 @@ export function CSVUploadModal({
                     ]}
                     value={selectedPoolId}
                     onValueChange={setSelectedPoolId}
-                    placeholder="Select pool to assign all leads"
+                    placeholder="Select pool for all leads"
                     searchPlaceholder="Search by name..."
                     emptyMessage="No pools found"
                     disabled={uploading}
@@ -402,7 +421,7 @@ export function CSVUploadModal({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  This will assign all leads to the selected pool
+                  Pool selection is required for upload. User assignment remains optional.
                 </p>
               </div>
               
@@ -450,6 +469,8 @@ export function CSVUploadModal({
                           <TableHead>Name</TableHead>
                           <TableHead>Phone</TableHead>
                           <TableHead>Email</TableHead>
+                          <TableHead>City</TableHead>
+                          <TableHead>State</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -474,6 +495,8 @@ export function CSVUploadModal({
                             </TableCell>
                             <TableCell>{lead.phone}</TableCell>
                             <TableCell>{lead.email}</TableCell>
+                            <TableCell>{lead.city || 'N/A'}</TableCell>
+                            <TableCell>{lead.state || 'N/A'}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
