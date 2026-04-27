@@ -30,6 +30,7 @@ import { OrderManagementPage } from "./pages/bd/OrderManagementPage";
 import { PaymentHistoryPage } from "./pages/bd/PaymentHistoryPage";
 import { LoanManagementPage } from "./pages/bd/LoanManagementPage";
 import { ReportsPage } from '@/pages/reports/ReportsPage';
+import { CashfreeSubscriptionAuthPage } from "./pages/CashfreeSubscriptionAuthPage";
 // Placeholder
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-[60vh]">
@@ -57,6 +58,7 @@ const AppRoutes = () => {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/verify-otp" element={<VerifyOTP />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/cashfree/subscription-auth" element={<CashfreeSubscriptionAuthPage />} />
 
 
         {/* Admin Panel */}

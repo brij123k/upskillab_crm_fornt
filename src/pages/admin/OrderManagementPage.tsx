@@ -26,7 +26,8 @@ import {
     Users,
     Receipt,
     Info,
-    BookOpen
+    BookOpen,
+    ExternalLink
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -138,7 +139,7 @@ interface OrderType {
         firstEmiDate: string;
     };
     subscriptionDetails?: {
-        subscriptionId: string;
+        cashfreeSubscriptionId: string;
         gateway: string;
         installmentAmount: number;
         firstInstallmentDate: string;
@@ -277,6 +278,13 @@ export function OrderManagementPage() {
     const [generatedLink, setGeneratedLink] = useState('');
     const [generatedLinkModalOpen, setGeneratedLinkModalOpen] = useState(false);
     const [paymentType, setPaymentType] = useState('UPI');
+    const [subscriptionModalOpen, setSubscriptionModalOpen] = useState(false);
+    const [subscriptionAuthModalOpen, setSubscriptionAuthModalOpen] = useState(false);
+    const [subscriptionCreating, setSubscriptionCreating] = useState(false);
+    const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+    const [subscriptionPlanId, setSubscriptionPlanId] = useState('');
+    const [subscriptionSessionId, setSubscriptionSessionId] = useState('');
+    const [subscriptionAuthUrl, setSubscriptionAuthUrl] = useState('');
     // Payment history modal
     const [paymentHistoryModalOpen, setPaymentHistoryModalOpen] = useState(false);
     const [paymentHistory, setPaymentHistory] = useState<PaymentType[]>([]);
@@ -492,9 +500,9 @@ export function OrderManagementPage() {
 
     // Initialize data
     useEffect(() => {
-        if(hasModulePermission(permissions, "orders")){
-                  fetchOrders();
-                }
+        if (hasModulePermission(permissions, "orders")) {
+            fetchOrders();
+        }
         fetchLeads();
         fetchCourses();
         fetchPools();
@@ -875,6 +883,135 @@ export function OrderManagementPage() {
         setPaymentModalOpen(true);
     };
 
+    const resetSubscriptionState = () => {
+        setSubscriptionPlanId('');
+        setSubscriptionSessionId('');
+        setSubscriptionAuthUrl('');
+    };
+
+    // Open subscription create modal
+    const openSubscriptionCreateModal = (order: OrderType) => {
+        setSelectedOrder(order);
+        resetSubscriptionState();
+        setSubscriptionModalOpen(true);
+    };
+
+    const openSubscriptionAuthModal = (order: OrderType, sessionId: string) => {
+        setSelectedOrder(order);
+        resetSubscriptionState();
+        setSubscriptionSessionId(sessionId);
+        setSubscriptionAuthModalOpen(true);
+    };
+
+    const handleSubscriptionAction = async (order: OrderType) => {
+        console.log(!!order.subscriptionDetails?.cashfreeSubscriptionId, "1")
+        if (!!order.subscriptionDetails?.cashfreeSubscriptionId) {
+            try {
+                setSubscriptionLoading(true);
+                const response = await getDataHandlerWithToken(ApiConfig.getSubscriptionByOrderId(order._id), null, null, true);
+                const subscription = response?.data || response;
+                const sessionId = subscription?.cashfreeSubscriptionId;
+
+                if (!sessionId) {
+                    throw new Error('Cashfree subscription ID was not found for this order.');
+                }
+
+                openSubscriptionAuthModal(order, sessionId);
+            } catch (error: any) {
+                toast({
+                    title: 'Error',
+                    description: error?.response?.data?.message || error?.message || 'Failed to load subscription details',
+                    variant: 'destructive',
+                });
+            } finally {
+                setSubscriptionLoading(false);
+            }
+            return;
+        }
+
+        openSubscriptionCreateModal(order);
+    };
+
+    const getCashfreeMode = () => {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            return 'sandbox';
+        }
+        return 'production';
+    };
+
+    const buildSubscriptionAuthUrl = (sessionId: string) => {
+        const params = new URLSearchParams({
+            session: sessionId,
+            mode: getCashfreeMode(),
+        });
+
+        return `${window.location.origin}/cashfree/subscription-auth?${params.toString()}`;
+    };
+
+    const handleCreateSubscription = async () => {
+        if (!selectedOrder) return;
+
+        try {
+            setSubscriptionCreating(true);
+
+            const payload: Record<string, string> = {
+                orderId: selectedOrder._id,
+            };
+
+            if (subscriptionPlanId.trim()) {
+                payload.planId = subscriptionPlanId.trim();
+            }
+
+            const response = await postDataHandlerWithToken(ApiConfig.createSubscription, payload, true);
+            const sessionId =
+                response?.cashfreeSubscriptionId ||
+                response?.subscription_session_id ||
+                response?.subscriptionSessionId ||
+                response?.data?.cashfreeSubscriptionId ||
+                response?.data?.subscription_session_id;
+
+            if (!sessionId) {
+                throw new Error('Cashfree subscription session ID was not returned.');
+            }
+
+            setSubscriptionSessionId(sessionId);
+            setSubscriptionAuthUrl('');
+            setSubscriptionModalOpen(false);
+            setSubscriptionAuthModalOpen(true);
+
+            toast({
+                title: 'Success',
+                description: 'Subscription created successfully. Generate the auth link to continue.',
+            });
+        } catch (error: any) {
+            toast({
+                title: 'Error',
+                description: error?.response?.data?.message || error?.message || 'Failed to create subscription',
+                variant: 'destructive',
+            });
+        } finally {
+            setSubscriptionCreating(false);
+        }
+    };
+
+    const handleGenerateSubscriptionAuthLink = async () => {
+        if (!subscriptionSessionId) return;
+
+        try {
+            setSubscriptionAuthUrl(buildSubscriptionAuthUrl(subscriptionSessionId));
+            toast({
+                title: 'Success',
+                description: 'Subscription auth link generated.',
+            });
+        } catch (error: any) {
+            toast({
+                title: 'Error',
+                description: error?.message || 'Failed to generate auth link',
+                variant: 'destructive',
+            });
+        }
+    };
+
     // Open payment history modal
     const handlePaymentHistory = async (order: OrderType) => {
         setSelectedOrder(order);
@@ -953,6 +1090,8 @@ export function OrderManagementPage() {
             page: 1
         }));
     };
+
+
 
     return (
         <div className="space-y-4 md:space-y-6 p-2 md:p-0">
@@ -1260,115 +1399,138 @@ export function OrderManagementPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {orders.map((order) => (
-                                        <TableRow key={order._id} className="hover:bg-muted/50">
-                                            <TableCell className="whitespace-nowrap">
-                                                <span className="font-mono text-xs">{order._id.slice(-8)}</span>
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap">
-                                                <div className="font-medium">{order.studentName}</div>
-                                                <div className="text-xs text-muted-foreground">{order.mobile}</div>
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap">
-                                                <div className="text-sm">{order.courseName}</div>
-                                                <div className="text-xs text-muted-foreground">{order.courseDuration} days</div>
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap">
-                                                <div className="font-medium">{formatCurrency(order.finalFee)}</div>
-                                                <div className="text-xs text-muted-foreground line-through">
-                                                    {order.discount > 0 && formatCurrency(order.totalFee)}
-                                                </div>
-                                                {order.GSTEnabled && order.GSTAmount && (
-                                                    <div className="text-xs text-muted-foreground">
-                                                        +GST: {formatCurrency(order.GSTAmount)}
+                                    {orders.map((order) => {
+                                        console.log("ORDER:", order);
+                                        console.log("cashfreeSubscriptionId:", order.subscriptionDetails?.cashfreeSubscriptionId);
+                                        console.log("BOOLEAN:", !!order.subscriptionDetails?.cashfreeSubscriptionId);
+                                        const hasSubscriptionId = !!order.subscriptionDetails?.cashfreeSubscriptionId;
+
+                                        return (
+                                            <TableRow key={order._id} className="hover:bg-muted/50">
+                                                <TableCell className="whitespace-nowrap">
+                                                    <span className="font-mono text-xs">{order._id.slice(-8)}</span>
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    <div className="font-medium">{order.studentName}</div>
+                                                    <div className="text-xs text-muted-foreground">{order.mobile}</div>
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    <div className="text-sm">{order.courseName}</div>
+                                                    <div className="text-xs text-muted-foreground">{order.courseDuration} days</div>
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    <div className="font-medium">{formatCurrency(order.finalFee)}</div>
+                                                    <div className="text-xs text-muted-foreground line-through">
+                                                        {order.discount > 0 && formatCurrency(order.totalFee)}
                                                     </div>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap">
-                                                <Badge variant="outline">{order.paymentMode}</Badge>
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap">
-                                                {getStatusBadge(order.status, order.Approved)}
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap">
-                                                {order.Approved ? (
-                                                    <Badge className="bg-green-100 text-green-700 border-green-200 flex items-center gap-1">
-                                                        <CheckCircle2 className="w-3 h-3" />
-                                                        Approved
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 flex items-center gap-1">
-                                                        <XCircle className="w-3 h-3" />
-                                                        Pending
-                                                    </Badge>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap">
-                                                <div className="text-sm">{formatDate(order.orderDate)}</div>
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap">
-                                                <div className="flex items-center gap-2">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleViewOrder(order)}
-                                                        className="h-8 w-8 p-0"
-                                                        title="View Details"
-                                                    >
-                                                        <Eye className="w-4 h-4" />
-                                                    </Button>
-                                                    {!order.Approved && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleEditOrder(order)}
-                                                            className="h-8 w-8 p-0"
-                                                            title="Edit Order"
-                                                        >
-                                                            <Edit className="w-4 h-4" />
-                                                        </Button>
+                                                    {order.GSTEnabled && order.GSTAmount && (
+                                                        <div className="text-xs text-muted-foreground">
+                                                            +GST: {formatCurrency(order.GSTAmount)}
+                                                        </div>
                                                     )}
-                                                    {!order.Approved && (
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    <Badge variant="outline">{order.paymentMode}</Badge>
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    {getStatusBadge(order.status, order.Approved)}
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    {order.Approved ? (
+                                                        <Badge className="bg-green-100 text-green-700 border-green-200 flex items-center gap-1">
+                                                            <CheckCircle2 className="w-3 h-3" />
+                                                            Approved
+                                                        </Badge>
+                                                    ) : (
+                                                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 flex items-center gap-1">
+                                                            <XCircle className="w-3 h-3" />
+                                                            Pending
+                                                        </Badge>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    <div className="text-sm">{formatDate(order.orderDate)}</div>
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    <div className="flex items-center gap-2">
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            onClick={() => handleApproveOrder(order._id, order.Approved)}
+                                                            onClick={() => handleViewOrder(order)}
                                                             className="h-8 w-8 p-0"
-                                                            title={order.Approved ? "Unapprove Order" : "Approve Order"}
-                                                            disabled={approvingOrder}
+                                                            title="View Details"
                                                         >
+                                                            <Eye className="w-4 h-4" />
+                                                        </Button>
+                                                        {!order.Approved && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleEditOrder(order)}
+                                                                className="h-8 w-8 p-0"
+                                                                title="Edit Order"
+                                                            >
+                                                                <Edit className="w-4 h-4" />
+                                                            </Button>
+                                                        )}
+                                                        {!order.Approved && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleApproveOrder(order._id, order.Approved)}
+                                                                className="h-8 w-8 p-0"
+                                                                title={order.Approved ? "Unapprove Order" : "Approve Order"}
+                                                                disabled={approvingOrder}
+                                                            >
 
-                                                            <ShieldCheck className="w-4 h-4 text-green-500" />
+                                                                <ShieldCheck className="w-4 h-4 text-green-500" />
 
-                                                        </Button>
-                                                    )}
+                                                            </Button>
+                                                        )}
+                                                        {order.Approved && order.paymentMode === 'Subscription' && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleSubscriptionAction(order)}
+                                                                className="h-8 w-8 p-0"
+                                                                title={order.subscriptionDetails?.cashfreeSubscriptionId?.trim() ? "Get Auth Link" : "Create Subscription"}
+                                                                disabled={subscriptionLoading}
+                                                            >
+                                                                {order.subscriptionDetails?.cashfreeSubscriptionId?.trim() ? (
+                                                                    <ExternalLink className="w-4 h-4 text-blue-500" />
+                                                                ) : (
+                                                                    <Receipt className="w-4 h-4 text-blue-500" />
+                                                                )}
+                                                            </Button>
+                                                        )}
 
-                                                    {order.paymentMode === 'Lumpsum' && order.Approved && order.status !== 'Fully Paid' && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handlePaymentModal(order)}
-                                                            className="h-8 w-8 p-0"
-                                                            title="Generate Payment Link"
-                                                        >
-                                                            <CreditCard className="w-4 h-4" />
-                                                        </Button>
-                                                    )}
-                                                    {order.paymentMode === 'Lumpsum' && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handlePaymentHistory(order)}
-                                                            className="h-8 w-8 p-0"
-                                                            title="View Payment History"
-                                                        >
-                                                            <Receipt className="w-4 h-4" />
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                                        {order.paymentMode === 'Lumpsum' && order.Approved && order.status !== 'Fully Paid' && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handlePaymentModal(order)}
+                                                                className="h-8 w-8 p-0"
+                                                                title="Generate Payment Link"
+                                                            >
+                                                                <CreditCard className="w-4 h-4" />
+                                                            </Button>
+                                                        )}
+                                                        {order.paymentMode === 'Lumpsum' && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handlePaymentHistory(order)}
+                                                                className="h-8 w-8 p-0"
+                                                                title="View Payment History"
+                                                            >
+                                                                <Receipt className="w-4 h-4" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        )
+                                    })}
                                 </TableBody>
                             </Table>
                         </div>
@@ -2716,6 +2878,164 @@ export function OrderManagementPage() {
                     <DialogFooter>
                         <Button onClick={() => setPaymentHistoryModalOpen(false)}>Close</Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Subscription Creation Modal */}
+            <Dialog open={subscriptionModalOpen} onOpenChange={setSubscriptionModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Create Subscription</DialogTitle>
+                        <DialogDescription>
+                            Create the Cashfree subscription session for the approved order.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {selectedOrder && (
+                        <div className="space-y-4">
+                            <div className="bg-muted/30 p-4 rounded-lg space-y-2">
+                                <p className="text-sm text-muted-foreground mb-2">Order Summary</p>
+                                <p><strong>Student:</strong> {selectedOrder.studentName}</p>
+                                <p><strong>Order ID:</strong> {selectedOrder._id}</p>
+                                <p><strong>Payment Mode:</strong> {selectedOrder.paymentMode}</p>
+                                <p><strong>Total Amount:</strong> {formatCurrency(selectedOrder.finalFee)}</p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="subscriptionPlanId">Plan ID (optional)</Label>
+                                <Input
+                                    id="subscriptionPlanId"
+                                    value={subscriptionPlanId}
+                                    onChange={(e) => setSubscriptionPlanId(e.target.value)}
+                                    placeholder="Enter Cashfree plan ID"
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Leave blank to create the subscription with only the order ID.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setSubscriptionModalOpen(false)} disabled={subscriptionCreating}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleCreateSubscription} disabled={subscriptionCreating}>
+                            {subscriptionCreating ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Creating...
+                                </>
+                            ) : (
+                                'Create Subscription'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Subscription Auth Modal */}
+            <Dialog open={subscriptionAuthModalOpen} onOpenChange={setSubscriptionAuthModalOpen}>
+                <DialogContent className="max-w-[95vw] sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[90vh] p-0 sm:p-6">
+                    <div className="flex flex-col h-full overflow-hidden">
+                        <DialogHeader className="px-4 pt-4 pb-2 sm:px-6 sm:pt-6">
+                            <DialogTitle className="text-lg sm:text-xl">Subscription Auth Link</DialogTitle>
+                            <DialogDescription className="text-xs sm:text-sm">
+                                Generate the shareable Cashfree auth link for the created subscription session.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="flex-1 overflow-y-auto px-4 py-2 sm:px-6 space-y-4">
+                            <div className="bg-muted/30 p-3 sm:p-4 rounded-lg space-y-2">
+                                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Subscription Session</p>
+                                <div className="grid grid-cols-1 gap-2 text-xs sm:text-sm">
+                                    <div className="flex justify-between sm:justify-start sm:block">
+                                        <span className="text-muted-foreground">Student:</span>
+                                        <span className="font-medium ml-2 sm:ml-0 sm:block break-words">{selectedOrder?.studentName}</span>
+                                    </div>
+                                    <div className="col-span-1 flex justify-between sm:justify-start sm:block">
+                                        <span className="text-muted-foreground">Student Number:</span>
+                                        <span className="font-mono text-xs ml-2 sm:ml-0 sm:block break-all">{selectedOrder?.phone || "N/A"}</span>
+                                    </div>
+                                    <div className="col-span-1 flex justify-between sm:justify-start sm:block">
+                                        <span className="text-muted-foreground">Student Email:</span>
+                                        <span className="font-mono text-xs ml-2 sm:ml-0 sm:block break-all">{selectedOrder?.email}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-xs sm:text-sm">Auth Link</Label>
+                                {subscriptionAuthUrl ? (
+                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                        <Input
+                                            value={subscriptionAuthUrl}
+                                            readOnly
+                                            className="font-mono text-xs sm:text-sm flex-1 break-all"
+                                        />
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(subscriptionAuthUrl);
+                                                toast({
+                                                    title: 'Copied!',
+                                                    description: 'Subscription auth link copied to clipboard.',
+                                                });
+                                            }}
+                                            className="shrink-0 w-full sm:w-auto"
+                                        >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="14"
+                                                height="14"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                className="mr-2"
+                                            >
+                                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                            </svg>
+                                            Copy
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <Button onClick={handleGenerateSubscriptionAuthLink} className="w-full sm:w-auto">
+                                        Generate Auth Link
+                                    </Button>
+                                )}
+                                <p className="text-xs text-muted-foreground">
+                                    Generate the link, then copy or open it to share the Cashfree subscription checkout.
+                                </p>
+                            </div>
+                        </div>
+
+                        <DialogFooter className="px-4 py-3 sm:px-6 sm:py-4 border-t mt-2 flex-col sm:flex-row gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => setSubscriptionAuthModalOpen(false)}
+                                className="w-full sm:w-auto order-2 sm:order-1"
+                            >
+                                Close
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    if (subscriptionAuthUrl) {
+                                        window.open(subscriptionAuthUrl, '_blank');
+                                    }
+                                }}
+                                disabled={!subscriptionAuthUrl}
+                                className="w-full sm:w-auto order-1 sm:order-2"
+                            >
+                                <ExternalLink className="mr-2 h-4 w-4" />
+                                Open Auth Link
+                            </Button>
+                        </DialogFooter>
+                    </div>
                 </DialogContent>
             </Dialog>
 
