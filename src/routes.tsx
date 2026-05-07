@@ -12,9 +12,10 @@ import { AdminDashboard } from "@/pages/admin/AdminDashboard";
 import { UsersPage } from "@/pages/admin/UsersPage";
 // import { DepartmentsPage } from "@/pages/admin/DepartmentsPage";
 import {LeadsPage} from "@/pages/admin/LeadsPage"
-// HR Pages
-import { HRDashboard } from "@/pages/hr/HRDashboard";
-import { EmployeesPage } from "@/pages/hr/EmployeesPage";
+import { CallLogsPage as AdminCallLogsPage } from "@/pages/bd/CallLogsPage";
+import { MeetingLogsPage as AdminMeetingLogsPage } from "@/pages/bd/MeetingLogsPage";
+import { OrderManagementPage as AdminOrderManagementPage } from "@/pages/bd/OrderManagementPage";
+import { PaymentHistoryPage as AdminPaymentHistoryPage } from "@/pages/bd/PaymentHistoryPage";
 
 // BD Pages
 import { BDDashboard } from "@/pages/bd/BDDashboard";
@@ -31,6 +32,14 @@ import { PaymentHistoryPage } from "./pages/bd/PaymentHistoryPage";
 import { LoanManagementPage } from "./pages/bd/LoanManagementPage";
 import { ReportsPage } from '@/pages/reports/ReportsPage';
 import { CashfreeSubscriptionAuthPage } from "./pages/CashfreeSubscriptionAuthPage";
+import { UserLogsPage } from "./pages/admin/UserLogsPage";
+import { UserActivityPage } from "./components/modal/UserActivityModal";
+import { TaskManagementPage } from "./pages/admin/TaskManagementPage";
+import { HRAnnouncementPage } from "./pages/admin/HRAnnouncementPage";
+import { PerformanceWarningPage } from "./pages/admin/PerformanceWarningPage";
+import { AttendancePage } from "./pages/AttendancePage";
+import { TaskManagementPagebd } from "./pages/bd/TaskManagementPagebd";
+import { BDAnnouncementPage } from "./pages/bd/AnnouncementPage";
 // Placeholder
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-[60vh]">
@@ -59,6 +68,7 @@ const AppRoutes = () => {
         <Route path="/verify-otp" element={<VerifyOTP />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/cashfree/subscription-auth" element={<CashfreeSubscriptionAuthPage />} />
+        
 
 
         {/* Admin Panel */}
@@ -71,29 +81,32 @@ const AppRoutes = () => {
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="leads" element={<LeadsPage />} />
+          <Route path="calls" element={<AdminCallLogsPage />} />
+          <Route path="meetings" element={<AdminMeetingLogsPage />} />
+          <Route path="orders" element={<AdminOrderManagementPage />} />
+          <Route path="payments" element={<AdminPaymentHistoryPage />} />
+          <Route path="subscriptions" element={<PlaceholderPage title="Subscriptions" />} />
           <Route path="finance" element={<PlaceholderPage title="Finance" />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="security" element={<PlaceholderPage title="Security & Audit" />} />
           <Route path="settings" element={<PlaceholderPage title="System Settings" />} />
+          <Route path="user-logs" element={<UserLogsPage/>} />
+          <Route path="user-activity/:userId" element={<UserActivityPage />} />
+          <Route path="tasks" element={<TaskManagementPage />} />
+          <Route path="announcements" element={<HRAnnouncementPage />} />
+          <Route path="performance-warnings" element={<PerformanceWarningPage />} />
+          <Route path="attendance/:userId" element={<AttendancePage />} />
         </Route>
 
         {/* HR Panel */}
-        <Route path="/hr" element={
-            <ProtectedRoute>
-                <RoleProtectedRoute allowedRoles={["hr"]}>
-                    <PanelLayout panel="hr" />
-                    </RoleProtectedRoute>
-                    </ProtectedRoute>
-                }>
-          <Route index element={<HRDashboard />} />
-          <Route path="employees" element={<EmployeesPage />} />
-          <Route path="attendance" element={<PlaceholderPage title="Attendance" />} />
+       
+          {/* <Route path="attendance" element={<PlaceholderPage title="Attendance" />} />
           <Route path="performance" element={<PlaceholderPage title="Performance" />} />
           <Route path="warnings" element={<PlaceholderPage title="Warnings & PIP" />} />
           <Route path="announcements" element={<PlaceholderPage title="Announcements" />} />
           <Route path="reports" element={<PlaceholderPage title="HR Reports" />} />
-          <Route path="exit" element={<PlaceholderPage title="Exit Management" />} />
-        </Route>
+          <Route path="exit" element={<PlaceholderPage title="Exit Management" />} /> */}
+        
 
         {/* BD Panel */}
         <Route path="/bd" element={
@@ -103,17 +116,17 @@ const AppRoutes = () => {
                 </RoleProtectedRoute>
                 </ProtectedRoute>}>
 
-          {/* <Route index element={<BDDashboard />} /> */}
-          <Route index element={<PlaceholderPage title="Dashboard" />} />
+          <Route index element={<BDDashboard />} />
           <Route path="users" element={<BDUsersPage />} />
           <Route path="leads" element={<BDLeadsPage />} />
-          <Route path="tasks" element={<PlaceholderPage title="Tasks & Follow-ups" />} />
           <Route path="calls" element={<CallLogsPage/>} />
           <Route path="meetings" element={<MeetingLogsPage />} />
           <Route path="orders" element={<OrderManagementPage />} />
           <Route path="payments" element={<PaymentHistoryPage />} />
           <Route path="loan-management" element={<LoanManagementPage />} />
           <Route path="subscriptions" element={<PlaceholderPage title="BD Subscriptions" />} />
+          <Route path="tasks" element={<TaskManagementPagebd />} />
+           <Route path="announcements" element={<BDAnnouncementPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<PlaceholderPage title="BD Settings" />} />
         </Route>

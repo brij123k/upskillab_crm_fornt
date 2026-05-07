@@ -60,28 +60,46 @@ const adminNavItems = [
     module: 'leads' 
   },
   { 
+    icon: PhoneCall, 
+    label: 'Call Logs', 
+    path: '/admin/calls', 
+    module: 'call_logs' 
+  },
+  { 
+    icon: Video, 
+    label: 'Meeting Logs', 
+    path: '/admin/meetings', 
+    module: 'meeting_logs' 
+  },
+  { 
+    icon: ListOrdered, 
+    label: 'Orders', 
+    path: '/admin/orders', 
+    module: 'orders' 
+  },
+  { 
+    icon: CreditCard, 
+    label: 'Payments', 
+    path: '/admin/payments', 
+    module: 'payments' 
+  },
+  { 
     icon: DollarSign, 
-    label: 'Finance', 
-    path: '/admin/finance', 
-    module: 'finance' 
+    label: 'Subscriptions', 
+    path: '/admin/subscriptions', 
+    module: 'subscriptions' 
+  },
+  { 
+    icon: FileText, 
+    label: 'Task Management', 
+    path: '/admin/tasks', 
+    module: 'tasks' 
   },
   { 
     icon: BarChart3, 
     label: 'Reports', 
     path: '/admin/reports', 
     module: 'reports' 
-  },
-  { 
-    icon: Shield, 
-    label: 'Security', 
-    path: '/admin/security', 
-    module: 'security' 
-  },
-  { 
-    icon: Settings, 
-    label: 'Settings', 
-    path: '/admin/settings', 
-    module: 'settings' 
   },
 ];
 
@@ -141,15 +159,14 @@ const bdNavItems = [
     icon: LayoutDashboard, 
     label: 'Dashboard', 
     path: '/bd', 
-    // BD Dashboard is always visible for BD panel users
     module: 'bd_dashboard' 
   },
-  //  { 
-  //   icon: User, 
-  //   label: 'Users', 
-  //   path: '/bd/users', 
-  //   module: 'user' 
-  // },
+   { 
+    icon: User, 
+    label: 'Users', 
+    path: '/bd/users', 
+    module: 'user' 
+  },
   { 
     icon: Target, 
     label: 'Leads', 
@@ -174,6 +191,12 @@ const bdNavItems = [
     label: 'Meeting Logs', 
     path: '/bd/meetings', 
     module: 'meeting_logs' 
+  },
+  { 
+    icon: FileText, 
+    label: 'Task Management', 
+    path: '/bd/tasks', 
+    module: 'task' 
   },
   { 
     icon: ListOrdered, 

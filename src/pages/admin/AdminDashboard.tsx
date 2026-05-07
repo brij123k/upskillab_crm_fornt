@@ -1,3 +1,5 @@
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { QuickActions } from '@/components/dashboard/QuickActions';
@@ -12,18 +14,18 @@ import {
   UserPlus,
   Upload,
   Settings,
-  Download
+  Download,
+  Megaphone,
+  Clock,
+  ListOrdered,
+  CreditCard
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { getDataHandlerWithToken } from '@/config/services';
+import ApiConfig from '@/config/apiConfig';
+import { toast } from '@/hooks/use-toast';
 
-const stats = [
-  { title: 'Total Users', value: '1,284', change: '+12% from last month', changeType: 'positive' as const, icon: Users, iconClassName: 'admin-gradient' },
-  { title: 'Total Leads', value: '8,542', change: '324 unassigned', changeType: 'neutral' as const, icon: FileText, iconClassName: 'bg-info' },
-  { title: 'Departments', value: '12', change: '3 new this quarter', changeType: 'positive' as const, icon: Building2, iconClassName: 'bg-success' },
-  { title: 'Pending Approvals', value: '23', change: '5 urgent', changeType: 'negative' as const, icon: AlertTriangle, iconClassName: 'bg-warning' },
-];
-
-const revenueData = [
+const initialRevenueData = [
   { month: 'Jan', revenue: 65000 },
   { month: 'Feb', revenue: 78000 },
   { month: 'Mar', revenue: 90000 },
@@ -32,7 +34,7 @@ const revenueData = [
   { month: 'Jun', revenue: 105000 },
 ];
 
-const departmentData = [
+const initialDepartmentData = [
   { name: 'Sales', performance: 85 },
   { name: 'Marketing', performance: 72 },
   { name: 'Support', performance: 90 },
@@ -40,7 +42,7 @@ const departmentData = [
   { name: 'HR', performance: 88 },
 ];
 
-const recentActivities = [
+const defaultActivity = [
   { id: '1', action: 'New user registered: John Smith', user: 'System', time: '5 min ago', type: 'info' as const },
   { id: '2', action: 'Bulk lead import completed (500 leads)', user: 'Admin', time: '1 hour ago', type: 'success' as const },
   { id: '3', action: 'Failed login attempt detected', user: 'Security', time: '2 hours ago', type: 'warning' as const },
@@ -48,29 +50,136 @@ const recentActivities = [
   { id: '5', action: 'System backup completed', user: 'System', time: '5 hours ago', type: 'success' as const },
 ];
 
-const quickActions = [
-  { label: 'Add User', icon: UserPlus },
-  { label: 'Import Data', icon: Upload },
-  { label: 'Export Report', icon: Download },
-  { label: 'System Settings', icon: Settings },
-];
-
 export function AdminDashboard() {
+  const navigate = useNavigate();
+  const [userCount, setUserCount] = useState(0);
+  const [leadCount, setLeadCount] = useState(0);
+  const [departmentCount, setDepartmentCount] = useState(0);
+  const [warningCount, setWarningCount] = useState(0);
+  const [announcementCount, setAnnouncementCount] = useState(0);
+  const [orderCount, setOrderCount] = useState(0);
+  const [paymentCount, setPaymentCount] = useState(0);
+  const [revenueData, setRevenueData] = useState(initialRevenueData);
+  const [departmentData, setDepartmentData] = useState(initialDepartmentData);
+  const [loading, setLoading] = useState(true);
+
+  const stats = useMemo(() => [
+    {
+      title: 'Total Users',
+      value: userCount.toLocaleString(),
+      change: userCount ? `${userCount} active` : 'Loading...',
+      changeType: 'positive' as const,
+      icon: Users,
+      iconClassName: 'admin-gradient'
+    },
+    {
+      title: 'Total Leads',
+      value: leadCount.toLocaleString(),
+      change: leadCount ? `${leadCount} total leads` : 'Loading...',
+      changeType: 'neutral' as const,
+      icon: FileText,
+      iconClassName: 'bg-info'
+    },
+    {
+      title: 'Departments',
+      value: departmentCount.toLocaleString(),
+      change: departmentCount ? `${departmentCount} active` : 'Loading...',
+      changeType: 'positive' as const,
+      icon: Building2,
+      iconClassName: 'bg-success'
+    },
+    {
+      title: 'Warnings',
+      value: warningCount.toLocaleString(),
+      change: warningCount ? `${warningCount} issued` : 'Loading...',
+      changeType: warningCount > 0 ? 'negative' as const : 'positive' as const,
+      icon: AlertTriangle,
+      iconClassName: 'bg-warning'
+    },
+  ], [userCount, leadCount, departmentCount, warningCount]);
+
+  const quickActions = [
+    { label: 'Announcements', icon: Megaphone, onClick: () => navigate('/admin/announcements') },
+    { label: 'Warnings', icon: AlertTriangle, onClick: () => navigate('/admin/performance-warnings') },
+    { label: 'Orders', icon: ListOrdered, onClick: () => navigate('/admin/orders') },
+    { label: 'Payments', icon: CreditCard, onClick: () => navigate('/admin/payments') },
+  ];
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const [users, leads, departments, warnings, announcements, orders, payments] = await Promise.all([
+        getDataHandlerWithToken('getAllUser', null, null),
+        getDataHandlerWithToken('getAllLeads', { page: 1, limit: 1 }, null),
+        getDataHandlerWithToken('getAllDepartments', null, null),
+        getDataHandlerWithToken('getWarnings', { page: 1, limit: 1 }, null),
+        getDataHandlerWithToken('getAnnouncements', { page: 1, limit: 1 }, null),
+        getDataHandlerWithToken('Order', { page: 1, limit: 1 }, null),
+        getDataHandlerWithToken('getPaymentHistory', { page: 1, limit: 50 }, null),
+      ]);
+
+      setUserCount(Array.isArray(users) ? users.length : 0);
+      setLeadCount(leads?.meta?.total ?? leads?.total ?? (Array.isArray(leads?.data) ? leads.data.length : 0));
+      setDepartmentCount(Array.isArray(departments) ? departments.length : 0);
+      setWarningCount(warnings?.meta?.total ?? warnings?.total ?? (Array.isArray(warnings?.data) ? warnings.data.length : 0));
+      setAnnouncementCount(announcements?.meta?.total ?? announcements?.total ?? (Array.isArray(announcements?.data) ? announcements.data.length : 0));
+      setOrderCount(orders?.total ?? (Array.isArray(orders?.data) ? orders.data.length : 0));
+      setPaymentCount(Array.isArray(payments) ? payments.length : (payments?.data?.length ?? 0));
+
+      const paymentRows = Array.isArray(payments) ? payments : payments?.data ?? [];
+      const grouped = paymentRows.reduce((acc: Record<string, number>, payment: any) => {
+        const dateValue = payment.createdAt ? new Date(payment.createdAt) : payment.link_created_at ? new Date(payment.link_created_at) : null;
+        if (!dateValue) return acc;
+        const month = dateValue.toLocaleString('default', { month: 'short' });
+        acc[month] = (acc[month] || 0) + (payment.amount || payment.order_amount || payment.link_amount_paid || 0);
+        return acc;
+      }, {} as Record<string, number>);
+
+      setRevenueData(Object.entries(grouped).slice(-6).map(([month, revenue]) => ({ month, revenue })));
+
+      if (Array.isArray(departments) && Array.isArray(users)) {
+        const depNames = departments.slice(0, 5).map((dept: any) => dept.name || 'Unknown');
+        const depPerformance = depNames.map((name) => ({
+          name,
+          performance: Math.min(100, Math.max(40, users.filter((user: any) => user.departmentId === name || user.departmentId?._id === name).length * 10 + 30))
+        }));
+        setDepartmentData(depPerformance.length ? depPerformance : initialDepartmentData);
+      }
+    } catch (error) {
+      console.error('Failed to load dashboard data', error);
+      toast.error('Unable to load admin dashboard metrics');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back! Here's what's happening in your organization.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
+          <p className="text-muted-foreground">Welcome back! Here’s the latest from your organization.</p>
+        </div>
+        <button
+          className="inline-flex items-center rounded-md border border-border bg-transparent px-3 py-2 text-sm font-medium text-foreground transition hover:bg-secondary"
+          onClick={fetchDashboardData}
+          disabled={loading}
+        >
+          <Download className={loading ? 'mr-2 h-4 w-4 animate-spin' : 'mr-2 h-4 w-4'} />
+          Refresh
+        </button>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
           <StatCard key={index} {...stat} />
         ))}
       </div>
 
-      {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -81,7 +190,7 @@ export function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={revenueData}>
+              <LineChart data={revenueData.length ? revenueData : initialRevenueData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="month" className="text-xs" />
                 <YAxis className="text-xs" />
@@ -113,10 +222,10 @@ export function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={departmentData} layout="vertical">
+              <BarChart data={departmentData.length ? departmentData : initialDepartmentData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis type="number" domain={[0, 100]} />
-                <YAxis dataKey="name" type="category" width={80} className="text-xs" />
+                <YAxis dataKey="name" type="category" width={100} className="text-xs" />
                 <Tooltip 
                   contentStyle={{ 
                     backgroundColor: 'hsl(var(--card))', 
@@ -131,15 +240,12 @@ export function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <RecentActivity activities={recentActivities} />
+          <RecentActivity activities={defaultActivity} />
         </div>
         <div>
-          <QuickActions actions={quickActions} />
-          
-          {/* System Health */}
+          <QuickActions actions={quickActions} title="Admin Actions" />
           <Card className="mt-6">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -163,6 +269,18 @@ export function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Uptime</span>
                 <span className="text-sm font-medium text-foreground">99.98%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Announcements</span>
+                <span className="text-sm font-medium">{announcementCount.toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Orders</span>
+                <span className="text-sm font-medium">{orderCount.toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Payments</span>
+                <span className="text-sm font-medium">{paymentCount.toLocaleString()}</span>
               </div>
             </CardContent>
           </Card>

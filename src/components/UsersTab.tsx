@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { UserActivityPage } from '@/components/modal/UserActivityModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,8 +20,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Phone } from 'lucide-react';
+import { Activity, CalendarDays, Phone } from 'lucide-react';
 import { AssignIVRModal } from './AssignIVRModal';
+import { AttendancePage } from '../pages/AttendancePage';
 import {
   Dialog,
   DialogContent,
@@ -43,6 +45,7 @@ import { SearchableDropdown } from './ui/searchable-dropdown';
 import ApiConfig from '@/config/apiConfig';
 import { getDataHandlerWithToken } from '@/config/services';
 import { MultiSelect } from './ui/multi-select';
+import { useNavigate } from 'react-router-dom';
 
 interface UsersTabProps {
   users: UserType[];
@@ -112,7 +115,7 @@ export function UsersTab({
 
   const [ivrModalOpen, setIvrModalOpen] = useState(false);
   const [selectedIVRUser, setSelectedIVRUser] = useState<UserType | null>(null);
-
+  const navigate = useNavigate();
   // Form states
   const [editUserForm, setEditUserForm] = useState({
     name: '',
@@ -129,6 +132,7 @@ export function UsersTab({
 
   // Filter users
   const filteredUsers = users.filter(user => {
+    console.log(user,"1")
     const searchMatch =
       user.name.toLowerCase().includes(filters.search.toLowerCase()) ||
       user.email.toLowerCase().includes(filters.search.toLowerCase()) ||
@@ -635,6 +639,22 @@ export function UsersTab({
                               <Edit className="mr-2 h-4 w-4" />
                               Edit User
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+  onClick={() => {
+    navigate(`/admin/user-activity/${user._id}`);
+  }}
+>
+  <Activity className="mr-2 h-4 w-4" />
+  View Activity Log
+</DropdownMenuItem>
+<DropdownMenuItem
+  onClick={() => {
+    navigate(`/admin/attendance/${user._id}`);
+  }}
+>
+  <CalendarDays className="mr-2 h-4 w-4" />
+  View Attendance
+</DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => {
                                 setSelectedUser(user);

@@ -1,3 +1,4 @@
+
 export { StageSummaryReport } from './StageSummaryReport';
 export { EmployeeStagesReport } from './EmployeeStagesReport';
 export { PoolStagesReport } from './PoolStagesReport';
@@ -5,7 +6,8 @@ export { PoolRevenueReport } from './PoolRevenueReport';
 export { UtilizationReport } from './UtilizationReport';
 export { ConsultantPerformanceReport } from './ConsultantPerformanceReport';
 export { DailyUtilizationReport } from './DailyUtilizationReport';
-
+export { SourceCampaignReport } from './SourceCampaignReport';
+export { SourceCampaignRevenueReport } from './SourceCampaignRevenueReport';
 // Shared utility functions that can be used across reports
 export const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('en-IN', {

@@ -48,7 +48,8 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'update', label: 'Update User' },
       { id: 'status', label: 'Change User Status' },
       { id: 'block', label: 'Block/Unblock User' },
-      { id: 'password_reset', label: 'Reset Password' }
+      { id: 'user_activity', label: 'View User Activity' },
+      // { id: 'password_reset', label: 'Reset Password' }
     ]
   },
   roles: {
@@ -105,6 +106,15 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'toggle_status', label: 'Toggle Loan Partner Status' },
     ]
   },
+  task: {
+    id: 'task',
+    label: 'Task Management',
+    actions: [
+      { id: 'create', label: 'Create Task' },
+      { id: 'read', label: 'View Tasks' },
+      { id: 'change_status', label: 'Change Task Status' },
+    ]
+  },
   reports: {
     id: 'reports',
     label: 'Reports & Analytics',
@@ -115,6 +125,7 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'share', label: 'Share Reports' }
     ]
   }
+
 };
 
 export const availableModules = Object.values(modulesConfig);

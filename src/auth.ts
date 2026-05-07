@@ -64,8 +64,6 @@ export const isSessionExpired = () => {
 
   const loginAt = getLoginAt();
   if (!loginAt) return false;
-  console.log(Date.now(),loginAt,SESSION_DURATION_MS)
-  console.log(Date.now() - loginAt >= SESSION_DURATION_MS)
   return Date.now() - loginAt >= SESSION_DURATION_MS;
 };
 

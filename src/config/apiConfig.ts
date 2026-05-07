@@ -83,7 +83,8 @@ const ApiConfig = {
   employeePoolUtilizationReport:`${url}/order/report/employee-pool-utilization`,
   consultantPerforment:`${url}/order/report/consultant-performance`,
   employeePoolDailyUtilizationReport:`${url}/call-logs/report/employee-pool-daily-utilization`,
-  
+  sourcecampaignstagesummary:`${url}/leads/report/source-campaign-stage-summary`,
+  sourcecampaignwiseleadrevenue:`${url}/order/report/source-campaign-wise-lead-revenue`,
   sourceCampaignWiseLeadRevenueReport:`${url}/order/report/source-campaign-wise-lead-revenue`,
 
   // IVR section
@@ -92,6 +93,35 @@ const ApiConfig = {
   callToLead:`${url}/IVR/click-to-call`,
   updateCallLog:`${url}/IVR/submit-call-log`,
 
+
+  // HR work
+  getUserLogs:`${url}/user-logs`,
+  getUserLogsByUserId:(userId:string)=>`${url}/user-logs/user/${userId}`, 
+  getUserActivity:(userId:string)=>`${url}/user-activities/user/${userId}`,
+  createTask:`${url}/tasks`,
+  getTasks:`${url}/tasks`,
+  getTaskById:(taskId:string)=>`${url}/tasks/${taskId}`,
+  updateTask:(taskId:string)=>`${url}/tasks/${taskId}`,
+  updateTaskStatus:(taskId:string)=>`${url}/tasks/${taskId}/status`,
+  deleteTask:(taskId:string)=>`${url}/tasks/${taskId}`,
+
+  // announcement
+  createAnnouncement:`${url}/announcements`,
+  getAnnouncements:`${url}/announcements`,
+  getAnnouncementById:(announcementId:string)=>`${url}/announcements/${announcementId}`,
+  deleteAnnouncement:(announcementId:string)=>`${url}/announcements/${announcementId}`,
+
+  // performance-warnings
+  createWarning:`${url}/performance-warnings`,
+  getWarnings:`${url}/performance-warnings`,
+  getWarningById:(warningId:string)=>`${url}/performance-warnings/${warningId}`,
+  updateWarning:(warningId:string)=>`${url}/performance-warnings/${warningId}`,
+
+  // attendance
+  markAttendance:`${url}/attendance/mark`,
+  getAttendance:`${url}/attendance`,
+  getAttendanceByUserId:(userId:string)=>`${url}/attendance/user/${userId}`,
+  getAttendanceByDate:(date:string)=>`${url}/attendance/date/${date}`,
 };
 
 export default ApiConfig;

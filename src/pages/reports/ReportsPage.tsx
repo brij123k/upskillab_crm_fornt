@@ -23,6 +23,8 @@ import {
   UtilizationReport,
   ConsultantPerformanceReport,
   DailyUtilizationReport,
+  SourceCampaignReport,
+  SourceCampaignRevenueReport
 } from '@/components/reports';
 
 const REPORTS = [
@@ -33,6 +35,8 @@ const REPORTS = [
   { id: 'utilization', name: 'Utilization', endpoint: ApiConfig.employeePoolUtilizationReport, icon: PhoneCall, hasFilter: true, filters: ['date'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: UtilizationReport },
   { id: 'consultant-performance', name: 'Consultants', endpoint: ApiConfig.consultantPerforment, icon: Award, hasFilter: true, filters: ['date'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: ConsultantPerformanceReport },
   { id: 'daily-utilization', name: 'Daily Calls', endpoint: ApiConfig.employeePoolDailyUtilizationReport, icon: Calendar, hasFilter: true, filters: ['date', 'poolId'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: DailyUtilizationReport },
+  { id: 'source-campaign', name: 'Source Campaign', endpoint: ApiConfig.sourcecampaignstagesummary, icon: BarChart, hasFilter: true, filters: ['date'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: SourceCampaignReport },
+   { id: 'source-campaign-revenue', name: 'Revenue by Source', endpoint: ApiConfig.sourcecampaignwiseleadrevenue, icon: IndianRupee, hasFilter: true, filters: ['date', 'stage', 'state'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: SourceCampaignRevenueReport },
 ];
 
 const dateFilterLabels: Record<string, string> = {
@@ -57,7 +61,8 @@ export function ReportsPage() {
   const [loading, setLoading] = useState(false);
   const [pools, setPools] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-
+   const [stageFilter, setStageFilter] = useState('all');  // Add this
+  const [stateFilter, setStateFilter] = useState('all'); 
   const currentReport = REPORTS.find(r => r.id === activeReport) || REPORTS[0];
   const CurrentComponent = currentReport.component;
 
@@ -120,7 +125,14 @@ export function ReportsPage() {
       if (poolId && poolId !== " " && currentReport.filters?.includes('poolId')) {
         params.poolId = poolId;
       }
+       if (stageFilter && stageFilter !== 'all' && currentReport.filters?.includes('stage')) {
+        params.stage = stageFilter;
+      }
       
+      // Add state filter if applicable
+      if (stateFilter && stateFilter !== 'all' && currentReport.filters?.includes('state')) {
+        params.state = stateFilter;
+      }
       const response = await getDataHandlerWithToken(currentReport.endpoint, params, null, true);
       setReportData(response?.data || response);
     } catch (error: any) {
@@ -362,6 +374,42 @@ export function ReportsPage() {
                   )}
                 </div>
               )}
+              {showFilters && currentReport.filters?.includes('stage') && (
+    <div className="w-[130px]">
+      <Select value={stageFilter} onValueChange={setStageFilter}>
+        <SelectTrigger className="h-8 text-xs">
+          <SelectValue placeholder="All Stages" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all" className="text-xs">All Stages</SelectItem>
+          {/* Add your stage options here - you can fetch these from API */}
+          <SelectItem value="new" className="text-xs">New Lead</SelectItem>
+          <SelectItem value="dnp" className="text-xs">DNP</SelectItem>
+          <SelectItem value="cbl" className="text-xs">CBL</SelectItem>
+          <SelectItem value="negotiation" className="text-xs">Negotiation Done</SelectItem>
+          {/* Add more stages as needed */}
+        </SelectContent>
+      </Select>
+    </div>
+  )}
+  
+  {showFilters && currentReport.filters?.includes('state') && (
+    <div className="w-[130px]">
+      <Select value={stateFilter} onValueChange={setStateFilter}>
+        <SelectTrigger className="h-8 text-xs">
+          <SelectValue placeholder="All States" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all" className="text-xs">All States</SelectItem>
+          {/* Add your state options here - you can fetch these from API */}
+          <SelectItem value="maharashtra" className="text-xs">Maharashtra</SelectItem>
+          <SelectItem value="delhi" className="text-xs">Delhi</SelectItem>
+          <SelectItem value="karnataka" className="text-xs">Karnataka</SelectItem>
+          {/* Add more states as needed */}
+        </SelectContent>
+      </Select>
+    </div>
+  )}
             </div>
           )}
 
@@ -383,10 +431,14 @@ export function ReportsPage() {
                 </div>
               ) : (
                 <CurrentComponent 
-                  data={reportData} 
-                  searchTerm={searchTerm}
-                  onSearchChange={setSearchTerm}
-                />
+      data={reportData} 
+      searchTerm={searchTerm}
+      onSearchChange={setSearchTerm}
+      stageFilter={stageFilter}
+      onStageFilterChange={setStageFilter}
+      stateFilter={stateFilter}
+      onStateFilterChange={setStateFilter}
+    />
               )}
             </CardContent>
           </Card>
