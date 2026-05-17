@@ -1,4 +1,4 @@
-import { Bell, CheckCheck, X, Clock, AlertCircle, CheckCircle, Info, ExternalLink } from 'lucide-react';
+import { Bell, CheckCheck, X, Clock, AlertCircle, CheckCircle, Info, ExternalLink, Megaphone, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -8,11 +8,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { formatDistanceToNow } from 'date-fns';
+import { FormattedText } from '@/components/editor/FormattedText';
 
 interface NotificationProps {
   n: any;
@@ -121,6 +123,9 @@ export function NotificationDropdown() {
   const { notifications, unreadCount, readOne, readAll } = useNotifications();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  const [activeNotification, setActiveNotification] = useState<any | null>(null);
+  const lastSeenNotificationId = useRef<string | null>(null);
+  const initialised = useRef(false);
 
   const unreadNotifications = notifications.filter(n => !n.isRead);
   const recentNotifications = notifications.slice(0, 10); // Show only recent 10
@@ -138,6 +143,26 @@ export function NotificationDropdown() {
   const handleReadAll = () => {
     readAll();
   };
+
+  const isAutoPreviewNotification = (n: any) => {
+    return n?.type === 'ADMIN_BROADCAST' || n?.type === 'PERFORMANCE_WARNING';
+  };
+
+  useEffect(() => {
+    if (!notifications.length) return;
+
+    const latest = notifications[0];
+    if (!initialised.current) {
+      initialised.current = true;
+      lastSeenNotificationId.current = latest?._id || null;
+      return;
+    }
+
+    if (latest?._id && latest._id !== lastSeenNotificationId.current && !latest.isRead && isAutoPreviewNotification(latest)) {
+      setActiveNotification(latest);
+      lastSeenNotificationId.current = latest._id;
+    }
+  }, [notifications]);
 
   const getNotificationCountBadge = () => {
     if (unreadCount === 0) return null;
@@ -288,6 +313,52 @@ export function NotificationDropdown() {
           )}
         </DropdownMenuContent >
       </DropdownMenu>
+
+      <Dialog open={!!activeNotification} onOpenChange={(open) => !open && setActiveNotification(null)}>
+        <DialogContent className="max-w-3xl">
+          {activeNotification && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  {activeNotification.type === 'PERFORMANCE_WARNING' ? (
+                    <ShieldAlert className="h-5 w-5 text-yellow-600" />
+                  ) : (
+                    <Megaphone className="h-5 w-5 text-primary" />
+                  )}
+                  {activeNotification.title}
+                </DialogTitle>
+                <DialogDescription>
+                  {activeNotification.type === 'PERFORMANCE_WARNING'
+                    ? 'A performance warning has been issued to your account.'
+                    : 'An announcement has been shared for you.'}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                <div className="rounded-2xl border bg-muted/30 p-4">
+                  <FormattedText text={activeNotification.message || ''} className="text-sm" />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setActiveNotification(null)}>
+                  Close
+                </Button>
+                {activeNotification.metadata?.redirectUrl && (
+                  <Button
+                    onClick={() => {
+                      navigate(activeNotification.metadata.redirectUrl);
+                      setActiveNotification(null);
+                    }}
+                  >
+                    Open full view
+                  </Button>
+                )}
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

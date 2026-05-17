@@ -179,7 +179,6 @@ const bdNavItems = [
     path: '/bd/tasks', 
     module: 'tasks' 
   },
- 
   { 
     icon: PhoneCall, 
     label: 'Call Logs', 
@@ -354,6 +353,9 @@ useEffect(() => {
 
   // Function to check if a nav item should be visible
   const shouldShowNavItem = (module: string): boolean => {
+    if (module === 'my_announcements') {
+      return panel === 'bd';
+    }
     // Always show BD dashboard for BD panel
     if (panel === 'bd' && module === 'bd_dashboard') {
       return true;

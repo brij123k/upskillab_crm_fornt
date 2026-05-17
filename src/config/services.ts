@@ -194,6 +194,19 @@ export const deleteDataHandlerWithoutToken = async (endPoint:any, query:any) => 
   return makeRequest("DELETE", endPoint, { params: query });
 };
 
+export const deleteTokenDataHandler = async (endPoint:any, isUrl=false) => {
+  const storedAuth = localStorage.getItem("access_token");
+
+  if (!storedAuth) {
+    throw new Error('No authentication token found');
+  }
+
+  return makeRequest("DELETE", endPoint, {
+    isUrl,
+    ...getAuthHeaders(storedAuth),
+  });
+};
+
 export const getDataHandler = async (endPointOrUrl:any, query = {}, data = {}, isUrl = false) => {
   return makeRequest("GET", endPointOrUrl, {
     params: query,

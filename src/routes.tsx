@@ -40,6 +40,9 @@ import { PerformanceWarningPage } from "./pages/admin/PerformanceWarningPage";
 import { AttendancePage } from "./pages/AttendancePage";
 import { TaskManagementPagebd } from "./pages/bd/TaskManagementPagebd";
 import { BDAnnouncementPage } from "./pages/bd/AnnouncementPage";
+import { MyAnnouncementsPage } from "@/pages/announcements/MyAnnouncementsPage";
+import { MyWarningsPage } from "@/pages/bd/MyWarningsPage";
+import { MyTasksPage } from "@/pages/bd/MyTasksPage";
 // Placeholder
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-[60vh]">
@@ -126,7 +129,13 @@ const AppRoutes = () => {
           <Route path="loan-management" element={<LoanManagementPage />} />
           <Route path="subscriptions" element={<PlaceholderPage title="BD Subscriptions" />} />
           <Route path="tasks" element={<TaskManagementPagebd />} />
-           <Route path="announcements" element={<BDAnnouncementPage />} />
+          <Route path="my-tasks" element={<MyTasksPage />} />
+          <Route path="my-tasks/:taskId" element={<MyTasksPage />} />
+          <Route path="announcements" element={<BDAnnouncementPage />} />
+          <Route path="my-announcements" element={<MyAnnouncementsPage />} />
+          <Route path="my-announcements/:announcementId" element={<MyAnnouncementsPage />} />
+          <Route path="my-warnings" element={<MyWarningsPage />} />
+          <Route path="my-warnings/:warningId" element={<MyWarningsPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<PlaceholderPage title="BD Settings" />} />
         </Route>

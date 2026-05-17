@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
   TableBody,
@@ -41,6 +40,8 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
+import { FormattedTextEditor } from '@/components/editor/FormattedTextEditor';
+import { FormattedText } from '@/components/editor/FormattedText';
 import {
   AlertTriangle,
   Plus,
@@ -736,11 +737,11 @@ export function PerformanceWarningPage() {
             {/* Notes */}
             <div className="space-y-2">
               <Label>Notes / Details *</Label>
-              <Textarea
-                placeholder="Describe the issue, incident, or performance concern in detail..."
-                rows={5}
+              <FormattedTextEditor
                 value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                onChange={(value) => setFormData({ ...formData, notes: value })}
+                placeholder="Describe the issue, incident, or performance concern in detail..."
+                previewLabel="Live preview"
               />
             </div>
 
@@ -813,7 +814,7 @@ export function PerformanceWarningPage() {
                 <div className="space-y-2">
                   <Label>Notes / Details</Label>
                   <div className="p-4 bg-muted rounded-lg">
-                    <p className="text-sm whitespace-pre-wrap">{selectedWarning.notes}</p>
+                    <FormattedText text={selectedWarning.notes} className="text-sm" />
                   </div>
                 </div>
 

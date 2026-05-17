@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
   TableBody,
@@ -41,6 +40,8 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
+import { FormattedTextEditor } from '@/components/editor/FormattedTextEditor';
+import { FormattedText } from '@/components/editor/FormattedText';
 import {
   Megaphone,
   Plus,
@@ -664,11 +665,11 @@ export function BDAnnouncementPage() {
 
             <div className="space-y-2">
               <Label>Message *</Label>
-              <Textarea
-                placeholder="Enter announcement message"
-                rows={4}
+              <FormattedTextEditor
                 value={formData.message}
-                onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                onChange={(value) => setFormData({ ...formData, message: value })}
+                placeholder="Write your announcement. Use bold, bullets, or quotes."
+                previewLabel="Live preview"
               />
             </div>
 
@@ -794,7 +795,7 @@ export function BDAnnouncementPage() {
                 <div className="space-y-2">
                   <Label>Message</Label>
                   <div className="p-4 bg-muted rounded-lg">
-                    <p className="text-sm whitespace-pre-wrap">{selectedAnnouncement.message}</p>
+                    <FormattedText text={selectedAnnouncement.message} className="text-sm" />
                   </div>
                 </div>
 

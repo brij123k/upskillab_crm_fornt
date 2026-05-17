@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { QuickActions } from '@/components/dashboard/QuickActions';
+import { BDAnnouncementWidget } from '@/components/announcements/BDAnnouncementWidget';
+import { BDWarningWidget } from '@/components/announcements/BDWarningWidget';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -65,13 +67,6 @@ const quickActions = [
   { label: 'Create Report', icon: FileText },
 ];
 
-const todayFollowUps = [
-  { id: '1', company: 'ABC Corp', contact: 'John Smith', time: '10:00 AM', type: 'call', priority: 'high' },
-  { id: '2', company: 'XYZ Industries', contact: 'Sarah Lee', time: '11:30 AM', type: 'email', priority: 'medium' },
-  { id: '3', company: 'Tech Solutions', contact: 'Mike Brown', time: '2:00 PM', type: 'meeting', priority: 'high' },
-  { id: '4', company: 'Global Services', contact: 'Emily Davis', time: '4:00 PM', type: 'call', priority: 'low' },
-];
-
 export function BDDashboard() {
   const navigate = useNavigate();
   const permissions = JSON.parse(localStorage.getItem("permissions") || "[]");
@@ -81,6 +76,7 @@ export function BDDashboard() {
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [recentPayments, setRecentPayments] = useState<any[]>([]);
   const [recentTasks, setRecentTasks] = useState<any[]>([]);
+  const [scheduledCalls, setScheduledCalls] = useState<any[]>([]);
   const [paymentChartData, setPaymentChartData] = useState<any[]>([]);
   const [announcementCount, setAnnouncementCount] = useState(0);
   const [fetchingData, setFetchingData] = useState(false);
@@ -93,7 +89,7 @@ export function BDDashboard() {
   // Fetch recent call logs
   const fetchRecentCallLogs = async () => {
     try {
-      const response = await getDataHandlerWithToken(ApiConfig.CallLog, { limit: 5 }, null);
+      const response = await getDataHandlerWithToken(ApiConfig.CallLog, { limit: 5 }, null, true);
       if (response?.data) {
         setRecentCallLogs(response.data);
       }
@@ -105,7 +101,7 @@ export function BDDashboard() {
   // Fetch recent meeting logs
   const fetchRecentMeetingLogs = async () => {
     try {
-      const response = await getDataHandlerWithToken(ApiConfig.getMeetingLog, { limit: 5 }, null);
+      const response = await getDataHandlerWithToken(ApiConfig.getMeetingLog, { limit: 5 }, null, true);
       if (response?.data) {
         setRecentMeetingLogs(response.data);
       }
@@ -117,7 +113,7 @@ export function BDDashboard() {
   // Fetch recent orders
   const fetchRecentOrders = async () => {
     try {
-      const response = await getDataHandlerWithToken(ApiConfig.Order, { limit: 5 }, null);
+      const response = await getDataHandlerWithToken(ApiConfig.Order, { limit: 5 }, null, true);
       if (response?.data) {
         setRecentOrders(response.data);
       }
@@ -129,7 +125,7 @@ export function BDDashboard() {
   // Fetch recent payments
   const fetchRecentPayments = async () => {
     try {
-      const response = await getDataHandlerWithToken(ApiConfig.getPaymentHistory, { limit: 10 }, null);
+      const response = await getDataHandlerWithToken(ApiConfig.getPaymentHistory, { limit: 10 }, null, true);
       if (response?.data) {
         setRecentPayments(response.data.slice(0, 5));
         
@@ -154,13 +150,29 @@ export function BDDashboard() {
 
   // Fetch recent tasks
   const fetchRecentTasks = async () => {
+    console.log("Fetching recent tasks...");
     try {
-      const response = await getDataHandlerWithToken(ApiConfig.getTasks, { limit: 5 }, null);
+      const response = await getDataHandlerWithToken(ApiConfig.getMyTasks, { limit: 10 }, null, true);
       if (response?.data) {
         setRecentTasks(response.data);
       }
     } catch (error) {
       console.error("Error fetching tasks:", error);
+    }
+  };
+
+  const fetchScheduledCalls = async () => {
+    try {
+      const response = await getDataHandlerWithToken(ApiConfig.getLeadSchedules, {
+        dateFilter: 'today',
+        status: 'upcoming',
+        limit: 10,
+      }, null, true);
+      if (response?.data) {
+        setScheduledCalls(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching scheduled calls:", error);
     }
   };
 
@@ -192,9 +204,8 @@ export function BDDashboard() {
       if (hasModulePermission(permissions, "payments")) {
         await fetchRecentPayments();
       }
-      if (hasModulePermission(permissions, "tasks")) {
-        await fetchRecentTasks();
-      }
+      await fetchRecentTasks();
+      await fetchScheduledCalls();
       if (hasModulePermission(permissions, "announcements")) {
         await fetchAnnouncementCount();
       }
@@ -223,6 +234,12 @@ export function BDDashboard() {
     hasModulePermission(permissions, "payments") ||
     hasModulePermission(permissions, "tasks") ||
     hasModulePermission(permissions, "announcements");
+
+  const openTask = (taskId: string) => {
+    navigate(`/bd/my-tasks/${taskId}`);
+  };
+
+  const incompleteTasks = recentTasks.filter((task) => task.status !== 'completed' && task.status !== 'cancelled');
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -548,13 +565,21 @@ export function BDDashboard() {
               </Card>
             )}
 
-            {/* Recent Tasks */}
-            {hasModulePermission(permissions, "tasks") && (
+          </div>
+
+          {/* Announcements and Warnings */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <BDAnnouncementWidget />
+            <BDWarningWidget />
+          </div>
+
+          {/* Recent Incomplete Tasks and Scheduled Calls */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Clock className="w-5 h-5 text-warning" />
-                    Recent Tasks
+                    Recent Incomplete Tasks
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -562,80 +587,93 @@ export function BDDashboard() {
                     <div className="flex justify-center py-8">
                       <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                     </div>
-                  ) : recentTasks.length > 0 ? (
+                  ) : incompleteTasks.length > 0 ? (
                     <div className="space-y-3">
-                      {recentTasks.map((task) => (
-                        <div key={task._id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition">
-                          <div className="flex items-center gap-3 flex-1">
-                            <div className="w-8 h-8 rounded-full bg-warning/10 flex items-center justify-center">
-                              <Clock className="w-4 h-4 text-warning" />
+                      {incompleteTasks.map((task) => (
+                        <button
+                          key={task._id}
+                          type="button"
+                          onClick={() => openTask(task._id)}
+                          className="flex w-full items-center justify-between rounded-lg bg-secondary/50 p-4 text-left transition hover:bg-secondary"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center">
+                              <Clock className="w-5 h-5 text-warning" />
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-foreground text-sm truncate">{task.title}</p>
-                              <p className="text-xs text-muted-foreground">{task.assignedTo?.name || "Unassigned"}</p>
+                            <div>
+                              <p className="font-medium text-foreground">{task.title}</p>
+                              <p className="text-sm text-muted-foreground">{task.assignTo?.name || 'Unassigned'}</p>
+                            </div>
+                          </div>
+                          <Badge
+                            variant={task.status === 'in_progress' ? 'secondary' : 'outline'}
+                            className="text-xs"
+                          >
+                            {task.status || 'Pending'}
+                          </Badge>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">No incomplete tasks</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-info" />
+                    Today&apos;s Scheduled Calls
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : scheduledCalls.length > 0 ? (
+                    <div className="space-y-3">
+                      {scheduledCalls.map((call) => (
+                        <div key={call._id} className="flex items-center justify-between rounded-lg bg-secondary/50 p-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-info/10 flex items-center justify-center">
+                              <Phone className="w-5 h-5 text-info" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">
+                                {call.leadName || `Lead #${call.leadId}`}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {call.message || 'Scheduled follow-up'}
+                              </p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <Badge 
-                              variant={task.status === 'completed' ? 'default' : task.status === 'in_progress' ? 'secondary' : 'outline'}
-                              className="text-xs"
-                            >
-                              {task.status || "Pending"}
+                            <Badge variant="outline" className="text-xs">
+                              {call.stageName || 'Scheduled'}
                             </Badge>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {call.scheduledAt ? new Date(call.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </p>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-center text-muted-foreground py-8">No tasks</p>
+                    <p className="text-center text-muted-foreground py-8">No scheduled calls today</p>
                   )}
                 </CardContent>
               </Card>
-            )}
           </div>
 
-          {/* Bottom Row - Follow-ups and Activity */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-warning" />
-                    Today's Follow-ups
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {todayFollowUps.map((followUp) => (
-                      <div key={followUp.id} className="flex items-center justify-between p-4 rounded-lg bg-secondary/50">
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-lg bg-bd/10 flex items-center justify-center">
-                            <Users className="w-5 h-5 text-bd" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-foreground">{followUp.company}</p>
-                            <p className="text-sm text-muted-foreground">{followUp.contact}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <Badge variant="outline">{followUp.type}</Badge>
-                          <span className="text-sm text-muted-foreground">{followUp.time}</span>
-                          <Badge 
-                            variant={followUp.priority === 'high' ? 'destructive' : followUp.priority === 'medium' ? 'default' : 'secondary'}
-                          >
-                            {followUp.priority}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-            <div className="space-y-6">
               <QuickActions actions={dynamicQuickActions} />
-              <RecentActivity activities={recentActivities} title="My Activity" />
             </div>
+            {/* <div>
+              <RecentActivity activities={recentActivities} title="My Activity" />
+            </div> */}
           </div>
         </>
       )}

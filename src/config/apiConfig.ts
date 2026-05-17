@@ -42,6 +42,7 @@ const ApiConfig = {
   leadmerge:`${url}/leads/leaddoublicate/merge`,
 
   CallLog:`${url}/call-logs/users`,
+  getLeadSchedules:`${url}/lead-schedules`,
 
   MeetingLog:`${url}/meeting-logs`,
   getMeetingLog:`${url}/meeting-logs/with-feedbacks`,
@@ -100,22 +101,44 @@ const ApiConfig = {
   getUserActivity:(userId:string)=>`${url}/user-activities/user/${userId}`,
   createTask:`${url}/tasks`,
   getTasks:`${url}/tasks`,
+  getMyTasks:`${url}/tasks/me`,
+  getMyTaskById:(taskId:string)=>`${url}/tasks/me/${taskId}`,
   getTaskById:(taskId:string)=>`${url}/tasks/${taskId}`,
   updateTask:(taskId:string)=>`${url}/tasks/${taskId}`,
   updateTaskStatus:(taskId:string)=>`${url}/tasks/${taskId}/status`,
+  updateMyTaskStatus:(taskId:string)=>`${url}/tasks/me/${taskId}/status`,
   deleteTask:(taskId:string)=>`${url}/tasks/${taskId}`,
 
   // announcement
   createAnnouncement:`${url}/announcements`,
   getAnnouncements:`${url}/announcements`,
+  getMyAnnouncements:`${url}/announcements/me`,
+  getMyAnnouncementById:(announcementId:string)=>`${url}/announcements/me/${announcementId}`,
+  getAnnouncementsByUserId:(userId:string)=>`${url}/announcements/user/${userId}`,
   getAnnouncementById:(announcementId:string)=>`${url}/announcements/${announcementId}`,
   deleteAnnouncement:(announcementId:string)=>`${url}/announcements/${announcementId}`,
 
   // performance-warnings
   createWarning:`${url}/performance-warnings`,
   getWarnings:`${url}/performance-warnings`,
+  getMyWarnings:`${url}/performance-warnings/bd/me`,
+  getMyWarningById:(warningId:string)=>`${url}/performance-warnings/me/${warningId}`,
   getWarningById:(warningId:string)=>`${url}/performance-warnings/${warningId}`,
   updateWarning:(warningId:string)=>`${url}/performance-warnings/${warningId}`,
+
+  // KRA
+  getKRA:`${url}/kra`,
+  getKRAByRole:(roleId:string)=>`${url}/kra/role/${roleId}`,
+  getKRACompare:(userId:string, roleId?: string, date?: string) => {
+    const params = new URLSearchParams();
+    params.set('userId', userId);
+    if (roleId) params.set('roleId', roleId);
+    if (date) params.set('date', date);
+    return `${url}/kra/compare?${params.toString()}`;
+  },
+  upsertKRA:`${url}/kra`,
+  updateKRA:(kraId:string)=>`${url}/kra/${kraId}`,
+  deleteKRA:(kraId:string)=>`${url}/kra/${kraId}`,
 
   // attendance
   markAttendance:`${url}/attendance/mark`,

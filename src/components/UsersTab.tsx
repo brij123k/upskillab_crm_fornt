@@ -1427,3 +1427,56 @@ export function UsersTab({
     </div>
   );
 }
+
+type KraComparison = {
+  roleId: string | null;
+  userId: string;
+  status: string;
+  appliedCriteria: string;
+  metrics: {
+    answeredCalls: number;
+    talkTime: number;
+    dialCalls: number;
+    bookings: number;
+    demoConducts: number;
+  };
+  thresholds: {
+    answeredCalls: number;
+    talkTime: number;
+    dialCalls: number;
+    bookings: number;
+    demoConducts: number;
+  } | null;
+  reason: string;
+};
+
+type KraConfig = {
+  _id?: string;
+  roleId: {
+    _id: string;
+    name: string;
+  };
+  fullDayAnsweredCalls: number;
+  fullDayTalkTime: number;
+  fullDayDialCalls: number;
+  fullDayBookings: number;
+  fullDayDemoConducts: number;
+  halfDayAnsweredCalls: number;
+  halfDayTalkTime: number;
+  halfDayDialCalls: number;
+  halfDayBookings: number;
+  halfDayDemoConducts: number;
+};
+
+const DEFAULT_KRA = {
+  fullDayAnsweredCalls: '0',
+  fullDayTalkTime: '0',
+  fullDayDialCalls: '0',
+  fullDayBookings: '0',
+  fullDayDemoConducts: '0',
+  halfDayAnsweredCalls: '0',
+  halfDayTalkTime: '0',
+  halfDayDialCalls: '0',
+  halfDayBookings: '0',
+  halfDayDemoConducts: '0',
+};

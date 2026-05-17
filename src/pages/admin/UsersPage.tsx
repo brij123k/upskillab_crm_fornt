@@ -5,7 +5,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { User, Shield, Loader2, RefreshCw, Building, Database, GitBranch } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import { postDataHandlerWithToken, getDataHandlerWithToken, patchTokenDataHandler } from '@/config/services';
+import { postDataHandlerWithToken, getDataHandlerWithToken, patchTokenDataHandler, deleteTokenDataHandler } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { LoanPartnersTab, LoanPartnerType } from '@/components/LoanPartnersTab';
 import { HandCoins } from 'lucide-react'
@@ -15,6 +15,7 @@ import { RolesTab } from '@/components/RolesTab';
 import { DepartmentsTab } from '@/components/DepartmentsTab';
 import { PoolsTab } from '@/components/PoolsTab';
 import { StagesTab } from '@/components/StagesTab';
+import { KRATab, KraConfig } from '@/components/KRATab';
 import { NewUserModal } from '@/components/NewUserModal';
 import { UserType, RoleType, DepartmentType, PoolType, StageType } from '@/types/user';
 
@@ -27,12 +28,14 @@ export function UsersPage() {
   const [departments, setDepartments] = useState<DepartmentType[]>([]);
   const [pools, setPools] = useState<PoolType[]>([]);
   const [stages, setStages] = useState<StageType[]>([]);
+  const [kras, setKras] = useState<KraConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingRoles, setLoadingRoles] = useState(false);
   const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [loadingPools, setLoadingPools] = useState(false);
   const [loadingStages, setLoadingStages] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'departments' | 'pools' | 'stages' | 'loanpartners'>('users');
+  const [loadingKras, setLoadingKras] = useState(false);
+  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'departments' | 'pools' | 'stages' | 'loanpartners' | 'kra'>('users');
   const [fetchingData, setFetchingData] = useState(false);
   const [loanPartners, setLoanPartners] = useState<LoanPartnerType[]>([]);
   const [loadingLoanPartners, setLoadingLoanPartners] = useState(false);
@@ -288,6 +291,25 @@ export function UsersPage() {
       setLoadingStages(false);
     }
   };
+
+  const fetchKras = async () => {
+    try {
+      setLoadingKras(true);
+      const response = await getDataHandlerWithToken(ApiConfig.getKRA, null, null, true);
+      if (response) {
+        setKras(response);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch KRA settings",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingKras(false);
+    }
+  };
+
   const fetchLoanPartners = async () => {
     try {
       setLoadingLoanPartners(true);
@@ -366,6 +388,65 @@ export function UsersPage() {
     }
   };
 
+  const handleAddKra = async (kraData: any) => {
+    try {
+      const response = await postDataHandlerWithToken(ApiConfig.upsertKRA, kraData, true);
+      toast({
+        title: "Success",
+        description: response?.message || "KRA created successfully",
+      });
+      fetchKras();
+      return response;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to create KRA",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
+  const handleUpdateKra = async (kraId: string, kraData: any) => {
+    try {
+      const endpoint = ApiConfig.updateKRA(kraId);
+      const response = await patchTokenDataHandler(endpoint, kraData, true);
+      toast({
+        title: "Success",
+        description: response?.message || "KRA updated successfully",
+      });
+      fetchKras();
+      return response;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to update KRA",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
+  const handleDeleteKra = async (kraId: string) => {
+    try {
+      const endpoint = ApiConfig.deleteKRA(kraId);
+      const response = await deleteTokenDataHandler(endpoint, true);
+      toast({
+        title: "Success",
+        description: response?.message || "KRA deleted successfully",
+      });
+      fetchKras();
+      return response;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to delete KRA",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
   // Update fetchAllData to include loan partners
   const fetchAllData = async () => {
     try {
@@ -375,8 +456,9 @@ export function UsersPage() {
         fetchRoles(),
         fetchDepartments(),
         fetchPools(),
-        fetchStages(),
-        fetchLoanPartners(), // Add this line
+      fetchStages(),
+      fetchKras(),
+      fetchLoanPartners(), // Add this line
       ]);
     } catch (error) {
       toast({
@@ -670,6 +752,10 @@ export function UsersPage() {
             <HandCoins className="w-4 h-4" />
             Loan Partners
           </TabsTrigger>
+          <TabsTrigger value="kra" className="flex items-center gap-2">
+            <Database className="w-4 h-4" />
+            KRA
+          </TabsTrigger>
         </TabsList>
       </Tabs>
       {/* Users Tab */}
@@ -746,6 +832,19 @@ export function UsersPage() {
           onUpdateLoanPartner={handleUpdateLoanPartner}
           onToggleActive={handleToggleLoanPartnerActive}
           onRefresh={fetchLoanPartners}
+        />
+      )}
+
+      {activeTab === 'kra' && (
+        <KRATab
+          kras={kras}
+          roles={roles}
+          loading={loadingKras}
+          fetchingData={fetchingData}
+          onRefresh={fetchKras}
+          onAddKra={handleAddKra}
+          onUpdateKra={handleUpdateKra}
+          onDeleteKra={handleDeleteKra}
         />
       )}
 
