@@ -23,6 +23,8 @@ import {
   PhoneCall,
   User,
   ListOrdered,
+  CalendarDays,
+  ClipboardList,
 } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import { getUser } from "@/auth";
@@ -221,6 +223,18 @@ const bdNavItems = [
     path: '/bd/subscriptions', 
     module: 'subscriptions' 
   },
+    { 
+    icon: CalendarDays, 
+    label: 'Apply Leave', 
+    path: '/bd/leaves', 
+    module: 'my_leaves' 
+  },
+  { 
+    icon: ClipboardList, 
+    label: 'Leave Requests', 
+    path: '/bd/leave-requests', 
+    module: 'leave_requests' 
+  },
   { 
     icon: BarChart3, 
     label: 'Reports', 
@@ -355,6 +369,12 @@ useEffect(() => {
   const shouldShowNavItem = (module: string): boolean => {
     if (module === 'my_announcements') {
       return panel === 'bd';
+    }
+    if (module === 'my_leaves') {
+      return panel === 'bd';
+    }
+    if (module === 'leave_requests') {
+      return panel === 'bd' && hasPermission(permissions, 'leave', 'approve');
     }
     // Always show BD dashboard for BD panel
     if (panel === 'bd' && module === 'bd_dashboard') {

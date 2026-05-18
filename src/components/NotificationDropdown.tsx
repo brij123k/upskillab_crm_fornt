@@ -145,7 +145,7 @@ export function NotificationDropdown() {
   };
 
   const isAutoPreviewNotification = (n: any) => {
-    return n?.type === 'ADMIN_BROADCAST' || n?.type === 'PERFORMANCE_WARNING';
+    return n?.type === 'ADMIN_BROADCAST' || n?.type === 'PERFORMANCE_WARNING' || n?.type === 'LEAVE_REQUEST' || n?.type === 'LEAVE_DECISION';
   };
 
   useEffect(() => {
@@ -322,6 +322,8 @@ export function NotificationDropdown() {
                 <DialogTitle className="flex items-center gap-2">
                   {activeNotification.type === 'PERFORMANCE_WARNING' ? (
                     <ShieldAlert className="h-5 w-5 text-yellow-600" />
+                  ) : activeNotification.type === 'LEAVE_REQUEST' || activeNotification.type === 'LEAVE_DECISION' ? (
+                    <ShieldAlert className="h-5 w-5 text-primary" />
                   ) : (
                     <Megaphone className="h-5 w-5 text-primary" />
                   )}
@@ -330,6 +332,10 @@ export function NotificationDropdown() {
                 <DialogDescription>
                   {activeNotification.type === 'PERFORMANCE_WARNING'
                     ? 'A performance warning has been issued to your account.'
+                    : activeNotification.type === 'LEAVE_REQUEST'
+                      ? 'A leave request needs your review.'
+                      : activeNotification.type === 'LEAVE_DECISION'
+                        ? 'Your leave request has been updated.'
                     : 'An announcement has been shared for you.'}
                 </DialogDescription>
               </DialogHeader>

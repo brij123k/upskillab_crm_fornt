@@ -1,5 +1,5 @@
-// const url = "http://localhost:3000"
-const url = "https://crm.upskillab.in"
+const url = "http://localhost:3000"
+// const url = "https://crm.upskillab.in"
 const ApiConfig = {
   url,
   login:`${url}/users/login`,
@@ -10,6 +10,8 @@ const ApiConfig = {
 
   getAllUser:`${url}/users`,
   getAllProfile:`${url}/users/profile`,
+  getMySeniors:`${url}/users/seniors/me`,
+  getUserSeniors:(userId:string)=>`${url}/users/seniors/${userId}`,
   getUserByDepartmentId:(departmentId:string)=>`${url}/profiles/department/${departmentId}`,
   getUserBydepId:(depId:string)=>`${url}/users/${depId}`,
   getAllRoles:`${url}/roles`,
@@ -139,6 +141,17 @@ const ApiConfig = {
   upsertKRA:`${url}/kra`,
   updateKRA:(kraId:string)=>`${url}/kra/${kraId}`,
   deleteKRA:(kraId:string)=>`${url}/kra/${kraId}`,
+
+  // leave
+  createLeave:`${url}/leaves`,
+  getLeaves:`${url}/leaves`,
+  getMyLeaves:`${url}/leaves/me`,
+  getMyLeaveById:(leaveId:string)=>`${url}/leaves/me/${leaveId}`,
+  updateMyLeave:(leaveId:string)=>`${url}/leaves/me/${leaveId}`,
+  cancelMyLeave:(leaveId:string)=>`${url}/leaves/me/${leaveId}/cancel`,
+  getLeaveRequests:`${url}/leaves/requests`,
+  getLeaveRequestById:(leaveId:string)=>`${url}/leaves/requests/${leaveId}`,
+  decideLeave:(leaveId:string)=>`${url}/leaves/${leaveId}/decision`,
 
   // attendance
   markAttendance:`${url}/attendance/mark`,

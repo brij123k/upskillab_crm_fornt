@@ -115,6 +115,13 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'change_status', label: 'Change Task Status' },
     ]
   },
+  leave: {
+    id: 'leave',
+    label: 'Leave Management',
+    actions: [
+      { id: 'approve', label: 'Approve / Reject Leave' },
+    ]
+  },
   reports: {
     id: 'reports',
     label: 'Reports & Analytics',

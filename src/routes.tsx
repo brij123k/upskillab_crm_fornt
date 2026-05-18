@@ -43,6 +43,8 @@ import { BDAnnouncementPage } from "./pages/bd/AnnouncementPage";
 import { MyAnnouncementsPage } from "@/pages/announcements/MyAnnouncementsPage";
 import { MyWarningsPage } from "@/pages/bd/MyWarningsPage";
 import { MyTasksPage } from "@/pages/bd/MyTasksPage";
+import { LeavesPage } from "@/pages/bd/LeavesPage";
+import { LeaveRequestsPage } from "@/pages/bd/LeaveRequestsPage";
 // Placeholder
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-[60vh]">
@@ -136,6 +138,10 @@ const AppRoutes = () => {
           <Route path="my-announcements/:announcementId" element={<MyAnnouncementsPage />} />
           <Route path="my-warnings" element={<MyWarningsPage />} />
           <Route path="my-warnings/:warningId" element={<MyWarningsPage />} />
+          <Route path="leaves" element={<LeavesPage />} />
+          <Route path="leaves/:leaveId" element={<LeavesPage />} />
+          <Route path="leave-requests" element={<LeaveRequestsPage />} />
+          <Route path="leave-requests/:leaveId" element={<LeaveRequestsPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<PlaceholderPage title="BD Settings" />} />
         </Route>

@@ -27,6 +27,7 @@ export type KraConfig = {
   halfDayDialCalls: number;
   halfDayBookings: number;
   halfDayDemoConducts: number;
+  maxLeavePerMonth: number;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -43,6 +44,7 @@ type KraFormState = {
   halfDayDialCalls: string;
   halfDayBookings: string;
   halfDayDemoConducts: string;
+  maxLeavePerMonth: string;
 };
 
 const EMPTY_FORM: KraFormState = {
@@ -57,6 +59,7 @@ const EMPTY_FORM: KraFormState = {
   halfDayDialCalls: '0',
   halfDayBookings: '0',
   halfDayDemoConducts: '0',
+  maxLeavePerMonth: '0',
 };
 
 type Props = {
@@ -101,6 +104,7 @@ export function KRATab({ kras, roles, loading, fetchingData, onRefresh, onAddKra
       halfDayDialCalls: String(kra.halfDayDialCalls ?? 0),
       halfDayBookings: String(kra.halfDayBookings ?? 0),
       halfDayDemoConducts: String(kra.halfDayDemoConducts ?? 0),
+      maxLeavePerMonth: String(kra.maxLeavePerMonth ?? 0),
     });
     setDialogOpen(true);
   };
@@ -121,6 +125,7 @@ export function KRATab({ kras, roles, loading, fetchingData, onRefresh, onAddKra
         halfDayDialCalls: Number(form.halfDayDialCalls || 0),
         halfDayBookings: Number(form.halfDayBookings || 0),
         halfDayDemoConducts: Number(form.halfDayDemoConducts || 0),
+        maxLeavePerMonth: Number(form.maxLeavePerMonth || 0),
       };
 
       if (editingKra?._id) {
@@ -280,11 +285,12 @@ export function KRATab({ kras, roles, loading, fetchingData, onRefresh, onAddKra
               ['fullDayBookings', 'Full Day Bookings'],
               ['fullDayDemoConducts', 'Full Day Demo Conducts'],
               ['halfDayAnsweredCalls', 'Half Day Answered Calls'],
-              ['halfDayTalkTime', 'Half Day Talk Time'],
-              ['halfDayDialCalls', 'Half Day Dial Calls'],
-              ['halfDayBookings', 'Half Day Bookings'],
-              ['halfDayDemoConducts', 'Half Day Demo Conducts'],
-            ] as const).map(([key, label]) => (
+            ['halfDayTalkTime', 'Half Day Talk Time'],
+            ['halfDayDialCalls', 'Half Day Dial Calls'],
+            ['halfDayBookings', 'Half Day Bookings'],
+            ['halfDayDemoConducts', 'Half Day Demo Conducts'],
+            ['maxLeavePerMonth', 'Max Leave / Month'],
+          ] as const).map(([key, label]) => (
               <div key={key} className="space-y-2">
                 <Label>{label}</Label>
                 <Input
