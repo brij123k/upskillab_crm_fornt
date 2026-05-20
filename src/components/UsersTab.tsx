@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,7 +55,7 @@ interface UsersTabProps {
   loading: boolean;
   loadingPools?: boolean; // Add loading for pools
   fetchingData: boolean;
-  onRefresh: () => Promise<void>;
+  onRefresh: (query?: { status?: string }) => Promise<void>;
   onUpdateUser: (userId: string, data: any) => Promise<void>;
   onUpdateStatus: (userId: string, status: string) => Promise<void>;
   onToggleBlock: (userId: string) => Promise<void>;
@@ -115,6 +115,7 @@ export function UsersTab({
 
   const [ivrModalOpen, setIvrModalOpen] = useState(false);
   const [selectedIVRUser, setSelectedIVRUser] = useState<UserType | null>(null);
+  const hasMountedRef = useRef(false);
   const navigate = useNavigate();
   // Form states
   const [editUserForm, setEditUserForm] = useState({
@@ -161,6 +162,15 @@ export function UsersTab({
     return searchMatch && roleMatch && statusMatch && poolMatch;
   });
 
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+
+    onRefresh({ status: filters.status });
+  }, [filters.status, onRefresh]);
+
   const fetchDepartmentUsers = async (departmentId: string) => {
     if (!departmentId) {
       setDepartmentUsers([]);
@@ -170,7 +180,7 @@ export function UsersTab({
     try {
       setLoadingDepartmentUsers(true);
       const endpoint = ApiConfig.getUserBydepId(departmentId);
-      const response = await getDataHandlerWithToken(endpoint, null, null, true);
+      const response = await getDataHandlerWithToken(endpoint, { status: 'active' }, null, true);
 
       if (response) {
         setDepartmentUsers(response);

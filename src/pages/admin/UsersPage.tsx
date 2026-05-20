@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -202,10 +202,14 @@ export function UsersPage() {
   };
 
   // Fetch data
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async (query?: { status?: string }) => {
     try {
       setLoading(true);
-      const response = await getDataHandlerWithToken("getAllProfile", null, null);
+      const response = await getDataHandlerWithToken(
+        "getAllProfile",
+        query?.status ? { status: query.status } : null,
+        null
+      );
       if (response) {
         setUsers(response);
       }
@@ -218,7 +222,7 @@ export function UsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const fetchRoles = async () => {
     try {
@@ -611,6 +615,7 @@ export function UsersPage() {
     try {
       const dataToSend: any = {
         name: roleData.name,
+        level: Number(roleData.level) || 1,
         isSuperAdmin: roleData.isSuperAdmin || false
       };
 
@@ -649,6 +654,7 @@ export function UsersPage() {
     try {
       const dataToSend: any = {
         name: roleData.name,
+        level: Number(roleData.level) || 1,
         isSuperAdmin: roleData.isSuperAdmin || false
       };
 

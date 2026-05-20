@@ -51,6 +51,7 @@ export function RolesTab({
   // Form states
   const [roleForm, setRoleForm] = useState({
     name: '',
+    level: 1,
     reportingRole: '',
     isSuperAdmin: false,
     permissions: [] as Array<{ module: string; actions: string[] }>
@@ -66,12 +67,29 @@ export function RolesTab({
     return module ? module.label : moduleId;
   };
 
+  const getSortedRoles = () => {
+    return [...roles].sort((a, b) => {
+      const levelDiff = (b.level ?? 0) - (a.level ?? 0);
+      if (levelDiff !== 0) return levelDiff;
+      return a.name.localeCompare(b.name);
+    });
+  };
+
+  const getReportingRoleOptions = (currentLevel: number, currentRoleId?: string) => {
+    return getSortedRoles().filter((role) => {
+      if (role.isSuperAdmin) return false;
+      if (currentRoleId && role._id === currentRoleId) return false;
+      return (role.level ?? 0) > currentLevel;
+    });
+  };
+
   const handleAddRole = async () => {
     setAddingRole(true);
     try {
       await onAddRole(roleForm);
       setRoleForm({ 
         name: '', 
+        level: 1,
         reportingRole: '', 
         isSuperAdmin: false,
         permissions: [] 
@@ -91,6 +109,7 @@ export function RolesTab({
       setSelectedRole(null);
       setRoleForm({ 
         name: '', 
+        level: 1,
         reportingRole: '', 
         isSuperAdmin: false,
         permissions: [] 
@@ -104,6 +123,7 @@ export function RolesTab({
     setSelectedRole(role);
     setRoleForm({
       name: role.name,
+      level: role.level ?? 1,
       reportingRole: role.reportingRole || '',
       isSuperAdmin: role.isSuperAdmin || false,
       permissions: role.permissions.map(perm => ({
@@ -158,16 +178,17 @@ export function RolesTab({
                       <ShieldCheck className="w-4 h-4 text-purple-600" />
                     )}
                   </CardTitle>
-                  {role.isSuperAdmin ? (
-                    <Badge className="bg-gradient-to-r from-purple-600 to-purple-800 text-white border-0">
-                      <Shield className="w-3 h-3 mr-1" />
-                      Super Admin
-                    </Badge>
-                  ) : (
+                  <div className="flex items-center gap-2">
+                    {role.isSuperAdmin && (
+                      <Badge className="bg-gradient-to-r from-purple-600 to-purple-800 text-white border-0">
+                        <Shield className="w-3 h-3 mr-1" />
+                        Super Admin
+                      </Badge>
+                    )}
                     <Badge variant="outline" className="text-xs">
-                      Standard Role
+                      Level {role.level ?? 1}
                     </Badge>
-                  )}
+                  </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Created {formatDate(role.createdAt)}
@@ -184,6 +205,20 @@ export function RolesTab({
                       <Badge variant="secondary" className="text-xs">
                         {roles.find(r => r._id === role.reportingRole)?.name || role.reportingRole}
                       </Badge>
+                    </div>
+                  )}
+
+                  {!role.isSuperAdmin && (
+                    <div>
+                      <div className="text-xs font-medium text-muted-foreground mb-1">
+                        Role Level:
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        Level {role.level ?? 1}
+                      </Badge>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Higher level means more senior
+                      </p>
                     </div>
                   )}
                   
@@ -260,6 +295,22 @@ export function RolesTab({
                 disabled={addingRole}
               />
             </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="role-level">Role Level *</Label>
+              <Input
+                id="role-level"
+                type="number"
+                min={1}
+                value={roleForm.level}
+                onChange={(e) => setRoleForm({...roleForm, level: Number(e.target.value) || 1})}
+                placeholder="1"
+                disabled={addingRole}
+              />
+              <p className="text-xs text-muted-foreground">
+                Use a higher number for more senior roles. Multiple roles can share the same level.
+              </p>
+            </div>
             
             {/* Super Admin Toggle */}
             <div className="flex items-center justify-between p-4 border rounded-lg">
@@ -295,11 +346,10 @@ export function RolesTab({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value=" ">No reporting role</SelectItem>
-                      {roles
-                        .filter(role => !role.isSuperAdmin)
+                      {getReportingRoleOptions(roleForm.level)
                         .map((role) => (
                           <SelectItem key={role._id} value={role._id}>
-                            {role.name}
+                            {role.name} (Level {role.level ?? 1})
                           </SelectItem>
                         ))}
                     </SelectContent>
@@ -372,6 +422,22 @@ export function RolesTab({
                     disabled={updatingRole}
                   />
                 </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-role-level">Role Level *</Label>
+                  <Input
+                    id="edit-role-level"
+                    type="number"
+                    min={1}
+                    value={roleForm.level}
+                    onChange={(e) => setRoleForm({...roleForm, level: Number(e.target.value) || 1})}
+                    placeholder="1"
+                    disabled={updatingRole}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Higher number = more senior. Multiple roles can use the same level.
+                  </p>
+                </div>
                 
                 {/* Super Admin Toggle for Edit */}
                 {!selectedRole.isSuperAdmin && ( // Only allow toggling if not already Super Admin
@@ -423,13 +489,12 @@ export function RolesTab({
                         <SelectTrigger>
                           <SelectValue placeholder="Select reporting role (optional)" />
                         </SelectTrigger>
-                        <SelectContent> 
+                      <SelectContent> 
                           <SelectItem value=" ">No reporting role</SelectItem>
-                          {roles
-                            .filter(role => !role.isSuperAdmin && role._id !== selectedRole._id)
+                          {getReportingRoleOptions(roleForm.level, selectedRole._id)
                             .map((role) => (
                               <SelectItem key={role._id} value={role._id}>
-                                {role.name}
+                                {role.name} (Level {role.level ?? 1})
                               </SelectItem>
                             ))}
                         </SelectContent>

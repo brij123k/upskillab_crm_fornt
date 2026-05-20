@@ -62,6 +62,12 @@ const adminNavItems = [
     module: 'leads' 
   },
   { 
+    icon: Target, 
+    label: 'Source Campaigns', 
+    path: '/admin/source-campaigns', 
+    module: 'source_campaigns' 
+  },
+  { 
     icon: PhoneCall, 
     label: 'Call Logs', 
     path: '/admin/calls', 
@@ -381,6 +387,9 @@ useEffect(() => {
       return true;
     }
     if (panel === 'bd' && module === 'bd_settings') {
+      return true;
+    }
+    if (panel === 'admin' && module === 'source_campaigns') {
       return true;
     }
     if (panel === 'bd' && module === 'payments') {

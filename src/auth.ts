@@ -9,6 +9,7 @@ type JwtPayload = {
   email: string;
   roleId: string;
   roleName: string;
+  roleLevel: number;
   isSuperAdmin: boolean;
   permissions: {
     module: string;

@@ -24,7 +24,8 @@ import {
   ConsultantPerformanceReport,
   DailyUtilizationReport,
   SourceCampaignReport,
-  SourceCampaignRevenueReport
+  SourceCampaignRevenueReport,
+  SourceCampaignComparisonReport
 } from '@/components/reports';
 
 const REPORTS = [
@@ -37,6 +38,7 @@ const REPORTS = [
   { id: 'daily-utilization', name: 'Daily Calls', endpoint: ApiConfig.employeePoolDailyUtilizationReport, icon: Calendar, hasFilter: true, filters: ['date', 'poolId'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: DailyUtilizationReport },
   { id: 'source-campaign', name: 'Source Campaign', endpoint: ApiConfig.sourcecampaignstagesummary, icon: BarChart, hasFilter: true, filters: ['date'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: SourceCampaignReport },
    { id: 'source-campaign-revenue', name: 'Revenue by Source', endpoint: ApiConfig.sourcecampaignwiseleadrevenue, icon: IndianRupee, hasFilter: true, filters: ['date', 'stage', 'state'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: SourceCampaignRevenueReport },
+  { id: 'source-campaign-comparison', name: 'Campaign Comparison', endpoint: ApiConfig.getSourceCampaignComparisonReport, icon: BarChart, hasFilter: false, component: SourceCampaignComparisonReport },
 ];
 
 const dateFilterLabels: Record<string, string> = {

@@ -89,6 +89,14 @@ const ApiConfig = {
   sourcecampaignstagesummary:`${url}/leads/report/source-campaign-stage-summary`,
   sourcecampaignwiseleadrevenue:`${url}/order/report/source-campaign-wise-lead-revenue`,
   sourceCampaignWiseLeadRevenueReport:`${url}/order/report/source-campaign-wise-lead-revenue`,
+  getSourceCampaigns:`${url}/source-campaigns`,
+  createSourceCampaign:`${url}/source-campaigns`,
+  getSourceCampaignById:(id:string)=>`${url}/source-campaigns/${id}`,
+  updateSourceCampaign:(id:string)=>`${url}/source-campaigns/${id}`,
+  toggleSourceCampaign:(id:string)=>`${url}/source-campaigns/${id}/toggle`,
+  getSourceCampaignComparisonReport:`${url}/source-campaigns/report/comparison`,
+  getPublicSourceCampaign:(id:string)=>`${url}/source-campaigns/public/${id}`,
+  submitPublicSourceLead:(id:string)=>`${url}/source-campaigns/public/${id}/lead`,
 
   // IVR section
   getMynumbers:`${url}/IVR/myNumbers`,

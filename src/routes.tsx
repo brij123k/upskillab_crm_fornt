@@ -37,6 +37,7 @@ import { UserActivityPage } from "./components/modal/UserActivityModal";
 import { TaskManagementPage } from "./pages/admin/TaskManagementPage";
 import { HRAnnouncementPage } from "./pages/admin/HRAnnouncementPage";
 import { PerformanceWarningPage } from "./pages/admin/PerformanceWarningPage";
+import { SourceCampaignsPage } from "./pages/admin/SourceCampaignsPage";
 import { AttendancePage } from "./pages/AttendancePage";
 import { TaskManagementPagebd } from "./pages/bd/TaskManagementPagebd";
 import { BDAnnouncementPage } from "./pages/bd/AnnouncementPage";
@@ -45,6 +46,7 @@ import { MyWarningsPage } from "@/pages/bd/MyWarningsPage";
 import { MyTasksPage } from "@/pages/bd/MyTasksPage";
 import { LeavesPage } from "@/pages/bd/LeavesPage";
 import { LeaveRequestsPage } from "@/pages/bd/LeaveRequestsPage";
+import { LeadEntryPage } from "@/pages/public/LeadEntryPage";
 // Placeholder
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-[60vh]">
@@ -73,6 +75,7 @@ const AppRoutes = () => {
         <Route path="/verify-otp" element={<VerifyOTP />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/cashfree/subscription-auth" element={<CashfreeSubscriptionAuthPage />} />
+        <Route path="/lead-entry/:campaignId" element={<LeadEntryPage />} />
         
 
 
@@ -86,6 +89,7 @@ const AppRoutes = () => {
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="leads" element={<LeadsPage />} />
+          <Route path="source-campaigns" element={<SourceCampaignsPage />} />
           <Route path="calls" element={<AdminCallLogsPage />} />
           <Route path="meetings" element={<AdminMeetingLogsPage />} />
           <Route path="orders" element={<AdminOrderManagementPage />} />
