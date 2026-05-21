@@ -127,6 +127,7 @@ const AppRoutes = () => {
 
           <Route index element={<BDDashboard />} />
           <Route path="users" element={<BDUsersPage />} />
+          <Route path="source-campaigns" element={<SourceCampaignsPage />} />
           <Route path="leads" element={<BDLeadsPage />} />
           <Route path="calls" element={<CallLogsPage/>} />
           <Route path="meetings" element={<MeetingLogsPage />} />

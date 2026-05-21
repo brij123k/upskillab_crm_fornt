@@ -169,11 +169,17 @@ const bdNavItems = [
     path: '/bd', 
     module: 'bd_dashboard' 
   },
-   { 
+  { 
     icon: User, 
     label: 'Users', 
     path: '/bd/users', 
     module: 'user' 
+  },
+  { 
+    icon: Target, 
+    label: 'Source Campaigns', 
+    path: '/bd/source-campaigns', 
+    module: 'source_campaigns' 
   },
   { 
     icon: Target, 

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Copy, Loader2, Plus, RefreshCw, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Copy, Eye, Loader2, Plus, RefreshCw, ToggleLeft, ToggleRight, Users } from 'lucide-react';
 import { getDataHandlerWithToken, patchTokenDataHandler, postDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from 'sonner';
@@ -17,12 +17,29 @@ type Campaign = {
   name: string;
   source: string;
   isActive: boolean;
+  createdBy?: { _id?: string; name?: string; employeeId?: string | number } | string;
+  updatedBy?: { _id?: string; name?: string; employeeId?: string | number } | string;
   defaultStageId?: { _id: string; name: string } | string;
   defaultPoolId?: { _id: string; name: string } | string;
   createdAt: string;
+  registeredUsers?: RegisteredUser[];
+  registeredCount?: number;
 };
 
 type Option = { _id: string; name: string };
+type RegisteredUser = {
+  _id: string;
+  leadId?: number | null;
+  name: string;
+  phone?: string;
+  email?: string;
+  city?: string | null;
+  state?: string | null;
+  source?: string | null;
+  source_campaign?: string | null;
+  status?: string | null;
+  submittedAt?: string;
+};
 
 const SOURCES = ['facebook', 'google', 'manual', 'positive', 'refurbished', 'api'];
 
@@ -35,6 +52,9 @@ export function SourceCampaignsPage() {
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<Campaign | null>(null);
   const [form, setForm] = useState({
@@ -99,6 +119,20 @@ export function SourceCampaignsPage() {
       isActive: campaign.isActive,
     });
     setEditOpen(true);
+  };
+
+  const openDetails = async (campaign: Campaign) => {
+    setDetailOpen(true);
+    setDetailLoading(true);
+    setSelectedCampaign(campaign);
+    try {
+      const details = await getDataHandlerWithToken(ApiConfig.getSourceCampaignById(campaign._id), null, null, true);
+      setSelectedCampaign(details?.data || details || campaign);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to load campaign details');
+    } finally {
+      setDetailLoading(false);
+    }
   };
 
   const submit = async () => {
@@ -199,6 +233,8 @@ export function SourceCampaignsPage() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Source</TableHead>
+                    <TableHead>Created By</TableHead>
+                    <TableHead>Leads</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Lead URL</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -207,8 +243,31 @@ export function SourceCampaignsPage() {
                 <TableBody>
                   {campaigns.map((campaign) => (
                     <TableRow key={campaign._id}>
-                      <TableCell className="font-medium">{campaign.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <button
+                          type="button"
+                          onClick={() => openDetails(campaign)}
+                          className="text-left font-medium text-primary underline-offset-4 hover:underline"
+                        >
+                          {campaign.name}
+                        </button>
+                      </TableCell>
                       <TableCell><Badge variant="outline">{campaign.source}</Badge></TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {typeof campaign.createdBy === 'object'
+                          ? (
+                            <span>
+                              {campaign.createdBy?.name || 'Unknown'} ({campaign.createdBy?._id || campaign.createdBy?.employeeId || '-'})
+                            </span>
+                          )
+                          : (campaign.createdBy || '-')}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="gap-1">
+                          <Users className="h-3.5 w-3.5" />
+                          {campaign.registeredCount ?? 0}
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         <Badge className={campaign.isActive ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-700'}>
                           {campaign.isActive ? 'Active' : 'Inactive'}
@@ -217,6 +276,10 @@ export function SourceCampaignsPage() {
                       <TableCell className="max-w-[360px] truncate text-sm text-muted-foreground">{buildUrl(campaign)}</TableCell>
                       <TableCell className="text-right">
                         <div className="inline-flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => openDetails(campaign)} className="gap-2">
+                            <Eye className="h-4 w-4" />
+                            View
+                          </Button>
                           <Button variant="outline" size="sm" onClick={() => copyUrl(campaign)} className="gap-2">
                             <Copy className="h-4 w-4" />
                             Copy
@@ -309,6 +372,85 @@ export function SourceCampaignsPage() {
             <Button variant="outline" onClick={() => setEditOpen(false)}>Close</Button>
             <Button onClick={submit} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{selectedCampaign?.name || 'Source Campaign Details'}</DialogTitle>
+            <DialogDescription>
+              Campaign info, creator details, and the users registered from this source campaign.
+            </DialogDescription>
+          </DialogHeader>
+
+          {detailLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : selectedCampaign ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 rounded-2xl border bg-muted/20 p-4 md:grid-cols-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Created By</p>
+                  <p className="mt-1 text-sm font-medium">
+                    {typeof selectedCampaign.createdBy === 'object'
+                      ? `${selectedCampaign.createdBy?.name || 'Unknown'} (${selectedCampaign.createdBy?._id || selectedCampaign.createdBy?.employeeId || '-'})`
+                      : (selectedCampaign.createdBy || '-')}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Registered Count</p>
+                  <p className="mt-1 text-sm font-medium">{selectedCampaign.registeredCount ?? 0}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Status</p>
+                  <p className="mt-1 text-sm font-medium">{selectedCampaign.isActive ? 'Active' : 'Inactive'}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">Registered Users</h3>
+                  <p className="text-xs text-muted-foreground">{selectedCampaign.registeredUsers?.length || 0} entries</p>
+                </div>
+                <div className="max-h-[420px] overflow-auto rounded-2xl border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>City</TableHead>
+                        <TableHead>State</TableHead>
+                        <TableHead>Submitted At</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedCampaign.registeredUsers?.length ? (
+                        selectedCampaign.registeredUsers.map((user) => (
+                          <TableRow key={user._id}>
+                            <TableCell className="font-medium">{user.name || '-'}</TableCell>
+                            <TableCell>{user.phone || '-'}</TableCell>
+                            <TableCell>{user.email || '-'}</TableCell>
+                            <TableCell>{user.city || '-'}</TableCell>
+                            <TableCell>{user.state || '-'}</TableCell>
+                            <TableCell>{user.submittedAt ? new Date(user.submittedAt).toLocaleString() : '-'}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                            No users registered from this campaign yet.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

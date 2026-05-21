@@ -179,6 +179,7 @@ export function UsersTab({
 
     try {
       setLoadingDepartmentUsers(true);
+      console.log('Fetching users for department:', departmentId);
       const endpoint = ApiConfig.getUserBydepId(departmentId);
       const response = await getDataHandlerWithToken(endpoint, { status: 'active' }, null, true);
 
@@ -949,13 +950,15 @@ export function UsersTab({
                           <SearchableDropdown
                             options={[
                               { value: "", label: "Select reporting senior..." },
-                              ...departmentUsers.map(user => ({
-                                value: user.userId._id,
-                                label: user.userId.name,
-                                empId: user.userId.employeeId,
-                                email: user.userId.email,
-                                role: user.userId.role?.name
-                              }))
+                              ...departmentUsers
+                                .filter((user) => user.userId && user.userId._id)
+                                .map(user => ({
+                                  value: user.userId._id,
+                                  label: user.userId.name,
+                                  empId: user.userId.employeeId,
+                                  email: user.userId.email,
+                                  role: user.userId.role?.name
+                                }))
                             ]}
                             value={editUserForm.reportingSeniorId}
                             onValueChange={(value) => setEditUserForm({ ...editUserForm, reportingSeniorId: value })}

@@ -452,7 +452,7 @@ export function UsersPage() {
   };
 
   // Update fetchAllData to include loan partners
-  const fetchAllData = async () => {
+  const fetchAllData = useCallback(async () => {
     try {
       setFetchingData(true);
       await Promise.all([
@@ -460,9 +460,9 @@ export function UsersPage() {
         fetchRoles(),
         fetchDepartments(),
         fetchPools(),
-      fetchStages(),
-      fetchKras(),
-      fetchLoanPartners(), // Add this line
+        fetchStages(),
+        fetchKras(),
+        fetchLoanPartners(), // Add this line
       ]);
     } catch (error) {
       toast({
@@ -473,11 +473,11 @@ export function UsersPage() {
     } finally {
       setFetchingData(false);
     }
-  };
+  }, [fetchUsers]);
 
   useEffect(() => {
     fetchAllData();
-  }, []);
+  }, [fetchAllData]);
 
   // User Handlers
   const handleAddUser = async (userData: any) => {

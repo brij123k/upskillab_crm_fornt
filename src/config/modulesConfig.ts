@@ -81,6 +81,16 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'update', label: 'Update Pool' },
     ]
   },
+  source_campaigns: {
+    id: 'source_campaigns',
+    label: 'Source Campaigns',
+    actions: [
+      { id: 'create', label: 'Create Campaign' },
+      { id: 'read', label: 'View Campaigns' },
+      { id: 'update', label: 'Update Campaign' },
+      { id: 'toggle_status', label: 'Toggle Campaign Status' },
+    ]
+  },
   orders: {
     id: 'orders',
     label: 'Order Management',
