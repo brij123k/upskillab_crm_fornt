@@ -89,6 +89,7 @@ interface LeadType {
   city: string;
   state: string;
   source: string;
+  source_campaign: string;
   stageId: {
     _id: string;
     name: string;
@@ -192,6 +193,7 @@ interface Filters {
   search: string;
   status: string;
   source: string;
+  source_compain: string;
   stageId: string;
   poolId: string;
   location: string;
@@ -238,6 +240,7 @@ export function BDLeadsPage() {
     search: '',
     status: 'all',
     source: 'all',
+    source_compain: '',
     stageId: 'all',
     assignedTo: 'all',
     poolId: 'all',
@@ -323,6 +326,7 @@ export function BDLeadsPage() {
     if (filters.search && filters.search !== "all") params.search = filters.search;
     if (filters.status && filters.status !== "all") params.status = filters.status;
     if (filters.source && filters.source !== "all") params.source = filters.source;
+    if (filters.source_compain && filters.source_compain !== "all") params.source_compain = filters.source_compain;
     if (filters.stageId && filters.stageId !== "all") params.stageId = filters.stageId;
     if (filters.poolId && filters.poolId !== "all") params.poolId = filters.poolId;
     if (filters.location) params.location = filters.location;
@@ -992,6 +996,7 @@ export function BDLeadsPage() {
       search: '',
       status: 'all',
       source: 'all',
+      source_compain: '',
       stageId: 'all',
       poolId: 'all',
       location: '',
@@ -1809,7 +1814,7 @@ export function BDLeadsPage() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Stage</Label>
                 <Select
@@ -1841,6 +1846,15 @@ export function BDLeadsPage() {
                     onChange={(e) => setFilters({ ...filters, location: e.target.value })}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Source Campaign</Label>
+                <Input
+                  placeholder="Search source campaign..."
+                  value={filters.source_compain}
+                  onChange={(e) => setFilters({ ...filters, source_compain: e.target.value })}
+                />
               </div>
 
               <div className="space-y-2">
@@ -2115,6 +2129,7 @@ export function BDLeadsPage() {
                     <TableHead>Contact</TableHead>
                     <TableHead>Location</TableHead>
                     <TableHead>Source</TableHead>
+                    <TableHead>Source Campaign</TableHead>
                     <TableHead>Stage</TableHead>
                     <TableHead>Pool</TableHead>
                     <TableHead>Created At</TableHead>
@@ -2181,6 +2196,7 @@ export function BDLeadsPage() {
                         </div>
                       </TableCell>
                       <TableCell>{getSourceBadge(lead.source)}</TableCell>
+                      <TableCell>{lead.source_campaign || '—'}</TableCell>
                       <TableCell>
                         <Badge variant="outline">
                           {lead.stageId.name}
