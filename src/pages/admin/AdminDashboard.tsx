@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { QuickActions } from '@/components/dashboard/QuickActions';
+import { TargetComparisonWidget } from '@/components/targets/TargetComparisonWidget';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Users, 
@@ -18,7 +19,8 @@ import {
   Megaphone,
   Clock,
   ListOrdered,
-  CreditCard
+  CreditCard,
+  Target
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { getDataHandlerWithToken } from '@/config/services';
@@ -103,6 +105,7 @@ export function AdminDashboard() {
     { label: 'Warnings', icon: AlertTriangle, onClick: () => navigate('/admin/performance-warnings') },
     { label: 'Orders', icon: ListOrdered, onClick: () => navigate('/admin/orders') },
     { label: 'Payments', icon: CreditCard, onClick: () => navigate('/admin/payments') },
+    { label: 'Targets', icon: Target, onClick: () => navigate('/admin/targets') },
   ];
 
   const fetchDashboardData = async () => {
@@ -179,6 +182,8 @@ export function AdminDashboard() {
           <StatCard key={index} {...stat} />
         ))}
       </div>
+
+      <TargetComparisonWidget managePath="/admin/targets" />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>

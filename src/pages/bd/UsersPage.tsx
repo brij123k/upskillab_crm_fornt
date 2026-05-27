@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -40,6 +40,7 @@ export function BDUsersPage() {
   const [loadingLoanPartners, setLoadingLoanPartners] = useState(false);
   const permissions = JSON.parse(localStorage.getItem("permissions") || "[]");
   const navigate = useNavigate();
+  const isInitialMount = useRef(true);
 
   const permittedTabs = {
     users: hasModulePermission(permissions, 'user'),
@@ -222,7 +223,7 @@ export function BDUsersPage() {
     }
   };
 
-  // Fetch data
+  // Fetch data - wrapped with useCallback with empty dependencies for stable references
   const fetchUsers = useCallback(async (query?: { status?: string }) => {
     try {
       setLoading(true);
@@ -243,9 +244,9 @@ export function BDUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // Empty dependencies
 
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     try {
       setLoadingRoles(true);
       const response = await getDataHandlerWithToken("getAllRoles", null, null);
@@ -261,9 +262,9 @@ export function BDUsersPage() {
     } finally {
       setLoadingRoles(false);
     }
-  };
+  }, []);
 
-  const fetchDepartments = async () => {
+  const fetchDepartments = useCallback(async () => {
     try {
       setLoadingDepartments(true);
       const response = await getDataHandlerWithToken("getAllDepartments", null, null);
@@ -279,9 +280,9 @@ export function BDUsersPage() {
     } finally {
       setLoadingDepartments(false);
     }
-  };
+  }, []);
 
-  const fetchPools = async () => {
+  const fetchPools = useCallback(async () => {
     try {
       setLoadingPools(true);
       const response = await getDataHandlerWithToken("getAllPools", null, null);
@@ -297,9 +298,9 @@ export function BDUsersPage() {
     } finally {
       setLoadingPools(false);
     }
-  };
+  }, []);
 
-  const fetchStages = async () => {
+  const fetchStages = useCallback(async () => {
     try {
       setLoadingStages(true);
       const response = await getDataHandlerWithToken("getAllStages", null, null);
@@ -315,8 +316,9 @@ export function BDUsersPage() {
     } finally {
       setLoadingStages(false);
     }
-  };
-  const fetchLoanPartners = async () => {
+  }, []);
+
+  const fetchLoanPartners = useCallback(async () => {
     try {
       setLoadingLoanPartners(true);
       const response = await getDataHandlerWithToken(ApiConfig.getLoanPartners, null, null, true);
@@ -332,7 +334,7 @@ export function BDUsersPage() {
     } finally {
       setLoadingLoanPartners(false);
     }
-  };
+  }, []);
 
   // Add CRUD handlers for loan partners
   const handleAddLoanPartner = async (partnerData: { name: string; type: string; submissionCharge: number }) => {
@@ -394,53 +396,60 @@ export function BDUsersPage() {
     }
   };
 
-  // Update fetchAllData to include loan partners
- const fetchAllData = async () => {
-  try {
-    setFetchingData(true);
+  // Update fetchAllData to be stable
+  const fetchAllData = useCallback(async () => {
+    // Prevent multiple simultaneous calls
+    if (fetchingData) return;
+    
+    try {
+      setFetchingData(true);
 
-    const promises = [];
+      const promises = [];
 
-    if (hasModulePermission(permissions, 'user')) {
-      promises.push(fetchUsers());
+      if (hasModulePermission(permissions, 'user')) {
+        promises.push(fetchUsers());
+      }
+
+      if (hasModulePermission(permissions, 'role')) {
+        promises.push(fetchRoles());
+      }
+
+      if (hasModulePermission(permissions, 'department')) {
+        promises.push(fetchDepartments());
+      }
+
+      if (hasModulePermission(permissions, 'pool')) {
+        promises.push(fetchPools());
+      }
+
+      if (hasModulePermission(permissions, 'stages')) {
+        promises.push(fetchStages());
+      }
+
+      if (hasModulePermission(permissions, 'loan_partner')) {
+        promises.push(fetchLoanPartners());
+      }
+
+      await Promise.all(promises);
+
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch data",
+        variant: "destructive",
+      });
+    } finally {
+      setFetchingData(false);
     }
+  }, [fetchUsers, fetchRoles, fetchDepartments, fetchPools, fetchStages, fetchLoanPartners]); // Keep dependencies but they're now stable
 
-    if (hasModulePermission(permissions, 'role')) {
-      promises.push(fetchRoles());
+  // Use useEffect with proper cleanup and prevent multiple initial calls
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      fetchAllData();
     }
-
-    if (hasModulePermission(permissions, 'department')) {
-      promises.push(fetchDepartments());
-    }
-
-    if (hasModulePermission(permissions, 'pool')) {
-      promises.push(fetchPools());
-    }
-
-    if (hasModulePermission(permissions, 'stages')) {
-      promises.push(fetchStages());
-    }
-
-    if (hasModulePermission(permissions, 'loan_partner')) {
-      promises.push(fetchLoanPartners());
-    }
-
-    await Promise.all(promises);
-
-  } catch (error) {
-    toast({
-      title: "Error",
-      description: "Failed to fetch data",
-      variant: "destructive",
-    });
-  } finally {
-    setFetchingData(false);
-  }
-};
-
-useEffect(() => {
-  fetchAllData();
-}, []);
+  }, [fetchAllData]); // This will now only run once on mount
 
   // User Handlers
   const handleAddUser = async (userData: any) => {

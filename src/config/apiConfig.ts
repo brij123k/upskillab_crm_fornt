@@ -1,5 +1,5 @@
-// const url = "http://localhost:3000"
-const url = "https://crm.upskillab.in"
+const url = "http://localhost:3000"
+// const url = "https://crm.upskillab.in"
 const ApiConfig = {
   url,
   login:`${url}/users/login`,
@@ -86,6 +86,16 @@ const ApiConfig = {
   employeePoolUtilizationReport:`${url}/order/report/employee-pool-utilization`,
   consultantPerforment:`${url}/order/report/consultant-performance`,
   employeePoolDailyUtilizationReport:`${url}/call-logs/report/employee-pool-daily-utilization`,
+  employeeSalarySheetReport:`${url}/attendance/report/salary-sheet`,
+  getTargetReport:`${url}/targets/report`,
+  getRevenueTargetReport:`${url}/targets/revenue-report`,
+  getTargetMy:`${url}/targets/me`,
+  getTargetCompareMy:`${url}/targets/compare/me`,
+  getTargetByUser:(userId:string)=>`${url}/targets/user/${userId}`,
+  createTarget:`${url}/targets`,
+  createTargetsBulk:`${url}/targets/bulk`,
+  copyTargets:`${url}/targets/copy`,
+  updateTarget:(id:string)=>`${url}/targets/${id}`,
   sourcecampaignstagesummary:`${url}/leads/report/source-campaign-stage-summary`,
   sourcecampaignwiseleadrevenue:`${url}/order/report/source-campaign-wise-lead-revenue`,
   sourceCampaignWiseLeadRevenueReport:`${url}/order/report/source-campaign-wise-lead-revenue`,
@@ -94,6 +104,7 @@ const ApiConfig = {
   getSourceCampaignById:(id:string)=>`${url}/source-campaigns/${id}`,
   updateSourceCampaign:(id:string)=>`${url}/source-campaigns/${id}`,
   toggleSourceCampaign:(id:string)=>`${url}/source-campaigns/${id}/toggle`,
+  
   getSourceCampaignComparisonReport:`${url}/source-campaigns/report/comparison`,
   getPublicSourceCampaign:(id:string)=>`${url}/source-campaigns/public/${id}`,
   submitPublicSourceLead:(id:string)=>`${url}/source-campaigns/public/${id}/lead`,

@@ -109,6 +109,12 @@ const adminNavItems = [
     path: '/admin/reports', 
     module: 'reports' 
   },
+  { 
+    icon: Target, 
+    label: 'Targets', 
+    path: '/admin/targets', 
+    module: 'targets' 
+  },
 ];
 
 const hrNavItems = [
@@ -252,6 +258,12 @@ const bdNavItems = [
     label: 'Reports', 
     path: '/bd/reports', 
     module: 'reports' 
+  },
+  { 
+    icon: Target, 
+    label: 'Targets', 
+    path: '/bd/targets', 
+    module: 'targets' 
   },
   { 
     icon: Settings, 

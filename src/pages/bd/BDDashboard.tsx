@@ -5,6 +5,7 @@ import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { BDAnnouncementWidget } from '@/components/announcements/BDAnnouncementWidget';
 import { BDWarningWidget } from '@/components/announcements/BDWarningWidget';
+import { TargetComparisonWidget } from '@/components/targets/TargetComparisonWidget';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -83,7 +84,8 @@ export function BDDashboard() {
 
   const dynamicQuickActions = [
     ...quickActions,
-    ...(hasModulePermission(permissions, "announcements") ? [{ label: 'Announcements', icon: Megaphone, onClick: () => navigate('/bd/announcements') }] : [])
+    ...(hasModulePermission(permissions, "announcements") ? [{ label: 'Announcements', icon: Megaphone, onClick: () => navigate('/bd/announcements') }] : []),
+    ...(hasModulePermission(permissions, "targets") ? [{ label: 'Targets', icon: Target, onClick: () => navigate('/bd/targets') }] : [])
   ];
 
   // Fetch recent call logs
@@ -280,6 +282,8 @@ export function BDDashboard() {
               <StatCard key={index} {...stat} />
             ))}
           </div>
+
+          <TargetComparisonWidget managePath="/bd/targets" />
 
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -47,6 +47,7 @@ import { MyTasksPage } from "@/pages/bd/MyTasksPage";
 import { LeavesPage } from "@/pages/bd/LeavesPage";
 import { LeaveRequestsPage } from "@/pages/bd/LeaveRequestsPage";
 import { LeadEntryPage } from "@/pages/public/LeadEntryPage";
+import { TargetsPage } from "@/pages/targets/TargetsPage";
 // Placeholder
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-[60vh]">
@@ -105,6 +106,7 @@ const AppRoutes = () => {
           <Route path="announcements" element={<HRAnnouncementPage />} />
           <Route path="performance-warnings" element={<PerformanceWarningPage />} />
           <Route path="attendance/:userId" element={<AttendancePage />} />
+          <Route path="targets" element={<TargetsPage />} />
         </Route>
 
         {/* HR Panel */}
@@ -148,6 +150,7 @@ const AppRoutes = () => {
           <Route path="leave-requests" element={<LeaveRequestsPage />} />
           <Route path="leave-requests/:leaveId" element={<LeaveRequestsPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="targets" element={<TargetsPage />} />
           <Route path="settings" element={<PlaceholderPage title="BD Settings" />} />
         </Route>
 

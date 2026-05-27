@@ -139,7 +139,18 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'read', label: 'View Reports' },
       { id: 'export', label: 'Export Reports' },
       { id: 'generate', label: 'Generate Reports' },
-      { id: 'share', label: 'Share Reports' }
+      { id: 'share', label: 'Share Reports' },
+      { id: 'salary_sheet', label: 'Employee Salary Sheet' }
+    ]
+  },
+  targets: {
+    id: 'targets',
+    label: 'Target Management',
+    actions: [
+      { id: 'create', label: 'Create Target' },
+      { id: 'read', label: 'View Target' },
+      { id: 'update', label: 'Update Target' },
+      { id: 'copy', label: 'Copy Monthly Target' },
     ]
   }
 

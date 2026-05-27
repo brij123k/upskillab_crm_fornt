@@ -9,6 +9,8 @@ export { DailyUtilizationReport } from './DailyUtilizationReport';
 export { SourceCampaignReport } from './SourceCampaignReport';
 export { SourceCampaignRevenueReport } from './SourceCampaignRevenueReport';
 export { SourceCampaignComparisonReport } from './SourceCampaignComparisonReport';
+export { SalarySheetReport } from './SalarySheetReport';
+export { RevenueTargetReport } from './RevenueTargetReport';
 // Shared utility functions that can be used across reports
 export const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('en-IN', {
