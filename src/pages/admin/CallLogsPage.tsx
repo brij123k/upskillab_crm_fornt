@@ -24,7 +24,11 @@ import {
   Phone,
   AlertCircle,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Mail,
+  Zap,
+  Link2,
+  MessageCircle
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -55,6 +59,7 @@ import { hasModulePermission } from '@/utils/modulePermissions';
 interface CallLogType {
   _id: string;
   leadId: number;
+  leadName: string;
   userId: {
     _id: string;
     name: string;
@@ -71,6 +76,28 @@ interface CallLogType {
   updatedAt: string;
   answered?: boolean;
   callCount30Days?: number;
+  logType?: 'call';
+}
+
+interface InteractionLogType {
+  _id: string;
+  leadId: number;
+  leadName: string;
+  userId: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  source: string;
+  outcome: string;
+  stageId?: {
+    _id: string;
+    name: string;
+  };
+  interactionAt: string;
+  createdAt: string;
+  updatedAt: string;
+  logType?: 'interaction';
 }
 
 interface LeadType {
@@ -156,7 +183,7 @@ export function CallLogsPage() {
     outcome: '',
     durationMin: '',
     durationMax: '',
-    dateFilter: 'all',
+    dateFilter: 'today',
     fromDate: '',
     toDate: '',
     sort: 'new',
@@ -449,7 +476,7 @@ export function CallLogsPage() {
       outcome: '',
       durationMin: '',
       durationMax: '',
-      dateFilter: 'all',
+      dateFilter: 'today',
       fromDate: '',
       toDate: '',
       sort: 'new',
@@ -848,11 +875,9 @@ export function CallLogsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent position="popper" className="max-h-60 overflow-y-auto">
-                      <SelectItem value="all">All Time</SelectItem>
                       <SelectItem value="today">Today</SelectItem>
                       <SelectItem value="week">This Week</SelectItem>
                       <SelectItem value="month">This Month</SelectItem>
-                      <SelectItem value="year">This Year</SelectItem>
                       <SelectItem value="custom">Custom Range</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1278,7 +1303,7 @@ export function CallLogsPage() {
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Lead Name</p>
-                            <p className="text-sm font-medium">{getLeadName(selectedCallLog.leadId)}</p>
+                            <p className="text-sm font-medium">{selectedCallLog.leadName || "N/A"}</p>
                           </div>
                         </div>
                         <div>

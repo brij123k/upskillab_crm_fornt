@@ -800,7 +800,7 @@ useEffect(() => {
     fetchLeadHistory(lead.leadId.toString());
   };
 
- // Edit lead
+  // Edit lead
 const handleEditLead = (lead: LeadType) => {
   setSelectedLead(lead);
   

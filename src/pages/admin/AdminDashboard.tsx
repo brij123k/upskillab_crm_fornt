@@ -26,6 +26,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
+import { formatDistanceToNow } from 'date-fns';
 
 const initialRevenueData = [
   { month: 'Jan', revenue: 65000 },
@@ -44,13 +45,41 @@ const initialDepartmentData = [
   { name: 'HR', performance: 88 },
 ];
 
-const defaultActivity = [
-  { id: '1', action: 'New user registered: John Smith', user: 'System', time: '5 min ago', type: 'info' as const },
-  { id: '2', action: 'Bulk lead import completed (500 leads)', user: 'Admin', time: '1 hour ago', type: 'success' as const },
-  { id: '3', action: 'Failed login attempt detected', user: 'Security', time: '2 hours ago', type: 'warning' as const },
-  { id: '4', action: 'Department restructure approved', user: 'CEO', time: '3 hours ago', type: 'info' as const },
-  { id: '5', action: 'System backup completed', user: 'System', time: '5 hours ago', type: 'success' as const },
-];
+type DashboardActivity = {
+  _id: string;
+  action: string;
+  user: string;
+  time: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+};
+
+const getActivityType = (action: string): DashboardActivity['type'] => {
+  const value = action.toLowerCase();
+  if (value.includes('fail') || value.includes('error')) return 'error';
+  if (value.includes('logout')) return 'warning';
+  if (value.includes('login') || value.includes('created') || value.includes('success')) return 'success';
+  return 'info';
+};
+
+const formatActivityLabel = (activity: any) => {
+  if (activity?.meta?.message) return activity.meta.message;
+  return activity?.action
+    ? activity.action
+        .replace(/_/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    : 'Activity';
+};
+
+const mapActivity = (activity: any): DashboardActivity => ({
+  _id: activity?._id ?? crypto.randomUUID(),
+  action: formatActivityLabel(activity),
+  user: activity?.userName || activity?.userId?.name || 'System',
+  time: activity?.createdAt
+    ? formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })
+    : 'just now',
+  type: getActivityType(activity?.action || ''),
+});
 
 export function AdminDashboard() {
   const navigate = useNavigate();
@@ -63,6 +92,7 @@ export function AdminDashboard() {
   const [paymentCount, setPaymentCount] = useState(0);
   const [revenueData, setRevenueData] = useState(initialRevenueData);
   const [departmentData, setDepartmentData] = useState(initialDepartmentData);
+  const [recentActivities, setRecentActivities] = useState<DashboardActivity[]>([]);
   const [loading, setLoading] = useState(true);
 
   const stats = useMemo(() => [
@@ -106,12 +136,13 @@ export function AdminDashboard() {
     { label: 'Orders', icon: ListOrdered, onClick: () => navigate('/admin/orders') },
     { label: 'Payments', icon: CreditCard, onClick: () => navigate('/admin/payments') },
     { label: 'Targets', icon: Target, onClick: () => navigate('/admin/targets') },
+    { label: 'Attendance & Policy', icon: Clock, onClick: () => navigate('/admin/attendance-policy') },
   ];
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [users, leads, departments, warnings, announcements, orders, payments] = await Promise.all([
+      const [users, leads, departments, warnings, announcements, orders, payments, activities] = await Promise.all([
         getDataHandlerWithToken('getAllUser', null, null),
         getDataHandlerWithToken('getAllLeads', { page: 1, limit: 1 }, null),
         getDataHandlerWithToken('getAllDepartments', null, null),
@@ -119,6 +150,7 @@ export function AdminDashboard() {
         getDataHandlerWithToken('getAnnouncements', { page: 1, limit: 1 }, null),
         getDataHandlerWithToken('Order', { page: 1, limit: 1 }, null),
         getDataHandlerWithToken('getPaymentHistory', { page: 1, limit: 50 }, null),
+        getDataHandlerWithToken(ApiConfig.getLastActivities, { limit: 5 }, null, true),
       ]);
 
       setUserCount(Array.isArray(users) ? users.length : 0);
@@ -128,6 +160,7 @@ export function AdminDashboard() {
       setAnnouncementCount(announcements?.meta?.total ?? announcements?.total ?? (Array.isArray(announcements?.data) ? announcements.data.length : 0));
       setOrderCount(orders?.total ?? (Array.isArray(orders?.data) ? orders.data.length : 0));
       setPaymentCount(Array.isArray(payments) ? payments.length : (payments?.data?.length ?? 0));
+      setRecentActivities(Array.isArray(activities) ? activities.map(mapActivity) : []);
 
       const paymentRows = Array.isArray(payments) ? payments : payments?.data ?? [];
       const grouped = paymentRows.reduce((acc: Record<string, number>, payment: any) => {
@@ -247,7 +280,7 @@ export function AdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <RecentActivity activities={defaultActivity} />
+          <RecentActivity activities={recentActivities} />
         </div>
         <div>
           <QuickActions actions={quickActions} title="Admin Actions" />

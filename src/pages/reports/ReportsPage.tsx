@@ -33,8 +33,8 @@ import {
 } from '@/components/reports';
 
 const REPORTS = [
-  { id: 'stage-summary', name: 'Stages', endpoint: ApiConfig.stageSummery, icon: PieChart, hasFilter: true, requiresLevel: true, filters: ['date'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: StageSummaryReport },
-  { id: 'employee-stages', name: 'Employees', endpoint: ApiConfig.allEmpStages, icon: Users, hasFilter: false, requiresLevel: true, component: EmployeeStagesReport },
+  { id: 'stage-summary', name: 'Stages', endpoint: ApiConfig.stageSummery, icon: PieChart, hasFilter: true, requiresLevel: false, filters: ['assignedDate'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: StageSummaryReport },
+  { id: 'employee-stages', name: 'Employees', endpoint: ApiConfig.allEmpStages, icon: Users, hasFilter: true, requiresLevel: false, filters: ['assignedDate'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: EmployeeStagesReport },
   { id: 'pool-stages', name: 'Pools', endpoint: ApiConfig.poolWiseStages, icon: Building2, hasFilter: true, requiresLevel: true, filters: ['date'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: PoolStagesReport },
   { id: 'pool-revenue', name: 'Revenue', endpoint: ApiConfig.employeePoolRevenueReport, icon: IndianRupee, hasFilter: true, requiresLevel: true, filters: ['date'], dateFilterOptions: ['month', 'custom'], component: PoolRevenueReport },
   { id: 'revenue-target-report', name: 'Revenue Target', endpoint: ApiConfig.getRevenueTargetReport, icon: IndianRupee, hasFilter: true, requiresLevel: true, filters: ['months'], dateFilterOptions: ['month'], component: RevenueTargetReport },
@@ -102,6 +102,9 @@ export function ReportsPage() {
   const [dateRange, setDateRange] = useState('today');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [assignedDateRange, setAssignedDateRange] = useState('today');
+  const [assignedDateFrom, setAssignedDateFrom] = useState('');
+  const [assignedDateTo, setAssignedDateTo] = useState('');
   const [poolId, setPoolId] = useState('');
   const [levelFilter, setLevelFilter] = useState('1');
   const [selectedMonths, setSelectedMonths] = useState<string[]>([getCurrentMonthKey()]);
@@ -115,6 +118,14 @@ export function ReportsPage() {
   const currentReport = visibleReports.find(r => r.id === activeReport) || visibleReports[0] || REPORTS[0];
   const CurrentComponent = currentReport.component;
   const currentReportRequiresLevel = currentReport.requiresLevel !== false;
+  const currentComponentProps: any = {
+    data: reportData,
+  };
+
+  if (currentReport.id === 'employee-stages') {
+    currentComponentProps.searchTerm = searchTerm;
+    currentComponentProps.onSearchChange = setSearchTerm;
+  }
 
   // Get default date range for a report
   const getDefaultDateRange = useCallback((reportId: string) => {
@@ -179,7 +190,23 @@ export function ReportsPage() {
         params.level = levelValue;
       }
 
-      if (currentReport.id === 'revenue-target-report') {
+      if (currentReport.filters?.includes('assignedDate')) {
+        if (assignedDateRange === 'custom') {
+          if (assignedDateFrom || assignedDateTo) {
+            const maxDays = currentReport.id === 'daily-utilization' ? 5 : 30;
+            const rangeStart = assignedDateFrom || assignedDateTo;
+            const rangeEnd = assignedDateTo || assignedDateFrom;
+            if (!validateDateRange(rangeStart, rangeEnd, maxDays)) {
+              setLoading(false);
+              return;
+            }
+            params.assignedDateFrom = rangeStart;
+            params.assignedDateTo = rangeEnd;
+          }
+        } else {
+          params.assignedDateFilter = assignedDateRange;
+        }
+      } else if (currentReport.id === 'revenue-target-report') {
         const months = selectedMonths.length ? selectedMonths : [getCurrentMonthKey()];
         params.months = months.join(',');
         params.month = months[0];
@@ -219,7 +246,10 @@ export function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, fromDate, toDate, poolId, currentReport, validateDateRange, levelFilter, toast, currentReportRequiresLevel, selectedMonths]);
+  }, [dateRange, fromDate, toDate, poolId, currentReport, validateDateRange, levelFilter, toast, currentReportRequiresLevel, selectedMonths,assignedDateRange,
+  assignedDateFrom,
+  assignedDateTo,
+]);
 
   // Export to CSV
   const handleExport = useCallback(() => {
@@ -299,6 +329,9 @@ export function ReportsPage() {
     setDateRange(getDefaultDateRange(reportId));
     setFromDate('');
     setToDate('');
+    setAssignedDateRange(getDefaultDateRange(reportId));
+    setAssignedDateFrom('');
+    setAssignedDateTo('');
     setPoolId('');
     setLevelFilter(nextReport.requiresLevel === false ? '' : '1');
     setSelectedMonths([getCurrentMonthKey()]);
@@ -314,6 +347,14 @@ export function ReportsPage() {
     if (value !== 'custom') {
       setFromDate('');
       setToDate('');
+    }
+  }, []);
+
+  const handleAssignedDateRangeChange = useCallback((value: string) => {
+    setAssignedDateRange(value);
+    if (value !== 'custom') {
+      setAssignedDateFrom('');
+      setAssignedDateTo('');
     }
   }, []);
 
@@ -334,6 +375,24 @@ export function ReportsPage() {
       setFromDate(value);
     }
   }, [fromDate]);
+
+  // Handle assigned from date change
+  const handleAssignedDateFromChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setAssignedDateFrom(value);
+    if (assignedDateTo && value > assignedDateTo) {
+      setAssignedDateTo(value);
+    }
+  }, [assignedDateTo]);
+
+  // Handle assigned to date change
+  const handleAssignedDateToChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setAssignedDateTo(value);
+    if (assignedDateFrom && value < assignedDateFrom) {
+      setAssignedDateFrom(value);
+    }
+  }, [assignedDateFrom]);
 
   // Handle pool change
   const handlePoolChange = useCallback((value: string) => {
@@ -365,8 +424,14 @@ export function ReportsPage() {
     }
 
     const defaultRange = getDefaultDateRange(activeReport);
-    if (dateRange !== defaultRange) return true;
-    if (dateRange === 'custom' && (fromDate || toDate)) return true;
+    if (currentReport.filters?.includes('assignedDate')) {
+      if (assignedDateRange !== defaultRange) return true;
+      if (assignedDateRange === 'custom' && (assignedDateFrom || assignedDateTo)) return true;
+    } else {
+      if (dateRange !== defaultRange) return true;
+      if (dateRange === 'custom' && (fromDate || toDate)) return true;
+    }
+
     if (poolId && poolId !== " ") return true;
     if (currentReportRequiresLevel && levelFilter.trim() && levelFilter.trim() !== '1') return true;
     return false;
@@ -450,50 +515,104 @@ export function ReportsPage() {
                       </div>
                     ) : (
                       <>
-                        <div className="w-[130px]">
-                          <Select value={dateRange} onValueChange={handleDateRangeChange}>
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {currentReport.dateFilterOptions.map((option) => (
-                                <SelectItem key={option} value={option} className="text-xs">
-                                  {dateFilterLabels[option]}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {dateRange === 'custom' && (
+                        {currentReport.filters?.includes('assignedDate') ? (
                           <>
-                            <div className="relative w-[130px]">
-                              <input
-                                type="date"
-                                value={fromDate}
-                                onChange={handleFromDateChange}
-                                className="w-full h-8 px-2 text-xs border rounded-md bg-background cursor-pointer"
-                                style={{ fontFamily: 'inherit' }}
-                              />
+                            <div className="w-[130px]">
+                              <Select value={assignedDateRange} onValueChange={handleAssignedDateRangeChange}>
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Assigned Date" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {currentReport.dateFilterOptions.map((option) => (
+                                    <SelectItem key={option} value={option} className="text-xs">
+                                      {dateFilterLabels[option]}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
-                            <div className="relative w-[130px]">
-                              <input
-                                type="date"
-                                value={toDate}
-                                onChange={handleToDateChange}
-                                className="w-full h-8 px-2 text-xs border rounded-md bg-background cursor-pointer"
-                                style={{ fontFamily: 'inherit' }}
-                              />
-                            </div>
-                            {currentReport.id === 'pool-revenue' && (fromDate || toDate) && (
-                              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                                Max 30 days
-                              </span>
+
+                            {assignedDateRange === 'custom' && (
+                              <>
+                                <div className="relative w-[130px]">
+                                  <input
+                                    type="date"
+                                    value={assignedDateFrom}
+                                    onChange={handleAssignedDateFromChange}
+                                    className="w-full h-8 px-2 text-xs border rounded-md bg-background cursor-pointer"
+                                    style={{ fontFamily: 'inherit' }}
+                                  />
+                                </div>
+                                <div className="relative w-[130px]">
+                                  <input
+                                    type="date"
+                                    value={assignedDateTo}
+                                    onChange={handleAssignedDateToChange}
+                                    className="w-full h-8 px-2 text-xs border rounded-md bg-background cursor-pointer"
+                                    style={{ fontFamily: 'inherit' }}
+                                  />
+                                </div>
+                                {currentReport.id === 'pool-revenue' && (assignedDateFrom || assignedDateTo) && (
+                                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                    Max 30 days
+                                  </span>
+                                )}
+                                {currentReport.id === 'daily-utilization' && (assignedDateFrom || assignedDateTo) && (
+                                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                    Max 5 days
+                                  </span>
+                                )}
+                              </>
                             )}
-                            {currentReport.id === 'daily-utilization' && (fromDate || toDate) && (
-                              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                                Max 5 days
-                              </span>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-[130px]">
+                              <Select value={dateRange} onValueChange={handleDateRangeChange}>
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {currentReport.dateFilterOptions.map((option) => (
+                                    <SelectItem key={option} value={option} className="text-xs">
+                                      {dateFilterLabels[option]}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {dateRange === 'custom' && (
+                              <>
+                                <div className="relative w-[130px]">
+                                  <input
+                                    type="date"
+                                    value={fromDate}
+                                    onChange={handleFromDateChange}
+                                    className="w-full h-8 px-2 text-xs border rounded-md bg-background cursor-pointer"
+                                    style={{ fontFamily: 'inherit' }}
+                                  />
+                                </div>
+                                <div className="relative w-[130px]">
+                                  <input
+                                    type="date"
+                                    value={toDate}
+                                    onChange={handleToDateChange}
+                                    className="w-full h-8 px-2 text-xs border rounded-md bg-background cursor-pointer"
+                                    style={{ fontFamily: 'inherit' }}
+                                  />
+                                </div>
+                                {currentReport.id === 'pool-revenue' && (fromDate || toDate) && (
+                                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                    Max 30 days
+                                  </span>
+                                )}
+                                {currentReport.id === 'daily-utilization' && (fromDate || toDate) && (
+                                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                    Max 5 days
+                                  </span>
+                                )}
+                              </>
                             )}
                           </>
                         )}
@@ -576,15 +695,7 @@ export function ReportsPage() {
                   </Button>
                 </div>
               ) : (
-                <CurrentComponent 
-      data={reportData} 
-      searchTerm={searchTerm}
-      onSearchChange={setSearchTerm}
-      stageFilter={stageFilter}
-      onStageFilterChange={setStageFilter}
-      stateFilter={stateFilter}
-      onStateFilterChange={setStateFilter}
-    />
+                <CurrentComponent {...currentComponentProps} />
               )}
             </CardContent>
           </Card>

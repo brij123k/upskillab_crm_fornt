@@ -93,7 +93,7 @@ export function UsersTab({
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     role: 'all',
-    status: 'all',
+    status: 'active',
     pool: 'all', // Add pool filter
     search: ''
   });

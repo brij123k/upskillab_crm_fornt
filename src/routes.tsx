@@ -38,13 +38,14 @@ import { TaskManagementPage } from "./pages/admin/TaskManagementPage";
 import { HRAnnouncementPage } from "./pages/admin/HRAnnouncementPage";
 import { PerformanceWarningPage } from "./pages/admin/PerformanceWarningPage";
 import { SourceCampaignsPage } from "./pages/admin/SourceCampaignsPage";
+import { AttendanceAndPolicyPage } from "./pages/admin/AttendanceAndPolicyPage";
 import { AttendancePage } from "./pages/AttendancePage";
 import { TaskManagementPagebd } from "./pages/bd/TaskManagementPagebd";
 import { BDAnnouncementPage } from "./pages/bd/AnnouncementPage";
 import { MyAnnouncementsPage } from "@/pages/announcements/MyAnnouncementsPage";
 import { MyWarningsPage } from "@/pages/bd/MyWarningsPage";
 import { MyTasksPage } from "@/pages/bd/MyTasksPage";
-import { LeavesPage } from "@/pages/bd/LeavesPage";
+import { AttendanceLeavePage } from "@/pages/bd/AttendanceLeavePage";
 import { LeaveRequestsPage } from "@/pages/bd/LeaveRequestsPage";
 import { LeadEntryPage } from "@/pages/public/LeadEntryPage";
 import { TargetsPage } from "@/pages/targets/TargetsPage";
@@ -107,6 +108,7 @@ const AppRoutes = () => {
           <Route path="performance-warnings" element={<PerformanceWarningPage />} />
           <Route path="attendance/:userId" element={<AttendancePage />} />
           <Route path="targets" element={<TargetsPage />} />
+          <Route path="attendance-policy" element={<AttendanceAndPolicyPage />} />
         </Route>
 
         {/* HR Panel */}
@@ -145,8 +147,10 @@ const AppRoutes = () => {
           <Route path="my-announcements/:announcementId" element={<MyAnnouncementsPage />} />
           <Route path="my-warnings" element={<MyWarningsPage />} />
           <Route path="my-warnings/:warningId" element={<MyWarningsPage />} />
-          <Route path="leaves" element={<LeavesPage />} />
-          <Route path="leaves/:leaveId" element={<LeavesPage />} />
+          <Route path="leaves" element={<AttendanceLeavePage />} />
+          <Route path="leaves/:leaveId" element={<AttendanceLeavePage />} />
+          <Route path="attendance-leave" element={<AttendanceLeavePage />} />
+          <Route path="attendance-leave/:leaveId" element={<AttendanceLeavePage />} />
           <Route path="leave-requests" element={<LeaveRequestsPage />} />
           <Route path="leave-requests/:leaveId" element={<LeaveRequestsPage />} />
           <Route path="reports" element={<ReportsPage />} />

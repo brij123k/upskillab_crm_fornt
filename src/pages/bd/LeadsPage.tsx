@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DuplicateLeadsModal } from '@/components/modal/DuplicateLeadsModal';
-import { CopyCheck, Database, MousePointer, PhoneCall,AlarmClock } from 'lucide-react';
+import { CopyCheck, Database, MousePointer, PhoneCall, AlarmClock, CalendarDays } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -268,6 +268,9 @@ export function BDLeadsPage() {
   const [selectedLead, setSelectedLead] = useState<LeadType | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<'active' | 'lost' | 'converted'>('active');
   const [selectedUser, setSelectedUser] = useState<string>('');
+  const [ongoingExam, setOngoingExam] = useState<{ _id: string; title?: string; description?: string } | null>(null);
+  const [loadingExam, setLoadingExam] = useState(false);
+  const [registeringPcat, setRegisteringPcat] = useState(false);
 
   // Selection states
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
@@ -298,7 +301,6 @@ export function BDLeadsPage() {
 
   // Progress tracking
   const [progressItems, setProgressItems] = useState<ProgressItem[]>([]);
-
   // Loading states
   const [addingLead, setAddingLead] = useState(false);
   const [addingBulkLeads, setAddingBulkLeads] = useState(false);
@@ -308,11 +310,37 @@ export function BDLeadsPage() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingStages, setLoadingStages] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
-
   // Filter visibility
   const [showFilters, setShowFilters] = useState(false);
 
   const [assignUserId, setAssignUserId] = useState<string>('');
+
+  useEffect(() => {
+    if (!actionsModalOpen || !selectedLead) {
+      setOngoingExam(null);
+      return;
+    }
+
+    const fetchOngoingExam = async () => {
+      try {
+        setLoadingExam(true);
+        const response = await fetch(ApiConfig.getOngoingPcatExam);
+        if (!response.ok) {
+          throw new Error(`Failed to load ongoing exam (${response.status})`);
+        }
+
+        const data = await response.json();
+        setOngoingExam(data?._id ? data : null);
+      } catch (error) {
+        console.error('Failed to load ongoing PCAT exam:', error);
+        setOngoingExam(null);
+      } finally {
+        setLoadingExam(false);
+      }
+    };
+
+    fetchOngoingExam();
+  }, [actionsModalOpen, selectedLead?._id]);
 
   // Build query params
   const buildQueryParams = () => {
@@ -844,6 +872,46 @@ export function BDLeadsPage() {
     setSelectedLead(lead);
     setViewLeadOpen(true);
     fetchLeadHistory(lead.leadId.toString());
+  };
+
+  const handlePcatRegister = async () => {
+    if (!selectedLead) return;
+    if (!ongoingExam?._id) {
+      toast({
+        title: "No ongoing exam",
+        description: "There is no running PCAT exam right now.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedLead.name || !selectedLead.email || !selectedLead.phone) {
+      toast({
+        title: "Missing lead data",
+        description: "Lead name, email, and phone are required for PCAT registration.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setRegisteringPcat(true);
+      const response = await postDataHandlerWithToken(ApiConfig.registerPcatBackend(selectedLead.leadId),{},true)
+      setActionsModalOpen(false);
+      setChangeStageModalOpen(true);
+      toast({
+        title: "PCAT registration submitted",
+        description: `${selectedLead.name} ${response.message}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to register lead for PCAT",
+        variant: "destructive",
+      });
+    } finally {
+      setRegisteringPcat(false);
+    }
   };
 
   // Edit lead
@@ -2981,159 +3049,197 @@ export function BDLeadsPage() {
 
 
       {/* Lead Actions Modal */}
-      <Dialog open={actionsModalOpen} onOpenChange={setActionsModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          {selectedLead && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Lead Actions</DialogTitle>
-                <DialogDescription>
-                  Select an action for {selectedLead.name}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {hasPermission(permissions, 'leads', 'read') && (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setActionsModalOpen(false);
-                        handleViewLead(selectedLead);
-                      }}
-                      className="h-auto py-4 justify-start"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Eye className="w-5 h-5" />
-                        <div className="text-left">
-                          <div className="font-medium">View Details</div>
-                          <div className="text-xs text-muted-foreground">View complete lead information</div>
-                        </div>
-                      </div>
-                    </Button>
-                  )}
-
-                  {hasPermission(permissions, 'leads', 'update') && (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setActionsModalOpen(false);
-                        handleEditLead(selectedLead);
-                      }}
-                      className="h-auto py-4 justify-start"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Edit className="w-5 h-5" />
-                        <div className="text-left">
-                          <div className="font-medium">Edit Lead</div>
-                          <div className="text-xs text-muted-foreground">Update lead information</div>
-                        </div>
-                      </div>
-                    </Button>
-                  )}
-
-                  {hasPermission(permissions, 'leads', 'status_change') && (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setActionsModalOpen(false);
-                        setSelectedStatus(selectedLead.status);
-                        setStatusModalOpen(true);
-                      }}
-                      className="h-auto py-4 justify-start"
-                    >
-                      <div className="flex items-center gap-3">
-                        {selectedLead.status === 'active' ? (
-                          <CheckCircle className="w-5 h-5 text-green-600" />
-                        ) : selectedLead.status === 'lost' ? (
-                          <XCircle className="w-5 h-5 text-red-600" />
-                        ) : (
-                          <TrendingUp className="w-5 h-5 text-blue-600" />
-                        )}
-                        <div className="text-left">
-                          <div className="font-medium">Change Status</div>
-                          <div className="text-xs text-muted-foreground">Update lead status</div>
-                        </div>
-                      </div>
-                    </Button>
-                  )}
-
-                  {hasPermission(permissions, 'leads', 'stage_change') && (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setActionsModalOpen(false);
-                        setChangeStageModalOpen(true);
-                      }}
-                      className="h-auto py-4 justify-start"
-                    >
-                      <div className="flex items-center gap-3">
-                        <TrendingUp className="w-5 h-5 text-purple-600" />
-                        <div className="text-left">
-                          <div className="font-medium">Change Stage</div>
-                          <div className="text-xs text-muted-foreground">Move to different stage</div>
-                        </div>
-                      </div>
-                    </Button>
-                  )}
-                  {hasPermission(permissions, 'leads', 'read') && (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setActionsModalOpen(false);
-                        handleViewLeadHistory(selectedLead);
-                      }}
-                      className="h-auto py-4 justify-start"
-                    >
-                      <div className="flex items-center gap-3">
-                        <FileText className="w-5 h-5" />
-                        <div className="text-left">
-                          <div className="font-medium">View History</div>
-                          <div className="text-xs text-muted-foreground">View complete lead history</div>
-                        </div>
-                      </div>
-                    </Button>
-                  )}
+    <Dialog open={actionsModalOpen} onOpenChange={setActionsModalOpen}>
+  <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0">
+    {selectedLead && (
+      <>
+        <DialogHeader className="px-6 pt-6 pb-3 border-b">
+          <DialogTitle>Lead Actions</DialogTitle>
+          <DialogDescription className="text-sm">
+            Select an action for {selectedLead.name}
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {/* PCAT Registration Section */}
+          <div className="rounded-xl border bg-gradient-to-br from-indigo-50 via-background to-background p-4 shadow-sm">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4 text-indigo-600 shrink-0" />
+                    <h4 className="font-semibold text-sm">PCAT Registration</h4>
+                  </div>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    Register this lead for the currently running PCAT exam.
+                  </p>
+                  <p className="text-[11px] sm:text-xs text-muted-foreground break-words">
+                    {loadingExam
+                      ? 'Checking for an ongoing exam...'
+                      : ongoingExam
+                        ? `${ongoingExam.title || 'Ongoing exam'}`
+                        : 'No ongoing exam found right now.'}
+                  </p>
                 </div>
+                <Button
+                  onClick={handlePcatRegister}
+                  disabled={loadingExam || registeringPcat || !ongoingExam?._id}
+                  size="sm"
+                  className="gap-2 shrink-0 w-full sm:w-auto"
+                >
+                  {registeringPcat && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  PCAT Register
+                </Button>
+              </div>
+            </div>
+          </div>
 
-                <div className="pt-4 border-t">
-                  <h4 className="font-medium mb-2">Quick Info</h4>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Current Stage:</span>
-                      <Badge variant="outline" className="ml-2">
-                        {selectedLead.stageId.name}
-                      </Badge>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Status:</span>
-                      <span className="ml-2">
-                        {getStatusBadge(selectedLead.status)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Source:</span>
-                      <span className="ml-2">
-                        {getSourceBadge(selectedLead.source)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Assigned:</span>
-                      <span className="ml-2">
-                        {selectedLead.assignedTo?.name || 'Not assigned'}
-                      </span>
-                    </div>
+          {/* Action Buttons Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {hasPermission(permissions, 'leads', 'read') && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setActionsModalOpen(false);
+                  handleViewLead(selectedLead);
+                }}
+                className="h-auto py-3 px-4 justify-start hover:bg-muted/50 transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <Eye className="w-4 h-4 shrink-0" />
+                  <div className="text-left min-w-0">
+                    <div className="font-medium text-sm">View Details</div>
+                    <div className="text-xs text-muted-foreground truncate">View complete lead information</div>
                   </div>
                 </div>
+              </Button>
+            )}
+
+            {hasPermission(permissions, 'leads', 'update') && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setActionsModalOpen(false);
+                  handleEditLead(selectedLead);
+                }}
+                className="h-auto py-3 px-4 justify-start hover:bg-muted/50 transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <Edit className="w-4 h-4 shrink-0" />
+                  <div className="text-left min-w-0">
+                    <div className="font-medium text-sm">Edit Lead</div>
+                    <div className="text-xs text-muted-foreground truncate">Update lead information</div>
+                  </div>
+                </div>
+              </Button>
+            )}
+
+            {hasPermission(permissions, 'leads', 'status_change') && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setActionsModalOpen(false);
+                  setSelectedStatus(selectedLead.status);
+                  setStatusModalOpen(true);
+                }}
+                className="h-auto py-3 px-4 justify-start hover:bg-muted/50 transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  {selectedLead.status === 'active' ? (
+                    <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                  ) : selectedLead.status === 'lost' ? (
+                    <XCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  ) : (
+                    <TrendingUp className="w-4 h-4 text-blue-600 shrink-0" />
+                  )}
+                  <div className="text-left min-w-0">
+                    <div className="font-medium text-sm">Change Status</div>
+                    <div className="text-xs text-muted-foreground truncate">Update lead status</div>
+                  </div>
+                </div>
+              </Button>
+            )}
+
+            {hasPermission(permissions, 'leads', 'stage_change') && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setActionsModalOpen(false);
+                  setChangeStageModalOpen(true);
+                }}
+                className="h-auto py-3 px-4 justify-start hover:bg-muted/50 transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <TrendingUp className="w-4 h-4 text-purple-600 shrink-0" />
+                  <div className="text-left min-w-0">
+                    <div className="font-medium text-sm">Change Stage</div>
+                    <div className="text-xs text-muted-foreground truncate">Move to different stage</div>
+                  </div>
+                </div>
+              </Button>
+            )}
+            
+            {hasPermission(permissions, 'leads', 'read') && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setActionsModalOpen(false);
+                  handleViewLeadHistory(selectedLead);
+                }}
+                className="h-auto py-3 px-4 justify-start hover:bg-muted/50 transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <FileText className="w-4 h-4 shrink-0" />
+                  <div className="text-left min-w-0">
+                    <div className="font-medium text-sm">View History</div>
+                    <div className="text-xs text-muted-foreground truncate">View complete lead history</div>
+                  </div>
+                </div>
+              </Button>
+            )}
+          </div>
+
+          {/* Quick Info Section */}
+          <div className="pt-3 border-t">
+            <h4 className="font-medium text-sm mb-3">Quick Info</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-muted-foreground text-xs">Current Stage:</span>
+                <Badge variant="outline" className="text-xs">
+                  {selectedLead.stageId?.name || 'N/A'}
+                </Badge>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setActionsModalOpen(false)}>
-                  Close
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-muted-foreground text-xs">Status:</span>
+                <div className="inline-block">
+                  {getStatusBadge(selectedLead.status)}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-muted-foreground text-xs">Source:</span>
+                <div className="inline-block">
+                  {getSourceBadge(selectedLead.source)}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-muted-foreground text-xs">Assigned:</span>
+                <span className="text-xs font-medium">
+                  {selectedLead.assignedTo?.name || 'Not assigned'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="px-6 py-3 border-t bg-muted/10 mt-auto">
+          <Button variant="outline" onClick={() => setActionsModalOpen(false)} size="sm">
+            Close
+          </Button>
+        </DialogFooter>
+      </>
+    )}
+  </DialogContent>
+</Dialog>
 
       {/* Change Stage Modal */}
       <ChangeStageModal

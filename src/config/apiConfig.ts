@@ -12,6 +12,7 @@ const ApiConfig = {
   getAllProfile:`${url}/users/profile`,
   getMySeniors:`${url}/users/seniors/me`,
   getUserSeniors:(userId:string)=>`${url}/users/seniors/${userId}`,
+  getLastActivities:`${url}/users/last-activities`,
   getUserByDepartmentId:(departmentId:string)=>`${url}/profiles/department/${departmentId}`,
   getUserBydepId:(depId:string)=>`${url}/users/${depId}`,
   getAllRoles:`${url}/roles`,
@@ -44,6 +45,8 @@ const ApiConfig = {
   leadmerge:`${url}/leads/leaddoublicate/merge`,
 
   CallLog:`${url}/call-logs/users`,
+  LeadInteractionLog:`${url}/interaction-logs/users`,
+  createInteractionLog:`${url}/interaction-logs`,
   getLeadSchedules:`${url}/lead-schedules`,
 
   MeetingLog:`${url}/meeting-logs`,
@@ -164,6 +167,10 @@ const ApiConfig = {
   // leave
   createLeave:`${url}/leaves`,
   getLeaves:`${url}/leaves`,
+  getLeavePolicies:`${url}/leaves/policies`,
+  getLeavePolicyByRole:(roleId:string)=>`${url}/leaves/policies/role/${roleId}`,
+  getLeavePolicyById:(policyId:string)=>`${url}/leaves/policies/${policyId}`,
+  getMyLeaveSummary:`${url}/leaves/me/summary`,
   getMyLeaves:`${url}/leaves/me`,
   getMyLeaveById:(leaveId:string)=>`${url}/leaves/me/${leaveId}`,
   updateMyLeave:(leaveId:string)=>`${url}/leaves/me/${leaveId}`,
@@ -171,6 +178,11 @@ const ApiConfig = {
   getLeaveRequests:`${url}/leaves/requests`,
   getLeaveRequestById:(leaveId:string)=>`${url}/leaves/requests/${leaveId}`,
   decideLeave:(leaveId:string)=>`${url}/leaves/${leaveId}/decision`,
+
+  // PCAT
+  getOngoingPcatExam:'https://api.upskillab.com/pcat/exams/ongoing/exam',
+  registerPcatUser:'https://api.upskillab.com/pcat-users/register',
+  registerPcatBackend:(leadId:number|string)=>`${url}/leads/${leadId}/pcat-register`,
 
   // attendance
   markAttendance:`${url}/attendance/mark`,

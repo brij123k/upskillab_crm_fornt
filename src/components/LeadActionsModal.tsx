@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -20,11 +20,15 @@ import {
   Loader2,
   Phone,
   Mail,
-  FileText
+  FileText,
+  CalendarDays
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LeadType } from '@/types/lead';
 import { Badge } from '@/components/ui/badge';
+import ApiConfig from '@/config/apiConfig';
+import { toast } from 'sonner';
+import { postDataHandlerWithToken } from '@/config/services';
 
 interface LeadActionsModalProps {
   open: boolean;
@@ -48,12 +52,66 @@ export function LeadActionsModal({
   loading,
   actions
 }: LeadActionsModalProps) {
+  const [ongoingExam, setOngoingExam] = useState<{ _id: string; title?: string; description?: string } | null>(null);
+  const [loadingExam, setLoadingExam] = useState(false);
+  const [registeringPcat, setRegisteringPcat] = useState(false);
+
+  useEffect(() => {
+    if (!open || !selectedLead) {
+      setOngoingExam(null);
+      return;
+    }
+
+    const fetchOngoingExam = async () => {
+      try {
+        setLoadingExam(true);
+        const response = await fetch(ApiConfig.getOngoingPcatExam);
+        if (!response.ok) {
+          throw new Error(`Failed to load ongoing exam (${response.status})`);
+        }
+
+        const data = await response.json();
+        setOngoingExam(data?._id ? data : null);
+      } catch (error) {
+        console.error('Failed to load ongoing PCAT exam:', error);
+        setOngoingExam(null);
+      } finally {
+        setLoadingExam(false);
+      }
+    };
+
+    fetchOngoingExam();
+  }, [open, selectedLead?._id]);
+
   if (!selectedLead) return null;
 
   const handleAction = (action: keyof typeof actions) => {
     if (actions[action]) {
       actions[action](selectedLead);
       onOpenChange(false);
+    }
+  };
+
+  const handlePcatRegister = async () => {
+    if (!ongoingExam?._id) {
+      toast.error('There is no running PCAT exam right now.');
+      return;
+    }
+
+    if (!selectedLead.name || !selectedLead.email || !selectedLead.phone) {
+      toast.error('Lead name, email, and phone are required for PCAT registration.');
+      return;
+    }
+
+    try {
+      setRegisteringPcat(true);
+      const response = await postDataHandlerWithToken(ApiConfig.registerPcatBackend(selectedLead.leadId),{},true)
+      toast.success(`${selectedLead.name} ${response.message}`);
+      handleAction('onChangeStage')
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to register lead for PCAT');
+    } finally {
+      setRegisteringPcat(false);
     }
   };
 
@@ -70,6 +128,7 @@ export function LeadActionsModal({
         
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
+          
           <div className="space-y-4 sm:space-y-5">
             {/* Lead Info Summary */}
             <div className="p-4 bg-muted/50 rounded-lg border">
@@ -125,6 +184,33 @@ export function LeadActionsModal({
                     {selectedLead.assignedTo?.name || 'Not assigned'}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-gradient-to-br from-indigo-50 via-background to-background p-4 shadow-sm">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4 text-indigo-600" />
+                    <h4 className="font-semibold text-sm sm:text-base">PCAT Registration</h4>
+                  </div>
+                  
+                  <p className="text-[11px] sm:text-xs text-muted-foreground">
+                    {loadingExam
+                      ? 'Checking for an ongoing exam...'
+                      : ongoingExam
+                        ? `${ongoingExam.title || 'Ongoing exam'}`
+                        : 'No ongoing exam found right now.'}
+                  </p>
+                </div>
+                <Button
+                  onClick={handlePcatRegister}
+                  disabled={loading || loadingExam || registeringPcat || !ongoingExam?._id}
+                  className="gap-2 shrink-0"
+                >
+                  {registeringPcat ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  PCAT register here
+                </Button>
               </div>
             </div>
 

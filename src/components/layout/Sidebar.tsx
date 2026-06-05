@@ -109,11 +109,17 @@ const adminNavItems = [
     path: '/admin/reports', 
     module: 'reports' 
   },
-  { 
-    icon: Target, 
-    label: 'Targets', 
-    path: '/admin/targets', 
-    module: 'targets' 
+  {
+    icon: Target,
+    label: 'Targets',
+    path: '/admin/targets',
+    module: 'targets'
+  },
+  {
+    icon: CalendarDays,
+    label: 'Attendance & Policy',
+    path: '/admin/attendance-policy',
+    module: 'attendance'
   },
 ];
 
@@ -241,10 +247,10 @@ const bdNavItems = [
     path: '/bd/subscriptions', 
     module: 'subscriptions' 
   },
-    { 
+  { 
     icon: CalendarDays, 
-    label: 'Apply Leave', 
-    path: '/bd/leaves', 
+    label: 'Attendance & Leave', 
+    path: '/bd/attendance-leave', 
     module: 'my_leaves' 
   },
   { 

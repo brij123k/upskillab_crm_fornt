@@ -28,6 +28,7 @@ import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { hasModulePermission } from '@/utils/modulePermissions';
+import { formatDistanceToNow } from 'date-fns';
 
 const stats = [
   { title: 'My Leads', value: '47', change: '+8 new today', changeType: 'positive' as const, icon: Target, iconClassName: 'bd-gradient' },
@@ -53,13 +54,41 @@ const funnelData = [
   { name: 'Closed', value: 65, fill: 'hsl(152, 69%, 31%)' },
 ];
 
-const recentActivities = [
-  { id: '1', action: 'Call completed with ABC Corp - Interested', user: 'You', time: '15 min ago', type: 'success' as const },
-  { id: '2', action: 'New lead assigned: XYZ Industries', user: 'Manager', time: '1 hour ago', type: 'info' as const },
-  { id: '3', action: 'Meeting scheduled with Tech Solutions', user: 'You', time: '2 hours ago', type: 'info' as const },
-  { id: '4', action: 'Proposal sent to Global Services', user: 'You', time: '3 hours ago', type: 'success' as const },
-  { id: '5', action: 'Follow-up reminder: Delta Inc', user: 'System', time: '5 hours ago', type: 'warning' as const },
-];
+type DashboardActivity = {
+  _id: string;
+  action: string;
+  user: string;
+  time: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+};
+
+const getActivityType = (action: string): DashboardActivity['type'] => {
+  const value = action.toLowerCase();
+  if (value.includes('fail') || value.includes('error')) return 'error';
+  if (value.includes('logout')) return 'warning';
+  if (value.includes('login') || value.includes('created') || value.includes('success')) return 'success';
+  return 'info';
+};
+
+const formatActivityLabel = (activity: any) => {
+  if (activity?.meta?.message) return activity.meta.message;
+  return activity?.action
+    ? activity.action
+        .replace(/_/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    : 'Activity';
+};
+
+const mapActivity = (activity: any): DashboardActivity => ({
+  _id: activity?._id ?? crypto.randomUUID(),
+  action: formatActivityLabel(activity),
+  user: activity?.userName || activity?.userId?.name || 'System',
+  time: activity?.createdAt
+    ? formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })
+    : 'just now',
+  type: getActivityType(activity?.action || ''),
+});
 
 const quickActions = [
   { label: 'Add Lead', icon: Plus },
@@ -81,6 +110,7 @@ export function BDDashboard() {
   const [paymentChartData, setPaymentChartData] = useState<any[]>([]);
   const [announcementCount, setAnnouncementCount] = useState(0);
   const [fetchingData, setFetchingData] = useState(false);
+  const [recentActivities, setRecentActivities] = useState<DashboardActivity[]>([]);
 
   const dynamicQuickActions = [
     ...quickActions,
@@ -211,6 +241,9 @@ export function BDDashboard() {
       if (hasModulePermission(permissions, "announcements")) {
         await fetchAnnouncementCount();
       }
+
+      const activities = await getDataHandlerWithToken(ApiConfig.getLastActivities, { limit: 5 }, null, true);
+      setRecentActivities(Array.isArray(activities) ? activities.map(mapActivity) : []);
     } catch (error) {
       toast({
         title: "Error",
@@ -673,11 +706,11 @@ export function BDDashboard() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
+              <RecentActivity activities={recentActivities} title="My / Team Activity" />
+            </div>
+            <div>
               <QuickActions actions={dynamicQuickActions} />
             </div>
-            {/* <div>
-              <RecentActivity activities={recentActivities} title="My Activity" />
-            </div> */}
           </div>
         </>
       )}
