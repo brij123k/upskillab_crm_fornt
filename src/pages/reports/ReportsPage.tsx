@@ -29,7 +29,8 @@ import {
   SourceCampaignRevenueReport,
   SourceCampaignComparisonReport,
   SalarySheetReport,
-  RevenueTargetReport
+  RevenueTargetReport,
+  UserActivitySummaryReport
 } from '@/components/reports';
 
 const REPORTS = [
@@ -45,6 +46,7 @@ const REPORTS = [
   { id: 'source-campaign-revenue', name: 'Revenue by Source', endpoint: ApiConfig.sourcecampaignwiseleadrevenue, icon: IndianRupee, hasFilter: true, requiresLevel: true, filters: ['date', 'stage', 'state'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: SourceCampaignRevenueReport },
   { id: 'salary-sheet', name: 'Salary Sheet', endpoint: ApiConfig.employeeSalarySheetReport, icon: IndianRupee, hasFilter: true, requiresLevel: false, filters: ['date'], dateFilterOptions: ['month', 'custom'], component: SalarySheetReport, permission: { module: 'reports', action: 'salary_sheet' } },
   { id: 'source-campaign-comparison', name: 'Campaign Comparison', endpoint: ApiConfig.getSourceCampaignComparisonReport, icon: BarChart, hasFilter: false, requiresLevel: false, component: SourceCampaignComparisonReport },
+  { id: 'user-activity-summary', name: 'User Activity', endpoint: ApiConfig.userActivitySummary, icon: Users, hasFilter: true, requiresLevel: false, filters: ['date', 'user'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: UserActivitySummaryReport },
 ];
 
 const dateFilterLabels: Record<string, string> = {
@@ -111,6 +113,8 @@ export function ReportsPage() {
   const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [pools, setPools] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
    const [stageFilter, setStageFilter] = useState('all');  // Add this
   const [stateFilter, setStateFilter] = useState('all'); 
@@ -149,6 +153,15 @@ export function ReportsPage() {
       setPools(res?.data || res || []);
     } catch (error) {
       console.error('Failed to load pools');
+    }
+  }, []);
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const res = await getDataHandlerWithToken('getAllUser', null, null);
+      setUsers(res?.data || res || []);
+    } catch (error) {
+      console.error('Failed to load users');
     }
   }, []);
 
@@ -237,6 +250,10 @@ export function ReportsPage() {
         if (stateFilter && stateFilter !== 'all' && currentReport.filters?.includes('state')) {
           params.state = stateFilter;
         }
+
+        if (currentReport.filters?.includes('user') && selectedUserId && selectedUserId !== 'all') {
+          params.userId = selectedUserId;
+        }
       }
       const response = await getDataHandlerWithToken(currentReport.endpoint, params, null, true);
       setReportData(response?.data || response);
@@ -299,18 +316,37 @@ export function ReportsPage() {
           combinedPercentage: user.combinedPercentage || 0,
         };
       });
-    }
-    else csvData = [reportData];
-    
+    } else if (currentReport.id === 'user-activity-summary' && reportData.users) {
+      csvData = reportData.users.map((row: any) => ({
+        userId: row.userId,
+        name: row.name,
+        employeeId: row.employeeId,
+        email: row.email,
+        mobile: row.mobile,
+        totalLeadAssigned: row.totalLeadAssigned,
+        totalNewLeadsAssigned: row.totalNewLeadsAssigned,
+        totalDialedCalls: row.totalDialedCalls,
+        totalAnsweredCalls: row.totalAnsweredCalls,
+        totalTalkTime: row.totalTalkTime,
+        acceptedOrderCount: row.acceptedOrderCount,
+        acceptedRevenue: row.acceptedRevenue,
+        pcatRegistered: row.pcatRegistered,
+        pcatDone: row.pcatDone,
+        sourceCounts: row.sourceCounts?.map((item: any) => `${item.source}:${item.count}`).join('; ') || '',
+        sourceCampaignCounts: row.sourceCampaignCounts?.map((item: any) => `${item.campaign}:${item.count}`).join('; ') || '',
+        stageChanges: row.stageChanges?.map((item: any) => `${item.stage}:${item.count}`).join('; ') || '',
+      }));
+    } else csvData = [reportData];
+
     if (!csvData.length) return toast({ title: 'No data to export' });
-    
+
     const headers = Object.keys(csvData[0]);
     const csvRows = [headers.join(',')];
     csvData.forEach(row => {
       const values = headers.map(h => String(row[h] || '').replace(/,/g, ' '));
       csvRows.push(values.join(','));
     });
-    
+
     const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -335,6 +371,7 @@ export function ReportsPage() {
     setPoolId('');
     setLevelFilter(nextReport.requiresLevel === false ? '' : '1');
     setSelectedMonths([getCurrentMonthKey()]);
+    setSelectedUserId('all');
     setStageFilter('all');
     setStateFilter('all');
     setSearchTerm('');
@@ -402,7 +439,8 @@ export function ReportsPage() {
   // Initial fetch
   useEffect(() => {
     fetchPools();
-  }, [fetchPools]);
+    fetchUsers();
+  }, [fetchPools, fetchUsers]);
 
   // Fetch report when dependencies change
   useEffect(() => {
@@ -433,6 +471,7 @@ export function ReportsPage() {
     }
 
     if (poolId && poolId !== " ") return true;
+    if (currentReport.filters?.includes('user') && selectedUserId !== 'all') return true;
     if (currentReportRequiresLevel && levelFilter.trim() && levelFilter.trim() !== '1') return true;
     return false;
   };
@@ -628,6 +667,24 @@ export function ReportsPage() {
                                 {pools.map((p: any) => (
                                   <SelectItem key={p._id} value={p._id} className="text-xs">
                                     {p.name || p.title}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        {currentReport.filters?.includes('user') && (
+                          <div className="w-[220px]">
+                            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="All Users" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all" className="text-xs">All Users</SelectItem>
+                                {users.map((user: any) => (
+                                  <SelectItem key={user._id || user.userId || user.id} value={user._id || user.userId || user.id} className="text-xs">
+                                    {user.name || user.fullName || user.email}
                                   </SelectItem>
                                 ))}
                               </SelectContent>

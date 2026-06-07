@@ -1,5 +1,5 @@
-// const url = "http://localhost:3000"
-const url = "https://crm.upskillab.in"
+const url = "http://localhost:3000"
+// const url = "https://crm.upskillab.in"
 const ApiConfig = {
   url,
   login:`${url}/users/login`,
@@ -92,6 +92,7 @@ const ApiConfig = {
   employeeSalarySheetReport:`${url}/attendance/report/salary-sheet`,
   getTargetReport:`${url}/targets/report`,
   getRevenueTargetReport:`${url}/targets/revenue-report`,
+  userActivitySummary:`${url}/reports/user-activity-summary`,
   getTargetMy:`${url}/targets/me`,
   getTargetCompareMy:`${url}/targets/compare/me`,
   getTargetByUser:(userId:string)=>`${url}/targets/user/${userId}`,
