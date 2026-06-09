@@ -46,7 +46,6 @@ const REPORTS = [
   { id: 'source-campaign-revenue', name: 'Revenue by Source', endpoint: ApiConfig.sourcecampaignwiseleadrevenue, icon: IndianRupee, hasFilter: true, requiresLevel: true, filters: ['date', 'stage', 'state'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: SourceCampaignRevenueReport },
   { id: 'salary-sheet', name: 'Salary Sheet', endpoint: ApiConfig.employeeSalarySheetReport, icon: IndianRupee, hasFilter: true, requiresLevel: false, filters: ['date'], dateFilterOptions: ['month', 'custom'], component: SalarySheetReport, permission: { module: 'reports', action: 'salary_sheet' } },
   { id: 'source-campaign-comparison', name: 'Campaign Comparison', endpoint: ApiConfig.getSourceCampaignComparisonReport, icon: BarChart, hasFilter: false, requiresLevel: false, component: SourceCampaignComparisonReport },
-  { id: 'user-activity-summary', name: 'User Activity', endpoint: ApiConfig.userActivitySummary, icon: Users, hasFilter: true, requiresLevel: false, filters: ['date', 'user'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: UserActivitySummaryReport },
 ];
 
 const dateFilterLabels: Record<string, string> = {
