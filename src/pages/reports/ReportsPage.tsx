@@ -39,7 +39,9 @@ const REPORTS = [
   { id: 'pool-stages', name: 'Pools', endpoint: ApiConfig.poolWiseStages, icon: Building2, hasFilter: true, requiresLevel: true, filters: ['date'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: PoolStagesReport },
   { id: 'pool-revenue', name: 'Revenue', endpoint: ApiConfig.employeePoolRevenueReport, icon: IndianRupee, hasFilter: true, requiresLevel: true, filters: ['date'], dateFilterOptions: ['month', 'custom'], component: PoolRevenueReport },
   { id: 'revenue-target-report', name: 'Revenue Target', endpoint: ApiConfig.getRevenueTargetReport, icon: IndianRupee, hasFilter: true, requiresLevel: true, filters: ['months'], dateFilterOptions: ['month'], component: RevenueTargetReport },
+
   { id: 'utilization', name: 'Utilization', endpoint: ApiConfig.employeePoolUtilizationReport, icon: PhoneCall, hasFilter: true, requiresLevel: true, filters: ['date'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: UtilizationReport },
+  
   { id: 'consultant-performance', name: 'Consultants', endpoint: ApiConfig.consultantPerforment, icon: Award, hasFilter: true, requiresLevel: true, filters: ['date'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: ConsultantPerformanceReport },
   { id: 'daily-utilization', name: 'Daily Calls', endpoint: ApiConfig.employeePoolDailyUtilizationReport, icon: Calendar, hasFilter: true, requiresLevel: true, filters: ['date', 'poolId'], dateFilterOptions: ['today', 'custom'], component: DailyUtilizationReport },
   { id: 'source-campaign', name: 'Source Campaign', endpoint: ApiConfig.sourcecampaignstagesummary, icon: BarChart, hasFilter: true, requiresLevel: true, filters: ['date'], dateFilterOptions: ['today', 'week', 'month', 'year', 'custom'], component: SourceCampaignReport },

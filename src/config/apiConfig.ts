@@ -87,6 +87,7 @@ const ApiConfig = {
   poolWiseStages:`${url}/leads/report/pool-wise-data`,
   employeePoolRevenueReport:`${url}/order/report/employee-pool-revenue`,
   employeePoolUtilizationReport:`${url}/order/report/employee-pool-utilization`,
+  employeeStageleads:`${url}/order/report/employee-stage-leads`,
   consultantPerforment:`${url}/order/report/consultant-performance`,
   employeePoolDailyUtilizationReport:`${url}/call-logs/report/employee-pool-daily-utilization`,
   employeeSalarySheetReport:`${url}/attendance/report/salary-sheet`,

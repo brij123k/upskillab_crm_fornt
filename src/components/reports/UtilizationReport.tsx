@@ -1,6 +1,6 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { Search, ChevronLeft, ChevronRight, Phone } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Phone, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import {
   Dialog,
@@ -9,6 +9,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { getDataHandlerWithToken } from '@/config/services';
+import ApiConfig from '@/config/apiConfig';
+import { useToast } from '@/hooks/use-toast';
 
 interface UtilizationReportProps {
   data: any;
@@ -20,7 +23,24 @@ interface StageModalProps {
   isOpen: boolean;
   onClose: () => void;
   employeeName: string;
-  stages: Record<string, number>;
+  stages: any;
+  employeeId: string;
+  startDate: string;
+  endDate: string;
+  onStageClick: (stageId: string, stageName: string) => void;
+}
+
+interface LeadDetailsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  leads: any[];
+  loading: boolean;
+  page: number;
+  totalPages: number;
+  totalLeads: number;
+  onPageChange: (newPage: number) => void;
+  stageName: string;
+  employeeName: string;
 }
 
 const formatTime = (seconds: number) => {
@@ -34,26 +54,142 @@ const formatTime = (seconds: number) => {
   return `${mins}m`;
 };
 
-// Stage Modal Component
-function StageModal({ isOpen, onClose, employeeName, stages }: StageModalProps) {
-  if (!stages || Object.keys(stages).length === 0) {
-    return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Stages - {employeeName}</DialogTitle>
-          </DialogHeader>
-          <div className="py-8 text-center text-muted-foreground">
-            <p>No stage data available for this employee</p>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
+const formatDate = (dateString: string) => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+// Lead Details Modal Component - Full Screen
+function LeadDetailsModal({ 
+  isOpen, 
+  onClose, 
+  leads, 
+  loading, 
+  page, 
+  totalPages, 
+  totalLeads,
+  onPageChange,
+  stageName,
+  employeeName
+}: LeadDetailsModalProps) {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] max-h-[90vh] p-4 flex flex-col">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle className="text-xl">
+            {stageName} Leads - {employeeName}
+          </DialogTitle>
+          {!loading && totalLeads > 0 && (
+            <div className="text-sm text-muted-foreground mt-1">
+              Total leads: {totalLeads}
+            </div>
+          )}
+        </DialogHeader>
+        
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          {loading ? (
+            <div className="flex justify-center items-center h-full">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : !leads || leads.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground h-full flex items-center justify-center">
+              No leads found for this stage
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto flex-1 min-h-0 border rounded-lg">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-background">
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="text-sm font-semibold">Lead Name</TableHead>
+                      <TableHead className="text-sm font-semibold">Phone</TableHead>
+                      <TableHead className="text-sm font-semibold">Email</TableHead>
+                      <TableHead className="text-sm font-semibold">Source</TableHead>
+                      <TableHead className="text-sm font-semibold">Stage</TableHead>
+                      <TableHead className="text-sm font-semibold">Assigned Date</TableHead>
+                      <TableHead className="text-sm font-semibold">Assigned To</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {leads.map((lead: any, idx: number) => (
+                      <TableRow key={lead.leadId || lead._id || idx} className="hover:bg-muted/30">
+                        <TableCell className="text-sm font-medium">{lead.name || '-'}</TableCell>
+                        <TableCell className="text-sm">{lead.phone || '-'}</TableCell>
+                        <TableCell className="text-sm">{lead.email || '-'}</TableCell>
+                        <TableCell className="text-sm capitalize">{lead.source || '-'}</TableCell>
+                        <TableCell className="text-sm capitalize">{lead.stageName || lead.stage || '-'}</TableCell>
+                        <TableCell className="text-sm">{formatDate(lead.assignedDate)}</TableCell>
+                        <TableCell className="text-sm">{lead.employeeName || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 mt-2 border-t flex-shrink-0">
+                  <div className="text-sm text-muted-foreground">
+                    Page {page + 1} of {totalPages}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => onPageChange(page - 1)}
+                      disabled={page === 0}
+                      className="px-3 py-1 text-sm border rounded hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => onPageChange(page + 1)}
+                      disabled={page === totalPages - 1}
+                      className="px-3 py-1 text-sm border rounded hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Stage Modal Component (unchanged, but kept for completeness)
+function StageModal({ isOpen, onClose, employeeName, stages, onStageClick }: StageModalProps) {
+  let stagesList: { id: string; name: string; count: number }[] = [];
+  
+  if (Array.isArray(stages)) {
+    stagesList = stages.map((item: any) => ({
+      id: item.stageId || item.id || '',
+      name: item.stageName || item.name || 'Unknown',
+      count: item.count || 0
+    }));
+  } else if (typeof stages === 'object' && stages !== null) {
+    stagesList = Object.entries(stages).map(([name, count]) => ({
+      id: name,
+      name,
+      count: count as number
+    }));
   }
-
-  // Sort stages by count in descending order
-  const sortedStages = Object.entries(stages).sort(([, a], [, b]) => b - a);
-
+  
+  stagesList.sort((a, b) => b.count - a.count);
+  
+  const handleBadgeClick = (stageId: string, stageName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onStageClick(stageId, stageName);
+  };
+  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
@@ -61,17 +197,27 @@ function StageModal({ isOpen, onClose, employeeName, stages }: StageModalProps) 
           <DialogTitle>Stage Details - {employeeName}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-          {sortedStages.map(([stage, count]) => (
-            <div
-              key={stage}
-              className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
-            >
-              <span className="text-sm font-medium capitalize">{stage}</span>
-              <Badge variant="secondary" className="text-sm">
-                {count}
-              </Badge>
+          {stagesList.length === 0 ? (
+            <div className="py-8 text-center text-muted-foreground">
+              <p>No stage data available for this employee</p>
             </div>
-          ))}
+          ) : (
+            stagesList.map((stage) => (
+              <div
+                key={stage.id}
+                className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+              >
+                <span className="text-sm font-medium capitalize">{stage.name}</span>
+                <Badge 
+                  variant="secondary" 
+                  className="text-sm cursor-pointer hover:bg-primary/20 transition-colors"
+                  onClick={(e) => handleBadgeClick(stage.id, stage.name, e)}
+                >
+                  {stage.count}
+                </Badge>
+              </div>
+            ))
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -79,10 +225,20 @@ function StageModal({ isOpen, onClose, employeeName, stages }: StageModalProps) 
 }
 
 export function UtilizationReport({ data, searchTerm = '', onSearchChange }: UtilizationReportProps) {
+  const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(0);
-  const [selectedEmployee, setSelectedEmployee] = useState<{ name: string; stages: Record<string, number> } | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
+  // State for second modal (lead details)
+  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
+  const [leadsData, setLeadsData] = useState<any[]>([]);
+  const [leadsLoading, setLeadsLoading] = useState(false);
+  const [leadsPage, setLeadsPage] = useState(0);
+  const [leadsTotalPages, setLeadsTotalPages] = useState(1);
+  const [leadsTotal, setLeadsTotal] = useState(0);
+  const [selectedStage, setSelectedStage] = useState('');
+  const [selectedStageId, setSelectedStageId] = useState('');
   const employeesPerPage = 10;
   
   if (!data?.employees || data.employees.length === 0) {
@@ -146,11 +302,64 @@ export function UtilizationReport({ data, searchTerm = '', onSearchChange }: Uti
   );
   
   const handleRowClick = (employee: any) => {
-    setSelectedEmployee({
-      name: employee.employeeName,
-      stages: employee.allStages || {}
-    });
+    setSelectedEmployee(employee);
     setIsModalOpen(true);
+  };
+  
+  const fetchLeadsForStage = async (stageId: string, stageName: string, pageNum: number = 0) => {
+    if (!selectedEmployee) return;
+    setSelectedStageId(stageId);
+    setLeadsLoading(true);
+    try {
+      const params = {
+        employeeId: selectedEmployee.employeeId,
+        stageId: stageId,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        page: pageNum + 1,
+        limit: 10
+      };
+      
+      const response = await getDataHandlerWithToken(ApiConfig.employeeStageleads, params, null, true);
+      const result = response?.data || response;
+      
+      // Extract leads array safely from response
+      let leadsArray = result?.data || [];
+      if (Array.isArray(result)) {
+        leadsArray = result;
+      } else if (result?.leads && Array.isArray(result.leads)) {
+        leadsArray = result.leads;
+      }
+      
+      setLeadsData(leadsArray);
+      setLeadsTotalPages(response?.totalPages || 1);
+      setLeadsTotal(response?.total || leadsArray.length);
+      setLeadsPage(pageNum);
+      setSelectedStage(stageName);
+    } catch (error: any) {
+      console.error('Error fetching leads:', error);
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to load leads',
+        variant: 'destructive'
+      });
+      setLeadsData([]);
+      setLeadsTotalPages(1);
+      setLeadsTotal(0);
+    } finally {
+      setLeadsLoading(false);
+    }
+  };
+  
+  const handleStageClick = (stageId: string, stageName: string) => {
+    setIsLeadModalOpen(true);
+    fetchLeadsForStage(stageId, stageName, 0);
+  };
+  
+  const handleLeadPageChange = (newPage: number) => {
+    if (selectedStageId) {
+      fetchLeadsForStage(selectedStageId, selectedStage, newPage);
+    }
   };
   
   return (
@@ -321,11 +530,32 @@ export function UtilizationReport({ data, searchTerm = '', onSearchChange }: Uti
       )}
       
       {/* Stage Modal */}
-      <StageModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        employeeName={selectedEmployee?.name || ''}
-        stages={selectedEmployee?.stages || {}}
+      {selectedEmployee && (
+        <StageModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          employeeName={selectedEmployee.employeeName}
+          stages={selectedEmployee.allStages || {}}
+          employeeId={selectedEmployee.employeeId}
+          startDate={data.startDate}
+          endDate={data.endDate}
+          onStageClick={handleStageClick}
+        />
+      )}
+      
+      {/* Lead Details Modal - Full Screen with Total and Pagination */}
+      <LeadDetailsModal
+        key={selectedStageId}
+        isOpen={isLeadModalOpen}
+        onClose={() => setIsLeadModalOpen(false)}
+        leads={leadsData}
+        loading={leadsLoading}
+        page={leadsPage}
+        totalPages={leadsTotalPages}
+        totalLeads={leadsTotal}
+        onPageChange={handleLeadPageChange}
+        stageName={selectedStage}
+        employeeName={selectedEmployee?.employeeName || ''}
       />
     </div>
   );
