@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import {
   Search,
   Plus,
-  Download,
   RefreshCw,
   Loader2,
   ChevronLeft,
@@ -17,14 +15,17 @@ import {
   Filter,
   ChevronUp,
   ChevronDown,
-  User,
-  Calendar,
-  MessageSquare,
-  Users,
   Phone,
   AlertCircle,
-  CheckCircle2,
-  XCircle
+  Mic,
+  Calendar,
+  User,
+  Users,
+  PhoneCall,
+  CheckCircle,
+  XCircle,
+  BarChart3,
+  Activity
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -44,100 +45,43 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import { getDataHandlerWithToken, postDataHandlerWithToken } from '@/config/services';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ApiConfig from '@/config/apiConfig';
 import { LeadHistoryModal } from '@/components/modal/LeadHistory';
 import { hasModulePermission } from '@/utils/modulePermissions';
 
-interface CallLogType {
-  _id: string;
-  leadId: number;
-  leadName: string;
-  userId: {
-    _id: string;
-    name: string;
-    email: string;
-  };
-  duration: number;
-  stageId?: {
-    _id: string;
-    name: string;
-  };
-  outcome?: string;
-  startedAt: string;
-  createdAt: string;
-  updatedAt: string;
-  answered?: boolean;
-  recording_url?:string;
-  callCount30Days?: number;
-}
-
-interface LeadType {
-  _id: string;
-  leadId: number;
-  name: string;
-  phone: string;
-  email: string;
-  stageId: {
-    _id: string;
-    name: string;
-  };
-}
-
-interface StageType {
-  _id: string;
-  name: string;
-  order: number;
-}
-
-interface UserType {
-  _id: string;
-  name: string;
-  email: string;
-  employeeId?: number;
-  role?: {
-    _id: string;
-    name: string;
-  };
-}
-
-interface CallLogForm {
-  leadId: string;
-  duration: string;
-  stageId?: string;
-  outcome?: string;
-}
-
-interface InteractionForm {
-  leadId: string;
-  source: string;
-  stageId?: string;
-  outcome: string;
-  interactionAt: string;
-}
-
-interface InteractionLogType {
+interface LogType {
   _id: string;
   leadId: number;
   leadName: string;
   leadNumber?: string;
   userId: {
-    _id?: string;
-    name?: string;
-    email?: string;
+    _id: string;
+    name: string;
+    employeeId?: number;
   };
-  source?: string;
-  outcome: string;
+  duration: number | null;
   stageId?: {
     _id: string;
     name: string;
   };
+  outcome?: string;
+  startedAt?: string;
   interactionAt?: string;
   createdAt: string;
-  updatedAt: string;
+  answered: boolean;
+  recording_url?: string;
+  callCount30Days?: number;
+  logType: 'call' | 'manual';
+}
+
+interface StatsType {
+  totalDials: number;
+  totalAnswered: number;
+  totalTalkTime: number;
+  totalInteractions: number;
+  totalRecords: number;
 }
 
 interface Filters {
@@ -145,1607 +89,616 @@ interface Filters {
   leadId: string;
   stageId: string;
   userId: string;
-  outcome: string;
-  durationMin: string;
-  durationMax: string;
   dateFilter: string;
   fromDate: string;
   toDate: string;
   sort: string;
-  answered: string; // 'true', 'false', or 'all'
-  group: string;    // 'true', 'false'
-  type:string;
+  answered: string;
+  group: string;
+  logType: string;
+  viewType: string;
 }
 
 export function CallLogsPage() {
-  // State declarations
-  const [callLogs, setCallLogs] = useState<CallLogType[]>([]);
-  const [interactionLogs, setInteractionLogs] = useState<InteractionLogType[]>([]);
-  const [leads, setLeads] = useState<LeadType[]>([]);
-  const [stages, setStages] = useState<StageType[]>([]);
-  const [users, setUsers] = useState<UserType[]>([]);
+  const [logs, setLogs] = useState<LogType[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
+  const [stages, setStages] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [stats, setStats] = useState<StatsType | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingInteractions, setLoadingInteractions] = useState(false);
-  const [loadingLeads, setLoadingLeads] = useState(false);
-  const [loadingStages, setLoadingStages] = useState(false);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const [CallModalOpen, setCallModalOpen] = useState(false);
-  const [selectedCallLog, setSelectedCallLog] = useState<CallLogType>();
-  const [currentreview, setCurrentreview] = useState<any>({});
-  const [leadHistoryModalOpen, setLeadHistoryModalOpen] = useState(false);
-  const [leadHistory, setLeadHistory] = useState<any[]>([]);
-  const [loadingLeadHistory, setLoadingLeadHistory] = useState(false);
-  // Pagination
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(25); // Increased for better view
+  const [limit, setLimit] = useState(25);
   const [totalPages, setTotalPages] = useState(1);
   const [totalLogs, setTotalLogs] = useState(0);
-  const [totalInteractionLogs, setTotalInteractionLogs] = useState(0);
+  const [showFilters, setShowFilters] = useState(true);
+  const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<LogType | null>(null);
+  const [leadHistoryOpen, setLeadHistoryOpen] = useState(false);
+  const [leadHistory, setLeadHistory] = useState([]);
+  const [addingManual, setAddingManual] = useState(false);
+  const [leadSearch, setLeadSearch] = useState('');
+  const [leadOptions, setLeadOptions] = useState([]);
+  const [searchingLeads, setSearchingLeads] = useState(false);
 
-  // Filters
   const [filters, setFilters] = useState<Filters>({
     search: '',
     leadId: 'all',
     stageId: 'all',
     userId: 'all',
-    outcome: '',
-    durationMin: '',
-    durationMax: '',
     dateFilter: 'today',
     fromDate: '',
     toDate: '',
     sort: 'new',
     answered: 'all',
     group: 'false',
-    type: 'uniq',
+    logType: 'all',
+    viewType: 'all',
   });
 
-  // Modal states
-  const [newCallLogOpen, setNewCallLogOpen] = useState(false);
-  const [newInteractionLogOpen, setNewInteractionLogOpen] = useState(false);
-
-  // Form states
-  const [callLogForm, setCallLogForm] = useState<CallLogForm>({
+  const [manualForm, setManualForm] = useState({
     leadId: '',
-    duration: '',
-    stageId: '',
-    outcome: ''
-  });
-  const [interactionForm, setInteractionForm] = useState<InteractionForm>({
-    leadId: '',
-    source: 'manual',
     stageId: '',
     outcome: '',
     interactionAt: new Date().toISOString().slice(0, 16)
   });
-  const permissions = JSON.parse(
-    localStorage.getItem("permissions") || "[]"
-  );
-  // Loading states
-  const [addingCallLog, setAddingCallLog] = useState(false);
-  const [addingInteractionLog, setAddingInteractionLog] = useState(false);
-  const [leadSearchTerm, setLeadSearchTerm] = useState('');
-  const [leadSearchOptions, setLeadSearchOptions] = useState<LeadType[]>([]);
-  const [searchingLeads, setSearchingLeads] = useState(false);
 
-  // Filter visibility
-  const [showFilters, setShowFilters] = useState(false); // Show by default for better UX
-
-  // Build query params with all backend filters
   const buildQueryParams = useCallback(() => {
-    const params: Record<string, any> = {};
-
-    // Pagination
-    params.page = page;
-    params.limit = limit;
-
-    // Text search
+    const params: any = { page, limit };
     if (filters.search) params.search = filters.search;
-
-    // Filter by specific fields
-    if (filters.leadId && filters.leadId !== "all") params.leadId = filters.leadId;
-    if (filters.stageId && filters.stageId !== "all") params.stageId = filters.stageId;
-    if (filters.userId && filters.userId !== "all") params.byUserId = filters.userId;
-    if (filters.outcome) params.outcome = filters.outcome;
-
-    // Duration range
-    if (filters.durationMin) params.durationMin = filters.durationMin;
-    if (filters.durationMax) params.durationMax = filters.durationMax;
-
-    // Date filters
-    if (filters.dateFilter && filters.dateFilter !== "all") {
-      params.dateFilter = filters.dateFilter;
-    }
-
+    if (filters.leadId !== 'all') params.leadId = filters.leadId;
+    if (filters.stageId !== 'all') params.stageId = filters.stageId;
+    if (filters.userId !== 'all') params.byUserId = filters.userId;
+    if (filters.dateFilter !== 'all') params.dateFilter = filters.dateFilter;
     if (filters.fromDate) params.fromDate = filters.fromDate;
     if (filters.toDate) params.toDate = filters.toDate;
-
-    // Sorting
     if (filters.sort) params.sort = filters.sort;
-
-    // New filters
-    if (filters.answered && filters.answered !== "all") {
-      params.answered = filters.answered;
-    }
-
-    if (filters.group === 'true') {
-      params.group = true;
-    }
-    if (filters.type) {
-  params.type = filters.type;
-}
-    console.log(params, "1")
+    if (filters.answered !== 'all') params.answered = filters.answered;
+    if (filters.group === 'true') params.group = true;
+    if (filters.logType !== 'all') params.logType = filters.logType;
+    if (filters.viewType !== 'all') params.type = filters.viewType;
     return params;
   }, [filters, page, limit]);
 
-  // Fetch call logs
-  const fetchCallLogs = async () => {
+  const fetchLogs = async () => {
     try {
       setLoading(true);
-      const queryParams = buildQueryParams();
-      const response = await getDataHandlerWithToken("CallLog", queryParams, null);
-      if (response?.data) {
-        setCallLogs(response.data);
-        setTotalLogs(response.total);
-        setTotalPages(response.totalPages);
+      const res = await getDataHandlerWithToken("CallLog", buildQueryParams(), null);
+      if (res?.data) {
+        setLogs(res.data);
+        setTotalLogs(res.total);
+        setTotalPages(res.totalPages);
+        if (res.stats) setStats(res.stats);
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch call logs",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to fetch logs", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchInteractionLogs = async () => {
+  const handleAddManual = async () => {
     try {
-      setLoadingInteractions(true);
-      const queryParams = buildQueryParams();
-      const response = await getDataHandlerWithToken("LeadInteractionLog", queryParams, null);
-      if (response?.data) {
-        setInteractionLogs(response.data);
-        setTotalInteractionLogs(response.total);
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch interaction logs",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingInteractions(false);
-    }
-  };
-
-  const handleAddInteractionLog = async () => {
-    try {
-      setAddingInteractionLog(true);
-      if (!interactionForm.leadId || !interactionForm.outcome) {
-        toast({
-          title: "Error",
-        description: "Lead and outcome are required for manual call logs",
-        });
+      setAddingManual(true);
+      if (!manualForm.leadId || !manualForm.outcome) {
+        toast({ title: "Error", description: "Lead and outcome required", variant: "destructive" });
         return;
       }
-
-      const payload = {
-        leadId: parseInt(interactionForm.leadId),
-        source: interactionForm.source,
-        outcome: interactionForm.outcome,
-        interactionAt: new Date(interactionForm.interactionAt).toISOString(),
-        ...(interactionForm.stageId ? { stageId: interactionForm.stageId } : {}),
-      };
-
-      await postDataHandlerWithToken("createInteractionLog", payload);
-
-      toast({
-        title: "Success",
-        description: "Manual call log created successfully",
-      });
-
-      setInteractionForm({
-        leadId: '',
+      await postDataHandlerWithToken("createInteractionLog", {
+        leadId: parseInt(manualForm.leadId),
         source: 'manual',
-        stageId: '',
-        outcome: '',
-        interactionAt: new Date().toISOString().slice(0, 16),
+        outcome: manualForm.outcome,
+        interactionAt: new Date(manualForm.interactionAt).toISOString(),
+        ...(manualForm.stageId ? { stageId: manualForm.stageId } : {}),
       });
-      setLeadSearchTerm('');
-      setLeadSearchOptions([]);
-      setNewInteractionLogOpen(false);
-      fetchInteractionLogs();
-      fetchCallLogs();
+      toast({ title: "Success", description: "Manual log created" });
+      setManualForm({ leadId: '', stageId: '', outcome: '', interactionAt: new Date().toISOString().slice(0, 16) });
+      setLeadSearch('');
+      setManualModalOpen(false);
+      fetchLogs();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to create manual call log",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.response?.data?.message || "Failed", variant: "destructive" });
     } finally {
-      setAddingInteractionLog(false);
-    }
-  };
-
-  // Fetch leads
-  const fetchLeads = async () => {
-    try {
-      setLoadingLeads(true);
-      const response = await getDataHandlerWithToken("getAllLeads", { page: 1, limit: 1000 }, null);
-      if (response?.data) {
-        setLeads(response.data);
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch leads",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingLeads(false);
+      setAddingManual(false);
     }
   };
 
   useEffect(() => {
     const searchLeads = async () => {
-      if (!leadSearchTerm.trim()) {
-        setLeadSearchOptions([]);
-        return;
-      }
-
+      if (!leadSearch.trim()) { setLeadOptions([]); return; }
       try {
         setSearchingLeads(true);
-        const response = await getDataHandlerWithToken(
-          "getAllLeads",
-          { page: 1, limit: 10, search: leadSearchTerm },
-          null
-        );
-        if (response?.data) {
-          setLeadSearchOptions(response.data);
-        }
-      } catch (error) {
-        setLeadSearchOptions([]);
-      } finally {
-        setSearchingLeads(false);
-      }
+        const res = await getDataHandlerWithToken("getAllLeads", { page: 1, limit: 10, search: leadSearch }, null);
+        if (res?.data) setLeadOptions(res.data);
+      } catch (error) { setLeadOptions([]); } finally { setSearchingLeads(false); }
     };
+    const timeout = setTimeout(searchLeads, 300);
+    return () => clearTimeout(timeout);
+  }, [leadSearch]);
 
-    const timeout = setTimeout(() => {
-      searchLeads();
-    }, 300);
-
-    return () => {
-      clearTimeout(timeout);
-    };
-  }, [leadSearchTerm]);
-
-  // Fetch stages
-  const fetchStages = async () => {
-    try {
-      setLoadingStages(true);
-      const response = await getDataHandlerWithToken("getAllStages", null, null);
-      if (response) {
-        setStages(response);
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch stages",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingStages(false);
-    }
-  };
-
-  // Fetch users
-  const fetchUsers = async () => {
-    try {
-      setLoadingUsers(true);
-      const response = await getDataHandlerWithToken("getAllUser", null, null);
-      if (response) {
-        setUsers(response);
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch users",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
-
-  // Initialize data
   useEffect(() => {
-    if (hasModulePermission(permissions, "user")) {
-      fetchUsers();
-    }
-    fetchCallLogs();
-    fetchInteractionLogs();
-    if (hasModulePermission(permissions, "leads")) {
-      fetchLeads();
-    }
+    fetchLogs();
     fetchStages();
+    fetchUsers();
+    fetchLeads();
   }, []);
 
-  // Refresh when filters or pagination changes
   useEffect(() => {
-    fetchCallLogs();
-    fetchInteractionLogs();
-  }, [page, limit, buildQueryParams]);
+    fetchLogs();
+  }, [page, limit, filters]);
+
+  const fetchLeads = async () => {
+    try {
+      const res = await getDataHandlerWithToken("getAllLeads", { page: 1, limit: 1000 }, null);
+      if (res?.data) setLeads(res.data);
+    } catch (error) {}
+  };
+
+  const fetchStages = async () => {
+    try {
+      const res = await getDataHandlerWithToken("getAllStages", null, null);
+      if (res) setStages(res);
+    } catch (error) {}
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const res = await getDataHandlerWithToken("getAllUser", null, null);
+      if (res) setUsers(res);
+    } catch (error) {}
+  };
 
   const fetchLeadHistory = async (leadId: number) => {
     try {
-      setLoadingLeadHistory(true);
-      const endpoint = ApiConfig.leadHistory(leadId.toString());
-      const response = await getDataHandlerWithToken(endpoint, null, null, true);
-      if (response) {
-        setLeadHistory(response);
-      }
+      const res = await getDataHandlerWithToken(ApiConfig.leadHistory(leadId.toString()), null, null, true);
+      if (res) setLeadHistory(res);
+      setLeadHistoryOpen(true);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch lead history",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingLeadHistory(false);
-    }
-  };
-  const handleViewLeadHistory = async (leadId: number) => {
-    await fetchLeadHistory(leadId);
-    setLeadHistoryModalOpen(true);
-  };
-  // Add new call log
-  const handleAddCallLog = async () => {
-    try {
-      setAddingCallLog(true);
-
-      if (!callLogForm.leadId || !callLogForm.duration) {
-        toast({
-          title: "Error",
-          description: "Lead and Duration are required",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const dataToSend = {
-        leadId: parseInt(callLogForm.leadId),
-        duration: parseInt(callLogForm.duration),
-        ...(callLogForm.stageId && { stageId: callLogForm.stageId }),
-        ...(callLogForm.outcome && { outcome: callLogForm.outcome })
-      };
-
-      await postDataHandlerWithToken("CallLog", dataToSend);
-
-      toast({
-        title: "Success",
-        description: "Call log created successfully",
-      });
-
-      setCallLogForm({
-        leadId: '',
-        duration: '',
-        stageId: '',
-        outcome: ''
-      });
-      setNewCallLogOpen(false);
-      fetchCallLogs();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to create call log",
-        variant: "destructive",
-      });
-    } finally {
-      setAddingCallLog(false);
+      toast({ title: "Error", description: "Failed to fetch history", variant: "destructive" });
     }
   };
 
-  // Format duration
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds && seconds !== 0) return '--:--';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Format date
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return {
-      date: date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      }),
-      time: date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-    };
+  const formatDate = (date: string) => {
+    const d = new Date(date);
+    return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
   };
 
-  // Format full date time
-  const formatFullDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const fetchCallReview = async (id: string) => {
-    try {
-      const endpoint = ApiConfig.getcallLogReview(id);
-      const response = await getDataHandlerWithToken(endpoint, null, null, true);
-      setCurrentreview(response);
-      return true;
-    } catch (error) {
-      console.error(error || "call review sending error");
-      return false;
-    }
-  };
-
-  // Reset filters
   const resetFilters = () => {
     setFilters({
-      search: '',
-      leadId: 'all',
-      stageId: 'all',
-      userId: 'all',
-      outcome: '',
-      durationMin: '',
-      durationMax: '',
-      dateFilter: 'today',
-      fromDate: '',
-      toDate: '',
-      sort: 'new',
-      answered: 'all',
-      group: 'false',
-      type: 'uniq'
+      search: '', leadId: 'all', stageId: 'all', userId: 'all', dateFilter: 'today',
+      fromDate: '', toDate: '', sort: 'new', answered: 'all', group: 'false', logType: 'all', viewType: 'all'
     });
     setPage(1);
   };
 
-  // Toggle group filter
-  const toggleGroupFilter = () => {
-    setFilters(prev => ({
-      ...prev,
-      group: prev.group === 'true' ? 'false' : 'true'
-    }));
-    setPage(1);
-  };
-
-  // Export to CSV
-  const exportToCSV = async (exportAll: boolean = false) => {
-    try {
-      let queryParams = buildQueryParams();
-
-      if (exportAll) {
-        delete queryParams.page;
-        delete queryParams.limit;
-        queryParams.limit = 10000;
-      }
-
-      toast({
-        title: "Preparing Download",
-        description: `Fetching ${exportAll ? 'all' : 'current page'} call logs...`,
-      });
-
-      const response = await getDataHandlerWithToken("CallLog", queryParams, null);
-
-      if (!response?.data) {
-        throw new Error("No data to export");
-      }
-
-      const logsData = response.data;
-
-      // CSV Headers
-      const headers = [
-        "ID",
-        "Lead ID",
-        "Lead Name",
-        "Lead Phone",
-        "Lead Email",
-        "Call By",
-        "Caller Email",
-        "Duration (seconds)",
-        "Formatted Duration",
-        "Stage",
-        "Outcome/Notes",
-        "Answered",
-        "Call Count (30 Days)",
-        "Created Date",
-        "Created Time",
-        "Updated At"
-      ];
-
-      // Prepare data
-      const rows = logsData.map((log: CallLogType) => {
-        const lead = leads.find(l => l.leadId === log.leadId);
-        const createdDateTime = formatDate(log.createdAt);
-
-        return [
-          log._id,
-          log.leadId,
-          `"${lead?.name || 'N/A'}"`,
-          lead?.phone || 'N/A',
-          lead?.email || 'N/A',
-          log.userId.name,
-          log.userId.email,
-          log.duration,
-          formatDuration(log.duration),
-          log.stageId?.name || '',
-          `"${(log.outcome || '').replace(/"/g, '""')}"`,
-          log.answered !== undefined ? (log.answered ? 'Answered' : 'Not Answered') : 'N/A',
-          log.callCount30Days || 0,
-          createdDateTime.date,
-          createdDateTime.time,
-          new Date(log.updatedAt).toISOString()
-        ];
-      });
-
-      // Create CSV
-      const csvContent = [
-        headers.join(","),
-        ...rows.map(row => row.join(","))
-      ].join("\n");
-
-      // Download
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-
-      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
-      const filename = `call_logs_${exportAll ? 'all' : 'page_' + page}_${timestamp}.csv`;
-
-      link.setAttribute("download", filename);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast({
-        title: "Download Complete",
-        description: `Exported ${logsData.length} call logs to CSV`,
-      });
-
-    } catch (error: any) {
-      toast({
-        title: "Export Failed",
-        description: error.message || "Failed to export call logs",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Get answered status badge
-  const getAnsweredBadge = (answered?: boolean) => {
-    if (answered === undefined) return null;
-
-    return answered ? (
-      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 flex items-center gap-1">
-        <CheckCircle2 className="w-3 h-3" />
-        Answered
-      </Badge>
-    ) : (
-      <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 flex items-center gap-1">
-        <XCircle className="w-3 h-3" />
-        Not Answered
-      </Badge>
-    );
-  };
-
-  const combinedLoading = loading || loadingInteractions;
-  const getLogTimestamp = (log: any) => {
-    return new Date(log.createdAt || log.interactionAt || log.startedAt || '').getTime();
-  };
-  const mergedLogs = [...interactionLogs.map((log) => ({ ...log, type: 'interaction' as const })),
-    ...callLogs.map((log) => ({ ...log, type: 'call' as const }))]
-    .sort((a, b) => getLogTimestamp(b) - getLogTimestamp(a));
-  const totalCombinedLogs = callLogs.length + interactionLogs.length;
-
   return (
-    <div className="space-y-4 md:space-y-6 p-2 md:p-0">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Calls & Interactions</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Track and manage manual call logs and call activities in one place</p>
-        </div>
-        {/* <div className="flex flex-wrap items-center gap-2">
-          <Dialog open={newCallLogOpen} onOpenChange={setNewCallLogOpen}>
-            <Button className="w-full sm:w-auto">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Call Log
-            </Button>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-hidden flex flex-col">
-              <DialogHeader>
-                <DialogTitle>Add New Call Log</DialogTitle>
-                <DialogDescription>Record a new call activity</DialogDescription>
-              </DialogHeader>
-
-              <div className="overflow-y-auto flex-1 py-2">
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <Label>Lead *</Label>
-                    <SearchableDropdown
-                      options={leads.map(lead => ({
-                        value: lead.leadId.toString(),
-                        label: `${lead.name} (ID: ${lead.leadId})`,
-                        name: lead.name,
-                        email: lead.email,
-                        phone: lead.phone
-                      }))}
-                      value={callLogForm.leadId}
-                      onValueChange={(value) => setCallLogForm({ ...callLogForm, leadId: value })}
-                      placeholder="Select lead"
-                      searchPlaceholder="Search by name or ID..."
-                      emptyMessage="No leads found"
-                      disabled={addingCallLog || loadingLeads}
-                      allowClear
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Duration (seconds) *</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={callLogForm.duration}
-                        onChange={(e) => setCallLogForm({ ...callLogForm, duration: e.target.value })}
-                        placeholder="120"
-                        disabled={addingCallLog}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Stage (Optional)</Label>
-                    <SearchableDropdown
-                      options={stages.map(stage => ({
-                        value: stage._id,
-                        label: stage.name
-                      }))}
-                      value={callLogForm.stageId || ''}
-                      onValueChange={(value) => setCallLogForm({ ...callLogForm, stageId: value })}
-                      placeholder="Select stage"
-                      searchPlaceholder="Search stage..."
-                      emptyMessage="No stages found"
-                      disabled={addingCallLog || loadingStages}
-                      allowClear
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Outcome/Notes (Optional)</Label>
-                    <Textarea
-                      value={callLogForm.outcome}
-                      onChange={(e) => setCallLogForm({ ...callLogForm, outcome: e.target.value })}
-                      placeholder="Add outcome details or notes about the call..."
-                      disabled={addingCallLog}
-                      className="min-h-[100px] resize-vertical"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <DialogFooter className="pt-4 border-t">
-                <Button
-                  variant="outline"
-                  onClick={() => setNewCallLogOpen(false)}
-                  disabled={addingCallLog}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleAddCallLog}
-                  disabled={addingCallLog || !callLogForm.leadId || !callLogForm.duration}
-                >
-                  {addingCallLog ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    'Create Call Log'
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          <div className="flex items-center gap-2">
-            <Select onValueChange={(value) => exportToCSV(value === 'all')}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Export options" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="current">
-                  <div className="flex items-center gap-2">
-                    <Download className="w-4 h-4" />
-                    Export Current Page
-                  </div>
-                </SelectItem>
-                <SelectItem value="all">
-                  <div className="flex items-center gap-2">
-                    <Download className="w-4 h-4" />
-                    Export All Pages
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Call Activity</h1>
+            <p className="text-slate-500 mt-1">Track and manage all call interactions</p>
           </div>
-        </div> */}
-      </div>
-
-      {/* Group Filter Checkbox */}
-      <div className="flex items-center space-x-2 bg-muted/30 p-3 rounded-lg border">
-        <Checkbox
-          id="group-filter"
-          checked={filters.group === 'true'}
-          onCheckedChange={toggleGroupFilter}
-        />
-        <Label htmlFor="group-filter" className="text-sm font-medium cursor-pointer">
-          Group
-        </Label>
-        {filters.group === 'true' && (
-          <Badge variant="secondary" className="ml-2">
-            Grouped View
-          </Badge>
-        )}
-      </div>
-
-      {/* Filters Toggle */}
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center gap-2"
-        >
-          <Filter className="w-4 h-4" />
-          {showFilters ? 'Hide Filters' : 'Show Filters'}
-          {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </Button>
-
-        {showFilters && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={resetFilters}
+          <Button 
+            onClick={() => setManualModalOpen(true)} 
+            className="bg-orange-600 hover:bg-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 rounded-xl px-5 py-2"
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Reset Filters
+            <Plus className="w-4 h-4 mr-2" />
+            Add Manual Log
           </Button>
+        </div>
+
+        {/* Stats Cards */}
+        {stats && (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Calls</p>
+                  <p className="text-2xl font-bold text-slate-800 mt-1">{stats.totalDials}</p>
+                </div>
+                <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center">
+                  <PhoneCall className="w-5 h-5 text-orange-600" />
+                </div>
+              </div>
+            </Card>
+            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Answered</p>
+                  <p className="text-2xl font-bold text-emerald-600 mt-1">{stats.totalAnswered}</p>
+                </div>
+                <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-emerald-600" />
+                </div>
+              </div>
+            </Card>
+            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Talk Time</p>
+                  <p className="text-2xl font-bold text-slate-800 mt-1">{formatDuration(stats.totalTalkTime)}</p>
+                </div>
+                <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-amber-600" />
+                </div>
+              </div>
+            </Card>
+            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Manual Logs</p>
+                  <p className="text-2xl font-bold text-purple-600 mt-1">{stats.totalInteractions}</p>
+                </div>
+                <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
+                  <Mic className="w-5 h-5 text-purple-600" />
+                </div>
+              </div>
+            </Card>
+            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Records</p>
+                  <p className="text-2xl font-bold text-slate-800 mt-1">{stats.totalRecords}</p>
+                </div>
+                <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+                  <Activity className="w-5 h-5 text-slate-600" />
+                </div>
+              </div>
+            </Card>
+          </div>
         )}
-      </div>
 
-      {/* Filters Panel */}
-      {showFilters && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              {/* Search Row */}
-              <div
-                className={`grid grid-cols-1 gap-4 md:grid-cols-3`}
-              >
-                <div className="space-y-2">
-                  <Label>Search</Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search leads, outcomes..."
-                      value={filters.search}
-                      onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
+        {/* Group Toggle */}
+        <div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm border border-slate-100">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
+            setFilters(prev => ({ ...prev, group: prev.group === 'true' ? 'false' : 'true' }));
+            setPage(1);
+          }}>
+            <div className={`w-4 h-4 rounded border ${filters.group === 'true' ? 'bg-orange-600 border-orange-600' : 'border-slate-300'} flex items-center justify-center transition-all`}>
+              {filters.group === 'true' && <div className="w-2 h-2 bg-white rounded-sm" />}
+            </div>
+            <span className="text-sm font-medium text-slate-700">Group by User</span>
+          </div>
+        </div>
 
-                <div className="space-y-2">
-                  <Label>Stage</Label>
-                  <Select
-                    value={filters.stageId}
-                    onValueChange={(value) => setFilters({ ...filters, stageId: value })}
-                    disabled={loadingStages}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="All stages" />
-                    </SelectTrigger>
-                    <SelectContent position="popper" className="max-h-60 overflow-y-auto">
-                      <SelectItem value="all">All Stages</SelectItem>
-                      {stages.map((stage) => (
-                        <SelectItem key={stage._id} value={stage._id}>
-                          {stage.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+        {/* Filters Header */}
+        <div className="flex justify-between items-center">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowFilters(!showFilters)} 
+            className="border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl"
+          >
+            <Filter className="w-4 h-4 mr-2" />
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+            {showFilters ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
+          </Button>
+          <Button variant="ghost" onClick={resetFilters} className="text-slate-500 hover:text-slate-700 rounded-xl">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Reset
+          </Button>
+        </div>
 
-                <div className="space-y-2">
-                  <Label>Answered Status</Label>
-                  <Select
-                    value={filters.answered}
-                    onValueChange={(value) => setFilters({ ...filters, answered: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="All" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Calls</SelectItem>
-                      <SelectItem value="true">Answered Only</SelectItem>
-                      <SelectItem value="false">Not Answered Only</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-
-              </div>
-
-              {/* Second Row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-
-                <div className="space-y-2">
-                  <Label>Date Filter</Label>
-                  <Select
-                    value={filters.dateFilter}
-                    onValueChange={(value) => setFilters({ ...filters, dateFilter: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent position="popper" className="max-h-60 overflow-y-auto">
-                      <SelectItem value="today">Today</SelectItem>
-                      <SelectItem value="week">This Week</SelectItem>
-                      <SelectItem value="month">This Month</SelectItem>
-                      <SelectItem value="custom">Custom Range</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-  <Label>Call View</Label>
-
-  <Select
-    value={filters.type}
-    onValueChange={(value) =>
-      setFilters({
-        ...filters,
-        type: value,
-      })
-    }
-  >
-    <SelectTrigger>
-      <SelectValue />
-    </SelectTrigger>
-
-    <SelectContent>
-      <SelectItem value="uniq">
-        Uniq
-      </SelectItem>
-
-      <SelectItem value="all">
-        All Calls
-      </SelectItem>
-    </SelectContent>
-  </Select>
-</div>
-
-
-                <div className="space-y-2">
-                  <Label>Sort By</Label>
-                  <Select
-                    value={filters.sort}
-                    onValueChange={(value) => setFilters({ ...filters, sort: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="new">Newest First</SelectItem>
-                      <SelectItem value="old">Oldest First</SelectItem>
-                    </SelectContent>
-                  </Select>
+        {/* Filters Panel */}
+        {showFilters && (
+          <Card className="p-5 bg-white border-0 shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Search</Label>
+                <div className="relative mt-1.5">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input placeholder="Lead name, outcome..." value={filters.search} onChange={e => setFilters({ ...filters, search: e.target.value })} className="pl-9 rounded-xl border-slate-200" />
                 </div>
               </div>
-              <div
-                className={`grid grid-cols-1 gap-4 ${filters.group === 'true' ? 'md:grid-cols-2' : 'md:grid-cols-1'
-                  }`}
-              >
-                <div className="space-y-2">
-                  <Label>Lead</Label>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Stage</Label>
+                <Select value={filters.stageId} onValueChange={v => setFilters({ ...filters, stageId: v })}>
+                  <SelectTrigger className="mt-1.5 rounded-xl"><SelectValue placeholder="All Stages" /></SelectTrigger>
+                  <SelectContent><SelectItem value="all">All Stages</SelectItem>{stages.map(s => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Log Type</Label>
+                <Select value={filters.logType} onValueChange={v => setFilters({ ...filters, logType: v })}>
+                  <SelectTrigger className="mt-1.5 rounded-xl"><SelectValue placeholder="All Logs" /></SelectTrigger>
+                  <SelectContent><SelectItem value="all">All Logs</SelectItem><SelectItem value="call">Call Logs</SelectItem><SelectItem value="manual">Manual Logs</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">View Type</Label>
+                <Select value={filters.viewType} onValueChange={v => setFilters({ ...filters, viewType: v })}>
+                  <SelectTrigger className="mt-1.5 rounded-xl"><SelectValue placeholder="All Calls" /></SelectTrigger>
+                  <SelectContent><SelectItem value="all">All Calls</SelectItem><SelectItem value="uniq">Unique Calls</SelectItem></SelectContent>
+                </Select>
+              </div>
+              </div>
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Date</Label>
+                <Select value={filters.dateFilter} onValueChange={v => setFilters({ ...filters, dateFilter: v })}>
+                  <SelectTrigger className="mt-1.5 rounded-xl"><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent><SelectItem value="today">Today</SelectItem><SelectItem value="week">This Week</SelectItem><SelectItem value="month">This Month</SelectItem><SelectItem value="custom">Custom Range</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Status</Label>
+                <Select value={filters.answered} onValueChange={v => setFilters({ ...filters, answered: v })}>
+                  <SelectTrigger className="mt-1.5 rounded-xl"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent><SelectItem value="all">All</SelectItem><SelectItem value="true">Answered</SelectItem><SelectItem value="false">Not Answered</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Sort</Label>
+                <Select value={filters.sort} onValueChange={v => setFilters({ ...filters, sort: v })}>
+                  <SelectTrigger className="mt-1.5 rounded-xl"><SelectValue placeholder="Sort" /></SelectTrigger>
+                  <SelectContent><SelectItem value="new">Newest First</SelectItem><SelectItem value="old">Oldest First</SelectItem></SelectContent>
+                </Select>
+              </div>
+              </div>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Lead</Label>
+                <SearchableDropdown
+                  options={[{ value: 'all', label: 'All Leads' }, ...leads.map(l => ({ value: l.leadId.toString(), label: `${l.name} (#${l.leadId})` }))]}
+                  value={filters.leadId} onValueChange={v => setFilters({ ...filters, leadId: v })}
+                  placeholder="Select lead" className="mt-1.5"
+                />
+              </div>
+              {filters.group === 'true' && (
+                <div>
+                  <Label className="text-xs font-semibold text-slate-500 uppercase">Employee</Label>
                   <SearchableDropdown
-                    options={[
-                      { value: 'all', label: 'All Leads' },
-                      ...leads.map(lead => ({
-                        value: lead.leadId.toString(),
-                        label: `${lead.name} (ID: ${lead.leadId})`
-                      }))
-                    ]}
-                    value={filters.leadId}
-                    onValueChange={(value) => setFilters({ ...filters, leadId: value })}
-                    placeholder="Select lead"
-                    searchPlaceholder="Search leads..."
-                    emptyMessage="No leads found"
-                    disabled={loadingLeads}
+                    options={[{ value: 'all', label: 'All Users' }, ...users.map(u => ({ value: u._id, label: u.name }))]}
+                    value={filters.userId} onValueChange={v => setFilters({ ...filters, userId: v })}
+                    placeholder="Select user" className="mt-1.5"
                   />
                 </div>
-                {filters.group === 'true' && (
-                  <div className="space-y-2">
-                    <Label>Enployee</Label>
-                    <SearchableDropdown
-                      options={[
-                        { value: 'all', label: 'All Users' },
-                        ...users.map(user => ({
-                          value: user._id,
-                          label: user.name,
-                          email: user.email,
-                          empId: user.employeeId
-                        }))
-                      ]}
-                      value={filters.userId}
-                      onValueChange={(value) => setFilters({ ...filters, userId: value })}
-                      placeholder="Select user"
-                      searchPlaceholder="Search users..."
-                      emptyMessage="No users found"
-                      disabled={loadingUsers}
-                    />
-                  </div>
-                )}
-
-              </div>
-
-              {filters.dateFilter === 'custom' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                  <div className="space-y-2">
-                    <Label>From Date</Label>
-                    <Input
-                      type="date"
-                      value={filters.fromDate}
-                      onChange={(e) => setFilters({ ...filters, fromDate: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>To Date</Label>
-                    <Input
-                      type="date"
-                      value={filters.toDate}
-                      onChange={(e) => setFilters({ ...filters, toDate: e.target.value })}
-                    />
-                  </div>
-                </div>
               )}
-
-              {/* Active Filters Display */}
-              <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
-                <span className="text-xs text-muted-foreground">Active filters:</span>
-                {filters.answered !== 'all' && (
-                  <Badge variant="secondary" className="text-xs">
-                    {filters.answered === 'true' ? 'Answered' : 'Not Answered'}
-                  </Badge>
-                )}
-                {filters.leadId !== 'all' && (
-                  <Badge variant="secondary" className="text-xs">
-                    Lead: {leads.find(l => l.leadId.toString() === filters.leadId)?.name || filters.leadId}
-                  </Badge>
-                )}
-                {filters.userId !== 'all' && (
-                  <Badge variant="secondary" className="text-xs">
-                    Call By: {users.find(u => u._id === filters.userId)?.name || filters.userId}
-                  </Badge>
-                )}
-                {filters.stageId !== 'all' && (
-                  <Badge variant="secondary" className="text-xs">
-                    Stage: {stages.find(s => s._id === filters.stageId)?.name || filters.stageId}
-                  </Badge>
-                )}
-                {filters.group === 'true' && (
-                  <Badge variant="secondary" className="text-xs">
-                    Grouped View
-                  </Badge>
-                )}
+            </div>
+            {filters.dateFilter === 'custom' && (
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <Input type="date" placeholder="From" value={filters.fromDate} onChange={e => setFilters({ ...filters, fromDate: e.target.value })} className="rounded-xl" />
+                <Input type="date" placeholder="To" value={filters.toDate} onChange={e => setFilters({ ...filters, toDate: e.target.value })} className="rounded-xl" />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Manual Call Log Entry */}
-      {/* <Card>
-        <CardHeader className="py-4">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div>
-              <CardTitle className="text-lg">Add Manual Call Log</CardTitle>
-              <p className="text-sm text-muted-foreground">Manually record a call log entry directly against a lead.</p>
-            </div>
-            <Button onClick={() => setNewInteractionLogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Manual Call Log
-            </Button>
-          </div>
-        </CardHeader>
-      </Card> */}
-
-      {/* Activity Logs Table */}
-      <Card>
-        <CardHeader className="py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <CardTitle className="text-lg flex items-center gap-2">
-              Activity Logs
-              <Badge variant="outline" className="ml-2">
-                {totalCombinedLogs} total
-              </Badge>
-            </CardTitle>
-            {combinedLoading && (
-              <Loader2 className="w-3 h-3 animate-spin ml-2" />
             )}
+          </Card>
+        )}
 
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="text-sm text-muted-foreground">
-                Page {page} of {totalPages}
+        {/* Table */}
+        <Card className="bg-white border-0 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
+            <h2 className="font-semibold text-slate-800">Call Records</h2>
+            <div className="flex items-center gap-3 text-sm text-slate-500">
+              <span>Page {page} of {totalPages}</span>
+              <div className="flex gap-1">
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1 || loading} className="h-8 w-8 p-0 rounded-lg"><ChevronLeft className="w-4 h-4" /></Button>
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || loading} className="h-8 w-8 p-0 rounded-lg"><ChevronRight className="w-4 h-4" /></Button>
               </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setPage(prev => Math.max(1, prev - 1))}
-                  disabled={page === 1 || combinedLoading}
-                  className="h-8 w-8"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={page === totalPages || combinedLoading}
-                  className="h-8 w-8"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-              <Select
-                value={limit.toString()}
-                onValueChange={(value) => {
-                  setLimit(parseInt(value));
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger className="w-20 h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="25">25</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                  <SelectItem value="100">100</SelectItem>
-                </SelectContent>
+              <Select value={limit.toString()} onValueChange={v => { setLimit(parseInt(v)); setPage(1); }}>
+                <SelectTrigger className="w-20 h-8 text-sm rounded-lg"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="10">10</SelectItem><SelectItem value="25">25</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem></SelectContent>
               </Select>
             </div>
           </div>
-        </CardHeader>
 
-        <CardContent className="p-0">
-          {combinedLoading ? (
-            <div className="text-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
-              <p className="mt-2 text-muted-foreground">Loading activity logs...</p>
+          {loading ? (
+            <div className="py-16 text-center">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-orange-400" />
+              <p className="mt-3 text-slate-500">Loading calls...</p>
             </div>
-          ) : mergedLogs.length === 0 ? (
-            <div className="text-center py-12">
-              <Phone className="w-12 h-12 mx-auto text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold">No activity logs found</h3>
-              <p className="text-muted-foreground">Try adjusting your filters or add a new manual call log</p>
-              {/* <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => setNewCallLogOpen(true)}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Call Log
-              </Button> */}
+          ) : logs.length === 0 ? (
+            <div className="py-16 text-center">
+              <Phone className="w-12 h-12 mx-auto text-slate-300" />
+              <h3 className="mt-3 text-base font-medium text-slate-700">No calls found</h3>
+              <p className="text-sm text-slate-400">Adjust filters or add a manual log</p>
             </div>
           ) : (
-            <>
-              {/* Responsive Table with Horizontal Scroll */}
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="whitespace-nowrap">Lead</TableHead>
-                      <TableHead className="whitespace-nowrap">Call By</TableHead>
-                      <TableHead className="whitespace-nowrap">Duration</TableHead>
-                      <TableHead className="whitespace-nowrap">Status</TableHead>
-                      <TableHead className="whitespace-nowrap">Stage</TableHead>
-                      <TableHead className="whitespace-nowrap">Outcome</TableHead>
-                      <TableHead className="whitespace-nowrap">Date</TableHead>
-                      <TableHead className="whitespace-nowrap">Time</TableHead>
-                      <TableHead className="whitespace-nowrap">Call Count</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {mergedLogs.map((log) => {
-                      const createdDateTime = formatDate(log.type === 'call' ? log.startedAt : log.createdAt);
-                      const isCallLog = log.type === 'call';
-
-                      return (
-                        <TableRow
-                          key={log._id}
-                          className="hover:bg-muted/50 cursor-pointer"
-                          onClick={() => {
-                            if (!isCallLog) return;
-                            fetchCallReview(log._id);
-                            setSelectedCallLog(log);
-                            setCallModalOpen(true);
-                          }}
-                        >
-                          <TableCell className="whitespace-nowrap">
-                            <div className="font-medium text-sm">ID: {log.leadId}</div>
-                            <div className="text-xs text-muted-foreground truncate max-w-[150px]">
-                              {log.leadName}
-                            </div>
-                          </TableCell>
-
-                          <TableCell className="whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                <span className="text-xs font-medium">
-                                  {log.userId?.name?.charAt(0) || 'U'}
-                                </span>
-                              </div>
-                              <div>
-                                <div className="text-sm font-medium">{log.userId?.name || 'Unknown'}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {log.userId?.email?.split('@')[0] || ''}
-                                </div>
-                              </div>
-                            </div>
-                          </TableCell>
-
-                          <TableCell className="whitespace-nowrap">
-                            {isCallLog && log.duration ? (
-                              <div className="flex items-center gap-2">
-                                <Clock className="w-3 h-3 text-muted-foreground" />
-                                <span className="text-sm font-mono">{formatDuration(log.duration)}</span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-
-                          <TableCell className="whitespace-nowrap">
-                            {getAnsweredBadge(isCallLog ? log.answered : undefined)}
-                          </TableCell>
-
-                          <TableCell className="whitespace-nowrap">
-                            {log.stageId ? (
-                              <Badge variant="secondary" className="text-xs">
-                                {log.stageId.name}
-                              </Badge>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-
-                          <TableCell className="max-w-[200px]">
-                            {log.outcome ? (
-                              <div className="flex items-start gap-1">
-                                <MessageSquare className="w-3 h-3 mt-1 flex-shrink-0 text-muted-foreground" />
-                                <span className="text-xs line-clamp-2 break-words">
-                                  {log.outcome}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-
-                          <TableCell className="whitespace-nowrap">
-                            <div className="text-sm">{createdDateTime.date}</div>
-                          </TableCell>
-
-                          <TableCell className="whitespace-nowrap">
-                            <div className="text-sm">{createdDateTime.time}</div>
-                          </TableCell>
-
-                          <TableCell className="whitespace-nowrap">
-                            {isCallLog && log.callCount30Days !== undefined ? (
-                              <Badge variant="outline" className="text-xs">
-                                {log.callCount30Days} in 30d
-                              </Badge>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell className='whitespace-nowrap'>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewLeadHistory(log.leadId);
-                              }}
-                              className="h-7 w-7 p-0"
-                              title="View Lead History"
-                            >
-                              <FileText className="w-3.5 h-3.5" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Compact Pagination for Mobile */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t">
-                <div className="text-xs sm:text-sm text-muted-foreground order-2 sm:order-1">
-                  Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, totalCombinedLogs)} of {totalCombinedLogs} logs
-                </div>
-
-                <div className="flex items-center gap-2 order-1 sm:order-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage(prev => Math.max(1, prev - 1))}
-                    disabled={page === 1 || combinedLoading}
-                    className="h-8 px-3 text-xs"
-                  >
-                    <ChevronLeft className="h-3 w-3 mr-1" />
-                    Prev
-                  </Button>
-
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
-                      let pageNum;
-                      if (totalPages <= 3) {
-                        pageNum = i + 1;
-                      } else if (page === 1) {
-                        pageNum = i + 1;
-                      } else if (page === totalPages) {
-                        pageNum = totalPages - 2 + i;
-                      } else {
-                        pageNum = page - 1 + i;
-                      }
-
-                      return (
-                        <Button
-                          key={pageNum}
-                          variant={page === pageNum ? "default" : "outline"}
-                          size="sm"
-                          className="w-7 h-7 p-0 text-xs"
-                          onClick={() => setPage(pageNum)}
-                          disabled={combinedLoading}
-                        >
-                          {pageNum}
-                        </Button>
-                      );
-                    })}
-                    {totalPages > 3 && page < totalPages - 1 && (
-                      <span className="text-xs px-1">...</span>
-                    )}
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={page === totalPages || combinedLoading}
-                    className="h-8 px-3 text-xs"
-                  >
-                    Next
-                    <ChevronRight className="h-3 w-3 ml-1" />
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Call Remark Modal */}
-      <Dialog open={CallModalOpen} onOpenChange={setCallModalOpen}>
-        <DialogContent className="sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="text-xl flex items-center gap-2">
-              <Phone className="w-5 h-5" />
-              Call Details
-            </DialogTitle>
-            <DialogDescription>
-              Complete information about this call
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-2 max-h-[calc(90vh-180px)] overflow-y-auto pr-2">
-            {selectedCallLog ? (
-              <div className="space-y-6">
-                {selectedCallLog.recording_url && (
-                  <div className="bg-muted/30 p-3 sm:p-4 rounded-lg">
-                    <h3 className="font-medium text-sm text-muted-foreground mb-3 flex items-center gap-2">
-                      <Phone className="w-4 h-4" />
-                      Call Recording
-                    </h3>
-                    <div className="bg-background border border-border rounded-lg p-3 sm:p-4">
-                      <audio controls className="w-full">
-                        <source src={selectedCallLog.recording_url} type="audio/mpeg" />
-                        <source src={selectedCallLog.recording_url} type="audio/wav" />
-                        Your browser does not support the audio element.
-                      </audio>
-                      <div className="mt-2 flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground">
-                          Click play to listen to the call recording
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50 border-b border-slate-100">
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase">Type</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase">Lead</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase">User</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase">Duration</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase">Status</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase">Stage</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase">Outcome</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase">Date & Time</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase">30d Calls</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {logs.map((log) => (
+                    <TableRow 
+                      key={log._id} 
+                      className="border-b border-slate-50 hover:bg-slate-50/50 cursor-pointer transition-colors"
+                      onClick={() => {
+                        if (log.logType === 'call') {
+                          setSelectedLog(log);
+                          setDetailsModalOpen(true);
+                        }
+                      }}
+                    >
+                      <TableCell className="py-3">
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg ${log.logType === 'call' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'}`}>
+                          {log.logType === 'call' ? <Phone className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                          {log.logType === 'call' ? 'Call' : 'Manual'}
                         </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => window.open(selectedCallLog.recording_url, '_blank')}
-                          className="text-xs"
-                        >
-                          Open in new tab
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {!selectedCallLog.recording_url && (
-                  <div className="bg-muted/30 p-3 sm:p-4 rounded-lg">
-                    <h3 className="font-medium text-sm text-muted-foreground mb-3 flex items-center gap-2">
-                      <Phone className="w-4 h-4" />
-                      Call Recording
-                    </h3>
-                    <div className="bg-background border border-border rounded-lg p-4 text-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <AlertCircle className="w-8 h-8 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">No recording available for this call</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-4">
-                    <div className="bg-muted/30 p-4 rounded-lg">
-                      <h3 className="font-medium text-sm text-muted-foreground mb-3">Call Details</h3>
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Lead ID</p>
-                            <p className="text-sm font-medium">{selectedCallLog.leadId || "N/A"}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Lead Name</p>
-                            <p className="text-sm font-medium">{selectedCallLog.leadName}</p>
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Stage</p>
-                          <p className="text-sm font-medium">{selectedCallLog.stageId?.name || "N/A"}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Call Status</p>
-                          <div className="mt-1">
-                            {getAnsweredBadge(selectedCallLog.answered)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-muted/30 p-4 rounded-lg">
-                      <h3 className="font-medium text-sm text-muted-foreground mb-2">Outcome</h3>
-                      <div className="bg-background border border-border rounded-lg p-3">
-                        <p className="text-sm whitespace-pre-wrap text-foreground">
-                          {selectedCallLog.outcome || "No outcome recorded"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="bg-muted/30 p-4 rounded-lg">
-                      <h3 className="font-medium text-sm text-muted-foreground mb-3">Employee Information</h3>
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-sm font-medium">
-                              {selectedCallLog.userId?.name?.charAt(0) || 'U'}
-                            </span>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">{selectedCallLog.userId?.name || "N/A"}</p>
-                            <p className="text-xs text-muted-foreground">{selectedCallLog.userId?.email || ""}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-muted/30 p-4 rounded-lg">
-                      <h3 className="font-medium text-sm text-muted-foreground mb-3">Timing Information</h3>
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Started At</p>
-                            <p className="text-sm font-medium">{formatDate(selectedCallLog.startedAt || selectedCallLog.createdAt).date}</p>
-                            <p className="text-xs text-muted-foreground">{formatDate(selectedCallLog.startedAt || selectedCallLog.createdAt).time}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Duration</p>
-                            <p className="text-sm font-medium">{formatDuration(selectedCallLog.duration) || "0:00"}</p>
-                          </div>
-                        </div>
-                        {selectedCallLog.callCount30Days !== undefined && (
-                          <div>
-                            <p className="text-xs text-muted-foreground">Call Activity</p>
-                            <Badge variant="outline" className="mt-1">
-                              {selectedCallLog.callCount30Days} calls in last 30 days
-                            </Badge>
-                          </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium text-slate-800 text-sm">#{log.leadId}</div>
+                        <div className="text-xs text-slate-400">{log.leadName}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm text-slate-700">{log.userId?.name || 'Unknown'}</div>
+                        {log.userId?.employeeId && <div className="text-xs text-slate-400">ID: {log.userId.employeeId}</div>}
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-mono text-sm text-slate-600">{formatDuration(log.duration)}</span>
+                      </TableCell>
+                      <TableCell>
+                        {log.logType === 'manual' ? (
+                          <span className="text-xs text-purple-600">Manual Entry</span>
+                        ) : log.answered ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-emerald-600"><CheckCircle className="w-3 h-3" />Answered</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs text-red-600"><XCircle className="w-3 h-3" />Missed</span>
                         )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-slate-600">{log.stageId?.name || '—'}</span>
+                      </TableCell>
+                      <TableCell className="max-w-[200px]">
+                        <p className="text-sm text-slate-600 truncate">{log.outcome || '—'}</p>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm text-slate-600">
+                        {formatDate(log.logType === 'call' ? log.startedAt || log.createdAt : log.interactionAt || log.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm font-medium text-slate-700">{log.callCount30Days || 0}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={(e) => { e.stopPropagation(); fetchLeadHistory(log.leadId); }} 
+                          className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100"
+                        >
+                          <FileText className="w-4 h-4 text-slate-400" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
 
-                <div className="bg-muted/30 p-4 rounded-lg">
-                  <h3 className="font-medium text-sm text-muted-foreground mb-3">Remarks</h3>
-                  <div className="bg-background border border-border rounded-lg p-4 min-h-[100px]">
-                    <p className="text-sm whitespace-pre-wrap text-foreground">
-                      {currentreview?.remark || "No remarks provided"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12">
-                <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                <h3 className="text-lg font-medium mb-1">No Data Available</h3>
-                <p className="text-muted-foreground text-center">
-                  No call remark data found for this session
-                </p>
-              </div>
-            )}
+          <div className="px-5 py-3 border-t border-slate-100 flex justify-between items-center text-sm text-slate-500">
+            <span>Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, totalLogs)} of {totalLogs}</span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1 || loading} className="rounded-lg">Previous</Button>
+              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || loading} className="rounded-lg">Next</Button>
+            </div>
           </div>
+        </Card>
 
-          <DialogFooter className="bottom-0 bg-background pt-4 border-t">
-            <Button
-              onClick={() => setCallModalOpen(false)}
-              className="w-full sm:w-auto"
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={newInteractionLogOpen} onOpenChange={setNewInteractionLogOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl">Add Manual Call Log</DialogTitle>
-            <DialogDescription>
-              Create a manual call log for the selected lead.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div className="grid gap-4">
-              <div className="space-y-2">
-                <Label>Lead</Label>
-                <Input
-                  value={leadSearchTerm}
-                  onChange={(e) => {
-                    setLeadSearchTerm(e.target.value);
-                    if (interactionForm.leadId) {
-                      setInteractionForm({ ...interactionForm, leadId: '' });
-                    }
-                  }}
-                  placeholder="Search by name, email or leadId"
+        {/* Manual Log Modal */}
+        <Dialog open={manualModalOpen} onOpenChange={setManualModalOpen}>
+          <DialogContent className="rounded-2xl max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="text-xl">Add Manual Call Log</DialogTitle>
+              <DialogDescription>Record a manual call entry for a lead</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium">Lead *</Label>
+                <Input 
+                  value={leadSearch} 
+                  onChange={e => { setLeadSearch(e.target.value); if (manualForm.leadId) setManualForm({ ...manualForm, leadId: '' }); }} 
+                  placeholder="Search lead by name or ID..." 
+                  className="mt-1.5 rounded-xl"
                 />
-                {leadSearchTerm.trim().length > 0 && (
-                  <div className="mt-2 max-h-52 overflow-auto rounded-lg border border-border bg-background shadow-sm">
+                {leadSearch && (
+                  <div className="mt-2 border rounded-xl max-h-48 overflow-auto">
                     {searchingLeads ? (
-                      <div className="p-3 text-sm text-muted-foreground">Searching leads...</div>
-                    ) : leadSearchOptions.length === 0 ? (
-                      <div className="p-3 text-sm text-muted-foreground">No leads found.</div>
+                      <div className="p-3 text-center text-sm text-slate-500">Searching...</div>
+                    ) : leadOptions.length === 0 ? (
+                      <div className="p-3 text-center text-sm text-slate-500">No leads found</div>
                     ) : (
-                      leadSearchOptions.map((lead) => (
+                      leadOptions.map(lead => (
                         <button
                           key={lead._id}
-                          type="button"
-                          className="w-full text-left px-3 py-2 hover:bg-muted/80"
+                          className="w-full text-left p-3 hover:bg-slate-50 transition-colors border-b last:border-0"
                           onClick={() => {
-                            setInteractionForm({ ...interactionForm, leadId: lead.leadId.toString() });
-                            setLeadSearchTerm(`${lead.name} (${lead.leadId})`);
-                            setLeadSearchOptions([]);
+                            setManualForm({ ...manualForm, leadId: lead.leadId.toString() });
+                            setLeadSearch(`${lead.name} (#${lead.leadId})`);
+                            setLeadOptions([]);
                           }}
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium text-sm">{lead.name}</span>
-                            <span className="text-xs text-muted-foreground">ID: {lead.leadId}</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground truncate">{lead.email || lead.phone}</div>
+                          <div className="font-medium text-sm">{lead.name}</div>
+                          <div className="text-xs text-slate-400">#{lead.leadId} • {lead.phone}</div>
                         </button>
                       ))
                     )}
                   </div>
                 )}
               </div>
-
-              <div className="space-y-2">
-                <Label>Stage</Label>
-                <Select value={interactionForm.stageId} onValueChange={(value) => setInteractionForm({ ...interactionForm, stageId: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select stage (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value=" ">None</SelectItem>
-                    {stages.map((stage) => (
-                      <SelectItem key={stage._id} value={stage._id}>
-                        {stage.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+              <div>
+                <Label className="text-sm font-medium">Stage (Optional)</Label>
+                <Select value={manualForm.stageId} onValueChange={v => setManualForm({ ...manualForm, stageId: v })}>
+                  <SelectTrigger className="mt-1.5 rounded-xl"><SelectValue placeholder="Select stage" /></SelectTrigger>
+                  <SelectContent><SelectItem value=" ">None</SelectItem>{stages.map(s => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-
-              <div className="space-y-2">
-                <Label>Outcome</Label>
-                <Textarea
-                  value={interactionForm.outcome}
-                  onChange={(e) => setInteractionForm({ ...interactionForm, outcome: e.target.value })}
-                  placeholder="Add call outcome or notes"
-                  rows={4}
-                />
+              <div>
+                <Label className="text-sm font-medium">Outcome / Notes *</Label>
+                <Textarea rows={4} value={manualForm.outcome} onChange={e => setManualForm({ ...manualForm, outcome: e.target.value })} placeholder="Enter call outcome or notes..." className="mt-1.5 rounded-xl" />
               </div>
-
-              <div className="space-y-2">
-                <Label>Interaction Date</Label>
-                <Input
-                  type="datetime-local"
-                  value={interactionForm.interactionAt}
-                  onChange={(e) => setInteractionForm({ ...interactionForm, interactionAt: e.target.value })}
-                />
+              <div>
+                <Label className="text-sm font-medium">Date & Time</Label>
+                <Input type="datetime-local" value={manualForm.interactionAt} onChange={e => setManualForm({ ...manualForm, interactionAt: e.target.value })} className="mt-1.5 rounded-xl" />
               </div>
             </div>
-          </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setManualModalOpen(false)} className="rounded-xl">Cancel</Button>
+              <Button onClick={handleAddManual} disabled={addingManual || !manualForm.leadId || !manualForm.outcome} className="bg-orange-600 hover:bg-orange-700 rounded-xl">
+                {addingManual ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                Save Log
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-          <DialogFooter className="pt-4">
-            <Button variant="outline" onClick={() => setNewInteractionLogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddInteractionLog} disabled={addingInteractionLog}>
-              {addingInteractionLog ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              Save Manual Call Log
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* Details Modal */}
+        <Dialog open={detailsModalOpen} onOpenChange={setDetailsModalOpen}>
+          <DialogContent className="rounded-2xl max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-xl">Call Details</DialogTitle>
+              <DialogDescription>Complete call information</DialogDescription>
+            </DialogHeader>
+            {selectedLog && (
+              <div className="space-y-5">
+                {selectedLog.recording_url && (
+                  <div className="bg-slate-50 p-4 rounded-xl">
+                    <p className="text-sm font-medium text-slate-700 mb-2">Recording</p>
+                    <audio controls className="w-full rounded-lg"><source src={selectedLog.recording_url} /></audio>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <div><p className="text-xs text-slate-500 uppercase font-semibold">Lead</p><p className="mt-1 font-medium text-slate-800">#{selectedLog.leadId} - {selectedLog.leadName}</p></div>
+                  <div><p className="text-xs text-slate-500 uppercase font-semibold">User</p><p className="mt-1 text-slate-800">{selectedLog.userId?.name}</p></div>
+                  <div><p className="text-xs text-slate-500 uppercase font-semibold">Duration</p><p className="mt-1 font-mono text-slate-800">{formatDuration(selectedLog.duration)}</p></div>
+                  <div><p className="text-xs text-slate-500 uppercase font-semibold">Status</p><p className="mt-1">{selectedLog.answered ? <span className="text-emerald-600">Answered</span> : <span className="text-red-600">Not Answered</span>}</p></div>
+                  <div><p className="text-xs text-slate-500 uppercase font-semibold">Stage</p><p className="mt-1 text-slate-800">{selectedLog.stageId?.name || '—'}</p></div>
+                  <div><p className="text-xs text-slate-500 uppercase font-semibold">30 Day Calls</p><p className="mt-1 text-slate-800">{selectedLog.callCount30Days || 0}</p></div>
+                </div>
+                <div><p className="text-xs text-slate-500 uppercase font-semibold">Outcome</p><div className="mt-1 bg-slate-50 p-3 rounded-xl text-sm text-slate-700">{selectedLog.outcome || 'No outcome recorded'}</div></div>
+              </div>
+            )}
+            <DialogFooter><Button onClick={() => setDetailsModalOpen(false)} className="rounded-xl">Close</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      <LeadHistoryModal
-        open={leadHistoryModalOpen}
-        onOpenChange={setLeadHistoryModalOpen}
-        leadHistory={leadHistory}
-        loadingHistory={loadingLeadHistory}
-        selectedLeadName={leads.find(l => l.leadId === callLogs.find(m => m.leadId)?.leadId)?.name}
-        onRefresh={() => {
-          if (selectedCallLog) {
-            fetchLeadHistory(selectedCallLog.leadId);
-          }
-        }}
-      />
+        {/* Lead History Modal */}
+        <LeadHistoryModal 
+        open={leadHistoryOpen} 
+        onOpenChange={setLeadHistoryOpen} 
+        leadHistory={leadHistory} 
+        loadingHistory={false} 
+        onRefresh={() => {}} />
+      </div>
     </div>
   );
 }

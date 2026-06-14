@@ -15,12 +15,46 @@ export interface UserType {
   profile?: ProfileType;
 }
 
+export interface Address {
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  country: string;
+  pincode: string;
+}
+
+export interface BankDetails {
+  accountHolderName: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+  branchName: string;
+  accountType: 'Savings' | 'Current' | 'Salary';
+}
+
+export interface EducationalDetail {
+  qualification: string;
+  instituteName: string;
+  boardOrUniversity: string;
+  passingYear: number;
+  percentageOrCGPA: string;
+}
+
+export interface Documents {
+  aadhaarFront?: string;
+  aadhaarBack?: string;
+  panCard?: string;
+  educationalCertificates?: string[];
+}
+
 export interface ProfileType {
   _id: string;
   userId: string;
   departmentId: DepartmentType;
   reportingManagerId: any;
   education: string;
+   profileImage?: string;
   salary: number;
   reportingSeniorId:{
     _id:string;
@@ -32,6 +66,11 @@ poolIds?: string[] | PoolType[];
     actions: string[];
     _id: string;
   }>;
+
+   address?: Address;
+  bankDetails?: BankDetails;
+  educationalDetails?: EducationalDetail[];
+  documents?: Documents;
   createdAt: string;
   updatedAt: string;
   __v: number;

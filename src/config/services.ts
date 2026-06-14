@@ -12,7 +12,6 @@ const getAuthHeaders = (token:string) => ({
 const getAuthHeadersFormData = (token:string) => ({
   headers: {
     'Authorization': `Bearer ${token}`,
-    "Content-Type": "multipart/form-data",
   }
 });
 
@@ -81,16 +80,15 @@ export const postDataHandlerWithToken = async (endPoint:any, data:any,isUrl=fals
   });
 };
 export const postDataHandlerWithTokenFormData = async (endPoint:any, data:any,isUrl=false) => {
-  const storedAuth = sessionStorage.getItem('auth');
-  const initialAuth = storedAuth ? JSON.parse(storedAuth) : null;
-  
-  if (!initialAuth?.authToken) {
+  const storedAuth = localStorage.getItem("access_token");
+  console.log(storedAuth,"1")
+    if (!storedAuth) {
     throw new Error('No authentication token found');
-  }
+    }
   return makeRequest("POST", endPoint, { 
     data, 
     isUrl,
-    ...getAuthHeadersFormData(initialAuth?.authToken) 
+    ...getAuthHeadersFormData(storedAuth) 
   });
 };
 

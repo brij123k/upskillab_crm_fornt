@@ -512,27 +512,107 @@ export function UsersPage() {
   const handleUpdateUser = async (userId: string, data: any) => {
     try {
       const endpoint = ApiConfig.updateUser(userId);
-      const response = await patchTokenDataHandler(endpoint, {
+
+      // Prepare the payload with all fields
+      const payload: any = {
+        // Basic user fields
         name: data.name,
         email: data.email,
         number: data.number,
         role: data.role,
+
+        // Profile fields
         departmentId: data.departmentId,
         education: data.education,
         salary: parseInt(data.salary) || 0,
-        reportingSeniorId: data.reportingSeniorId,
+        reportingSeniorId: data.reportingSeniorId || null,
         poolIds: data.poolIds || [],
-        extraAccessControls: data.extraAccessControls.filter((control: any) => control.actions.length > 0)
-      }, true);
+
+        // Profile image
+        profileImage: data.profileImage || '',
+
+        // Address details
+        address: data.address ? {
+          addressLine1: data.address.addressLine1 || '',
+          addressLine2: data.address.addressLine2 || '',
+          city: data.address.city || '',
+          state: data.address.state || '',
+          country: data.address.country || '',
+          pincode: data.address.pincode || ''
+        } : null,
+
+        // Bank details
+        bankDetails: data.bankDetails ? {
+          accountHolderName: data.bankDetails.accountHolderName || '',
+          bankName: data.bankDetails.bankName || '',
+          accountNumber: data.bankDetails.accountNumber || '',
+          ifscCode: data.bankDetails.ifscCode || '',
+          branchName: data.bankDetails.branchName || '',
+          accountType: data.bankDetails.accountType || ''
+        } : null,
+
+        // Educational details
+        educationalDetails: data.educationalDetails && data.educationalDetails.length > 0
+          ? data.educationalDetails.map((edu: any) => ({
+            qualification: edu.qualification,
+            instituteName: edu.instituteName,
+            boardOrUniversity: edu.boardOrUniversity,
+            passingYear: parseInt(edu.passingYear) || edu.passingYear,
+            percentageOrCGPA: edu.percentageOrCGPA
+          }))
+          : [],
+
+        // Documents
+        documents: data.documents ? {
+          aadhaarFront: data.documents.aadhaarFront || '',
+          aadhaarBack: data.documents.aadhaarBack || '',
+          panCard: data.documents.panCard || '',
+          educationalCertificates: data.documents.educationalCertificates || []
+        } : null,
+
+        // Extra access controls
+        extraAccessControls: data.extraAccessControls?.filter((control: any) => control.actions.length > 0) || []
+      };
+
+      // Clean up null/undefined values
+      Object.keys(payload).forEach(key => {
+        if (payload[key] === null || payload[key] === undefined) {
+          delete payload[key];
+        }
+      });
+
+      // Remove empty address object
+      if (payload.address && Object.keys(payload.address).every(key => !payload.address[key])) {
+        delete payload.address;
+      }
+
+      // Remove empty bankDetails object
+      if (payload.bankDetails && Object.keys(payload.bankDetails).every(key => !payload.bankDetails[key])) {
+        delete payload.bankDetails;
+      }
+
+      // Remove empty documents object
+      if (payload.documents && Object.keys(payload.documents).every(key => !payload.documents[key] ||
+        (Array.isArray(payload.documents[key]) && payload.documents[key].length === 0))) {
+        delete payload.documents;
+      }
+
+      // Remove empty educationalDetails array
+      if (payload.educationalDetails && payload.educationalDetails.length === 0) {
+        delete payload.educationalDetails;
+      }
+
+      const response = await patchTokenDataHandler(endpoint, payload, true);
 
       toast({
         title: "Success",
         description: response?.message || "User updated successfully",
       });
+
       fetchUsers();
       return response;
     } catch (error: any) {
-      console.log(error)
+      console.log(error);
       toast({
         title: "Error",
         description: error.response?.data?.message || "Failed to update user",
@@ -585,22 +665,94 @@ export function UsersPage() {
   const handleCreateProfile = async (userId: string, data: any) => {
     try {
       const endpoint = ApiConfig.profileGen(userId);
-      const response = await patchTokenDataHandler(endpoint, {
+
+      // Prepare the payload with all the new fields
+      const payload: any = {
+        // Basic profile fields
         departmentId: data.departmentId,
         education: data.education,
         salary: parseInt(data.salary) || 0,
-        reportingSeniorId: data.reportingSeniorId,
+        reportingSeniorId: data.reportingSeniorId || null,
         poolIds: data.poolIds || [],
-        extraAccessControls: data.extraAccessControls.filter((control: any) => control.actions.length > 0)
-      }, true);
+
+        // New fields
+        profileImage: data.profileImage || '',
+
+        // Address details
+        address: data.address ? {
+          addressLine1: data.address.addressLine1 || '',
+          addressLine2: data.address.addressLine2 || '',
+          city: data.address.city || '',
+          state: data.address.state || '',
+          country: data.address.country || '',
+          pincode: data.address.pincode || ''
+        } : null,
+
+        // Bank details
+        bankDetails: data.bankDetails ? {
+          accountHolderName: data.bankDetails.accountHolderName || '',
+          bankName: data.bankDetails.bankName || '',
+          accountNumber: data.bankDetails.accountNumber || '',
+          ifscCode: data.bankDetails.ifscCode || '',
+          branchName: data.bankDetails.branchName || '',
+          accountType: data.bankDetails.accountType || ''
+        } : null,
+
+        // Educational details (array)
+        educationalDetails: data.educationalDetails && data.educationalDetails.length > 0
+          ? data.educationalDetails.map((edu: any) => ({
+            qualification: edu.qualification,
+            instituteName: edu.instituteName,
+            boardOrUniversity: edu.boardOrUniversity,
+            passingYear: parseInt(edu.passingYear) || edu.passingYear,
+            percentageOrCGPA: edu.percentageOrCGPA
+          }))
+          : [],
+
+        // Documents
+        documents: data.documents ? {
+          aadhaarFront: data.documents.aadhaarFront || '',
+          aadhaarBack: data.documents.aadhaarBack || '',
+          panCard: data.documents.panCard || '',
+          educationalCertificates: data.documents.educationalCertificates || []
+        } : null,
+
+        // Extra access controls
+        extraAccessControls: data.extraAccessControls?.filter((control: any) => control.actions.length > 0) || []
+      };
+
+      // Remove null values to keep payload clean (optional)
+      Object.keys(payload).forEach(key => {
+        if (payload[key] === null || payload[key] === undefined) {
+          delete payload[key];
+        }
+      });
+
+      // Remove empty objects
+      if (payload.address && Object.keys(payload.address).every(key => !payload.address[key])) {
+        delete payload.address;
+      }
+
+      if (payload.bankDetails && Object.keys(payload.bankDetails).every(key => !payload.bankDetails[key])) {
+        delete payload.bankDetails;
+      }
+
+      if (payload.documents && Object.keys(payload.documents).every(key => !payload.documents[key] ||
+        (Array.isArray(payload.documents[key]) && payload.documents[key].length === 0))) {
+        delete payload.documents;
+      }
+
+      const response = await patchTokenDataHandler(endpoint, payload, true);
 
       toast({
         title: "Success",
         description: response?.message || "Profile created successfully",
       });
+
       fetchUsers();
       return response;
     } catch (error: any) {
+      console.error("Create profile error:", error);
       toast({
         title: "Error",
         description: error.response?.data?.message || "Failed to create profile",

@@ -8,6 +8,7 @@ const ApiConfig = {
   varify_otp:`${url}/users/verify-otp`,
   reset_password:`${url}/users/reset-password`,
 
+  uploadImage: `${url}/profile-upload/image`,
   getAllUser:`${url}/users`,
   getAllProfile:`${url}/users/profile`,
   getMySeniors:`${url}/users/seniors/me`,
@@ -40,6 +41,7 @@ const ApiConfig = {
   changeStageLead:(leadid:string)=>`${url}/leads/${leadid}/stage`,
   leadHistory:(leadid:string)=>`${url}/lead-history/${leadid}`,
   assignLead:`${url}/leads/lead/assign`,
+  poolChange:`${url}/leads/pool/assign`,
   assignLeadToDepartment:`${url}/leads/lead/assign-department`,
   leaddoublicateFinder:`${url}/leads/leaddoublicate/duplicates`,
   leadmerge:`${url}/leads/leaddoublicate/merge`,

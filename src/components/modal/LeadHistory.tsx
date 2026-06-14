@@ -8,8 +8,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, FileText, Calendar, Phone, User, RefreshCw, Clock, MessageSquare, Users, TrendingUp, Mail } from 'lucide-react';
+import { Loader2, FileText, Calendar, Phone, User, RefreshCw, Clock, MessageSquare, Users, TrendingUp, Mail, Video, ClipboardList } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface HistoryActionBy {
@@ -28,7 +27,7 @@ interface LeadHistoryType {
   _id: string;
   leadId: string;
   actionType: string;
-  meet_log?:any;
+  meet_log?: any;
   actionBy: HistoryActionBy;
   fromUser?: HistoryUser;
   toUser?: HistoryUser;
@@ -69,108 +68,104 @@ export function LeadHistoryModal({
   const getActionIcon = (actionType: string) => {
     switch (actionType) {
       case 'created':
-        return <FileText className="w-4 h-4" />;
+        return <FileText className="w-4 h-4 text-orange-600" />;
       case 'updated':
-        return <RefreshCw className="w-4 h-4" />;
+        return <RefreshCw className="w-4 h-4 text-orange-600" />;
       case 'call_log':
-        return <Phone className="w-4 h-4" />;
+        return <Phone className="w-4 h-4 text-orange-600" />;
       case 'stage changed by calls':
-        return <TrendingUp className="w-4 h-4" />;
+        return <TrendingUp className="w-4 h-4 text-orange-600" />;
       case 'assigned':
-        return <Users className="w-4 h-4" />;
+        return <Users className="w-4 h-4 text-orange-600" />;
       case 'lead_schedule':
-        return <Calendar className="w-4 h-4" />;
+        return <Calendar className="w-4 h-4 text-orange-600" />;
       case 'status_changed':
-        return <TrendingUp className="w-4 h-4" />;
+        return <TrendingUp className="w-4 h-4 text-orange-600" />;
       case 'meet_log':
-        return <Calendar className="w-4 h-4" />; // Using Calendar icon for meetings
+        return <Video className="w-4 h-4 text-orange-600" />;
       case 'meet_log_feedback':
-        return <MessageSquare className="w-4 h-4" />; // Using MessageSquare for feedback
+        return <ClipboardList className="w-4 h-4 text-orange-600" />;
       default:
-        return <FileText className="w-4 h-4" />;
+        return <FileText className="w-4 h-4 text-orange-600" />;
     }
   };
 
-  const getActionBadge = (actionType: string) => {
+  const formatActionLabel = (actionType: string) => {
     switch (actionType) {
       case 'created':
-        return <Badge className="bg-green-100 text-green-800">Created</Badge>;
+        return 'Lead Created';
       case 'updated':
-        return <Badge className="bg-blue-100 text-blue-800">Updated</Badge>;
+        return 'Lead Updated';
       case 'call_log':
-        return <Badge className="bg-purple-100 text-purple-800">Call Log</Badge>;
+        return 'Call Logged';
       case 'stage changed by calls':
-        return <Badge className="bg-indigo-100 text-indigo-800">Stage Changed</Badge>;
+        return 'Stage Changed';
       case 'assigned':
-        return <Badge className="bg-yellow-100 text-yellow-800">Assigned</Badge>;
+        return 'Lead Assigned';
       case 'lead_schedule':
-        return <Badge className="bg-pink-100 text-pink-800">Scheduled</Badge>;
+        return 'Meeting Scheduled';
       case 'status_changed':
-        return <Badge className="bg-orange-100 text-orange-800">Status Changed</Badge>;
+        return 'Status Changed';
       case 'meet_log':
-        return <Badge className="bg-teal-100 text-teal-800">Meeting</Badge>;
+        return 'Meeting Conducted';
       case 'meet_log_feedback':
-        return <Badge className="bg-emerald-100 text-emerald-800">Meeting Feedback</Badge>;
+        return 'Meeting Feedback';
       default:
-        return <Badge variant="outline">{actionType}</Badge>;
+        return actionType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
   };
 
   const formatDuration = (seconds: number) => {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const remainingSeconds = seconds % 60;
-  
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-  if (minutes > 0) {
-    return `${minutes}m ${remainingSeconds}s`;
-  }
-  return `${remainingSeconds}s`;
-};
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
 
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    if (minutes > 0) {
+      return `${minutes}m ${remainingSeconds}s`;
+    }
+    return `${remainingSeconds}s`;
+  };
 
   const renderChanges = (history: LeadHistoryType) => {
-    const { actionType, changes, reason,meet_log } = history;
+    const { actionType, changes, reason, meet_log } = history;
 
     switch (actionType) {
       case 'created':
         return (
-          <div className="space-y-2">
-            <div className="text-sm">
-              <span className="font-medium">Lead created with details:</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-4">
               {changes.name && (
                 <div>
-                  <span className="text-muted-foreground">Name:</span>{' '}
-                  <span className="font-medium">{changes.name}</span>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Name</div>
+                  <div className="text-sm font-medium text-slate-800 mt-0.5">{changes.name}</div>
                 </div>
               )}
               {changes.phone && (
                 <div>
-                  <span className="text-muted-foreground">Phone:</span>{' '}
-                  <span className="font-medium">{changes.phone}</span>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Phone</div>
+                  <div className="text-sm font-medium text-slate-800 mt-0.5">{changes.phone}</div>
                 </div>
               )}
               {changes.email && (
                 <div>
-                  <span className="text-muted-foreground">Email:</span>{' '}
-                  <span className="font-medium">{changes.email}</span>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Email</div>
+                  <div className="text-sm font-medium text-slate-800 mt-0.5">{changes.email}</div>
                 </div>
               )}
               {changes.source && (
                 <div>
-                  <span className="text-muted-foreground">Source:</span>{' '}
-                  <span className="font-medium">{changes.source}</span>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Source</div>
+                  <div className="text-sm font-medium text-slate-800 mt-0.5">{changes.source}</div>
                 </div>
               )}
             </div>
             {reason && (
-              <div className="text-sm">
-                <span className="font-medium">Reason:</span>{' '}
-                <span className="text-muted-foreground">{reason}</span>
+              <div className="pt-2 border-t border-slate-100">
+                <div className="text-xs text-slate-400 uppercase tracking-wide">Reason</div>
+                <div className="text-sm text-slate-600 mt-0.5">{reason}</div>
               </div>
             )}
           </div>
@@ -178,102 +173,85 @@ export function LeadHistoryModal({
 
       case 'call_log':
         return (
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-4">
               {changes.duration !== undefined && (
                 <div>
-                  <span className="text-muted-foreground">Duration:</span>{' '}
-                  <span className="font-medium">{changes.duration} seconds</span>
-                </div>
-              )}
-              {changes.outcome && (
-                <div>
-                  <span className="text-muted-foreground">Outcome:</span>{' '}
-                  <span className="font-medium">{changes.outcome}</span>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Duration</div>
+                  <div className="text-sm font-medium text-slate-800 mt-0.5">{formatDuration(changes.duration)}</div>
                 </div>
               )}
               {changes.startedAt && (
                 <div>
-                  <span className="text-muted-foreground">Started:</span>{' '}
-                  <span className="font-medium">
-                    {new Date(changes.startedAt).toLocaleString()}
-                  </span>
-                </div>
-              )}
-              {changes.stageId && (
-                <div>
-                  <span className="text-muted-foreground">Stage:</span>{' '}
-                  <span className="font-medium">{changes.stageId}</span>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Started At</div>
+                  <div className="text-sm font-medium text-slate-800 mt-0.5">{formatDate(changes.startedAt)}</div>
                 </div>
               )}
             </div>
+            {changes.outcome && (
+              <div className="pt-2 border-t border-slate-100">
+                <div className="text-xs text-slate-400 uppercase tracking-wide">Outcome</div>
+                <div className="text-sm text-slate-600 mt-0.5">{changes.outcome}</div>
+              </div>
+            )}
             {reason && (
-              <div className="text-sm">
-                <span className="font-medium">Notes:</span>{' '}
-                <span className="text-muted-foreground">{reason}</span>
+              <div className="pt-2 border-t border-slate-100">
+                <div className="text-xs text-slate-400 uppercase tracking-wide">Notes</div>
+                <div className="text-sm text-slate-600 mt-0.5">{reason}</div>
               </div>
             )}
           </div>
         );
 
-      case 'stage_changed_by_calls':
+      case 'stage changed by calls':
+      case 'stage_changed':
+      case 'status_changed':
         return (
-          <div className="space-y-2">
-            <div className="text-sm">
-              <span className="font-medium">Stage changed from </span>
-              <Badge variant="outline" className="mx-1">
-                {changes.status?.from || 'Unknown'}
-              </Badge>
-              <span className="font-medium"> to </span>
-              <Badge variant="outline" className="mx-1">
-                {changes.status?.to || 'Unknown'}
-              </Badge>
-            </div>
+          <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg">
+            <span className="text-sm font-medium text-slate-700">{changes.status?.from || 'Unknown'}</span>
+            <TrendingUp className="w-4 h-4 text-orange-500" />
+            <span className="text-sm font-medium text-slate-700">{changes.status?.to || 'Unknown'}</span>
           </div>
         );
 
       case 'assigned':
         return (
-          <div className="space-y-2">
-            <div className="text-sm">
+          <div className="space-y-3">
+            <div className="flex items-center flex-wrap gap-1 text-sm">
               {history.fromUser ? (
                 <>
-                  <span className="font-medium">Reassigned from </span>
-                  <span className="text-primary">{history.fromUser.name}</span>
-                  <span className="font-medium"> to </span>
-                  <span className="text-primary">{history.toUser?.name}</span>
+                  <span className="text-slate-600">Reassigned from</span>
+                  <span className="font-medium text-orange-700">{history.fromUser.name}</span>
+                  <span className="text-slate-600">to</span>
+                  <span className="font-medium text-orange-700">{history.toUser?.name}</span>
                 </>
               ) : (
                 <>
-                  <span className="font-medium">Assigned to </span>
-                  <span className="text-primary">{history.toUser?.name}</span>
+                  <span className="text-slate-600">Assigned to</span>
+                  <span className="font-medium text-orange-700">{history.toUser?.name}</span>
                 </>
               )}
             </div>
             {reason && (
-              <div className="text-sm">
-                <span className="font-medium">Reason:</span>{' '}
-                <span className="text-muted-foreground">{reason}</span>
+              <div className="pt-2 border-t border-slate-100">
+                <div className="text-xs text-slate-400 uppercase tracking-wide">Reason</div>
+                <div className="text-sm text-slate-600 mt-0.5">{reason}</div>
               </div>
             )}
-            <div className="text-xs text-muted-foreground">
-              Modified by: {history.changes.modifiedBy || 'System'}
+            <div className="text-xs text-slate-400">
+              Modified by: {history.actionBy.name || 'System'}
             </div>
           </div>
         );
 
       case 'lead_schedule':
         return (
-          <div className="space-y-2">
-            <div className="text-sm">
-              <span className="font-medium">{changes.message || 'Lead Scheduled'}</span>
-            </div>
+          <div className="space-y-3">
+            <div className="text-sm text-slate-700">{changes.message || 'Meeting Scheduled'}</div>
             {changes.scheduler && (
-              <div className="text-sm">
-                <span className="text-muted-foreground">Scheduled for:</span>{' '}
-                <span className="font-medium">
-                  {new Date(changes.scheduler).toLocaleString()}
-                </span>
+              <div>
+                <div className="text-xs text-slate-400 uppercase tracking-wide">Scheduled On</div>
+                <div className="text-sm font-medium text-slate-800 mt-0.5">{formatDate(changes.scheduler)}</div>
               </div>
             )}
           </div>
@@ -281,76 +259,54 @@ export function LeadHistoryModal({
 
       case 'updated':
         return (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {changes.scheduler ? (
               <>
-                <div className="text-sm">
-                  <span className="font-medium">{changes.message || 'Lead Scheduled'}</span>
-                </div>
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Scheduled for:</span>{' '}
-                  <span className="font-medium">
-                    {new Date(changes.scheduler).toLocaleString()}
-                  </span>
+                <div className="text-sm text-slate-700">{changes.message || 'Meeting Scheduled'}</div>
+                <div>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Scheduled on</div>
+                  <div className="text-sm font-medium text-slate-800 mt-0.5">{formatDate(changes.scheduler)}</div>
                 </div>
               </>
             ) : (
-              <div className="text-sm">
-                <span className="font-medium">Lead information updated</span>
-              </div>
+              <div className="text-sm text-slate-600">Lead information was updated</div>
             )}
           </div>
         );
+
       case 'meet_log':
         return (
-          <div className="space-y-2">
-            <div className="text-sm">
-              <span className="font-medium">Meeting Details:</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-4">
               {changes.meetingType && (
                 <div>
-                  <span className="text-muted-foreground">Meeting Type:</span>{' '}
-                  <span className="font-medium">{changes.meetingType}</span>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Meeting Type</div>
+                  <div className="text-sm font-medium text-slate-800 mt-0.5">{changes.meetingType}</div>
                 </div>
               )}
               {changes.duration !== undefined && (
                 <div>
-                  <span className="text-muted-foreground">Duration:</span>{' '}
-                  <span className="font-medium">{changes.duration} seconds</span>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Duration</div>
+                  <div className="text-sm font-medium text-slate-800 mt-0.5">{formatDuration(changes.duration)}</div>
                 </div>
               )}
-              {changes.outcome && (
-                <div>
-                  <span className="text-muted-foreground">Outcome:</span>{' '}
-                  <span className="font-medium">{changes.outcome}</span>
-                </div>
-              )}
-              {/* {changes.stageId && (
-                <div>
-                  <span className="text-muted-foreground">Stage:</span>{' '}
-                  <span className="font-medium">{changes.stageId}</span>
-                </div>
-              )} */}
               {changes.startedAt && (
                 <div className="col-span-2">
-                  <span className="text-muted-foreground">Started At:</span>{' '}
-                  <span className="font-medium">
-                    {new Date(changes.startedAt).toLocaleString()}
-                  </span>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Started At</div>
+                  <div className="text-sm font-medium text-slate-800 mt-0.5">{formatDate(changes.startedAt)}</div>
                 </div>
               )}
             </div>
-            {changes.notes && (
-              <div className="text-sm">
-                <span className="font-medium">Notes:</span>{' '}
-                <span className="text-muted-foreground">{changes.notes}</span>
+            {changes.outcome && (
+              <div className="pt-2 border-t border-slate-100">
+                <div className="text-xs text-slate-400 uppercase tracking-wide">Outcome</div>
+                <div className="text-sm text-slate-600 mt-0.5">{changes.outcome}</div>
               </div>
             )}
-            {reason && (
-              <div className="text-sm">
-                <span className="font-medium">Reason:</span>{' '}
-                <span className="text-muted-foreground">{reason}</span>
+            {changes.notes && (
+              <div className="pt-2 border-t border-slate-100">
+                <div className="text-xs text-slate-400 uppercase tracking-wide">Notes</div>
+                <div className="text-sm text-slate-600 mt-0.5">{changes.notes}</div>
               </div>
             )}
           </div>
@@ -358,53 +314,34 @@ export function LeadHistoryModal({
 
       case 'meet_log_feedback':
         return (
-          <div className="space-y-2">
-            <div className="text-sm">
-              <span className="font-medium">Meeting Feedback:</span>
+          <div className="space-y-3">
+            <div className="bg-orange-50 p-3 rounded-lg">
+              <div className="text-xs text-orange-600 uppercase tracking-wide mb-1">Feedback</div>
+              <div className="text-sm text-slate-700">{changes.feedback || reason}</div>
             </div>
-            <div className="bg-muted/50 p-3 rounded-lg text-sm">
-              <span className="text-muted-foreground">Feedback:</span>{' '}
-              <span className="font-medium">{changes.feedback || reason}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              {meet_log.meetingType && (
+            <div className="grid grid-cols-2 gap-4">
+              {meet_log?.meetingType && (
                 <div>
-                  <span className="text-muted-foreground">Meeting Type:</span>{' '}
-                  <span className="font-medium">{meet_log.meetingType}</span>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Meeting Type</div>
+                  <div className="text-sm font-medium text-slate-800 mt-0.5">{meet_log.meetingType}</div>
                 </div>
               )}
-              {meet_log.duration !== undefined && (
+              {meet_log?.duration !== undefined && (
                 <div>
-                  <span className="text-muted-foreground">Duration:</span>{' '}
-                  <span className="font-medium">{meet_log.duration} seconds</span>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Duration</div>
+                  <div className="text-sm font-medium text-slate-800 mt-0.5">{formatDuration(meet_log.duration)}</div>
                 </div>
               )}
-              {meet_log.outcome && (
-                <div>
-                  <span className="text-muted-foreground">Outcome:</span>{' '}
-                  <span className="font-medium">{meet_log.outcome}</span>
-                </div>
-              )}
-              {meet_log.startedAt && (
+              {meet_log?.outcome && (
                 <div className="col-span-2">
-                  <span className="text-muted-foreground">Started At:</span>{' '}
-                  <span className="font-medium">
-                    {new Date(meet_log.startedAt).toLocaleString()}
-                  </span>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Outcome</div>
+                  <div className="text-sm font-medium text-slate-800 mt-0.5">{meet_log.outcome}</div>
                 </div>
               )}
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mt-1">
-              {/* {changes.meetingId && (
-                <div>
-                  <span>Meeting ID: </span>
-                  <span className="font-mono">{changes.meetingId.slice(-6)}</span>
-                </div>
-              )} */}
-              {changes.leadId && (
-                <div>
-                  <span>Lead ID: </span>
-                  <span>{changes.leadId}</span>
+              {meet_log?.startedAt && (
+                <div className="col-span-2">
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Started At</div>
+                  <div className="text-sm font-medium text-slate-800 mt-0.5">{formatDate(meet_log.startedAt)}</div>
                 </div>
               )}
             </div>
@@ -413,20 +350,12 @@ export function LeadHistoryModal({
 
       default:
         return (
-          <div className="space-y-2">
-            <div className="text-sm">
-              <span className="font-medium">Action: </span>
-              <span className="text-muted-foreground">{actionType}</span>
-            </div>
+          <div className="space-y-3">
+            <div className="text-sm text-slate-600">Action: {actionType}</div>
             {reason && (
-              <div className="text-sm">
-                <span className="font-medium">Reason:</span>{' '}
-                <span className="text-muted-foreground">{reason}</span>
-              </div>
-            )}
-            {changes && Object.keys(changes).length > 0 && (
-              <div className="text-xs text-muted-foreground">
-                Changes: {JSON.stringify(changes)}
+              <div>
+                <div className="text-xs text-slate-400 uppercase tracking-wide">Reason</div>
+                <div className="text-sm text-slate-600 mt-0.5">{reason}</div>
               </div>
             )}
           </div>
@@ -436,17 +365,17 @@ export function LeadHistoryModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[90vw] max-h-[95vh] overflow-hidden flex flex-col">
-        {/* Fixed Header */}
-        <DialogHeader className="px-1 pt-1 pb-2 border-b shrink-0">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 rounded-2xl shadow-xl">
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-slate-100 bg-white rounded-t-2xl">
           <div className="flex items-center justify-between">
             <div>
-              <DialogTitle className="text-lg sm:text-xl flex items-center gap-2">
-                <FileText className="w-3 h-3" />
+              <DialogTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-orange-500" />
                 Lead History
               </DialogTitle>
-              <DialogDescription className="text-sm sm:text-base">
-                {selectedLeadName ? `Complete history for ${selectedLeadName}` : 'Lead activity history'}
+              <DialogDescription className="text-sm text-slate-500 mt-1">
+                {selectedLeadName ? `Activity timeline for ${selectedLeadName}` : 'Lead activity timeline'}
               </DialogDescription>
             </div>
             <Button
@@ -454,7 +383,7 @@ export function LeadHistoryModal({
               size="sm"
               onClick={onRefresh}
               disabled={loadingHistory}
-              className="h-9"
+              className="rounded-xl border-slate-200 hover:bg-slate-50 hover:border-orange-200 transition-colors"
             >
               {loadingHistory ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -463,111 +392,92 @@ export function LeadHistoryModal({
               )}
             </Button>
           </div>
-        </DialogHeader>
+        </div>
 
-        {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto px-6 py-6 bg-slate-50/30">
           {loadingHistory ? (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-16">
               <div className="text-center">
-                <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
-                <p className="mt-2 text-muted-foreground">Loading lead history...</p>
+                <Loader2 className="w-8 h-8 animate-spin mx-auto text-orange-400" />
+                <p className="mt-3 text-sm text-slate-500">Loading history...</p>
               </div>
             </div>
           ) : leadHistory.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <FileText className="w-12 h-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No history found</h3>
-              <p className="text-muted-foreground text-center">
-                No activity history recorded for this lead yet.
-              </p>
+            <div className="flex flex-col items-center justify-center py-16">
+              <FileText className="w-12 h-12 text-slate-300 mb-4" />
+              <h3 className="text-base font-medium text-slate-700 mb-1">No history found</h3>
+              <p className="text-sm text-slate-400 text-center">No activity recorded for this lead yet.</p>
             </div>
           ) : (
-            <div className="space-y-6">
-              {/* Timeline */}
-              <div className="relative">
-                {/* Timeline line */}
-                <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-muted" />
+            <div className="relative">
+              {/* Timeline vertical line */}
+              <div className="absolute left-[21px] top-0 bottom-0 w-px bg-slate-200" />
 
-                {leadHistory.map((history, index) => (
-                  <div key={history._id} className="relative pl-14 pb-6">
-                    {/* Timeline dot */}
-                    <div
-                      className={cn(
-                        'absolute left-5 top-2 w-3 h-3 rounded-full border-4 border-background z-10',
-                        {
-                          'bg-green-500': history.actionType === 'created',
-                          'bg-blue-500': history.actionType === 'updated',
-                          'bg-purple-500': history.actionType === 'call_log',
-                          'bg-indigo-500': history.actionType === 'stage changed by calls',
-                          'bg-yellow-500': history.actionType === 'assigned',
-                          'bg-pink-500': history.actionType === 'lead_schedule',
-                          'bg-orange-500': history.actionType === 'status_changed',
-                          'bg-teal-500': history.actionType === 'meet_log',
-                          'bg-emerald-500': history.actionType === 'meet_log_feedback',
-                          'bg-gray-500': true, // default
-                        }
-                      )}
-                    />
+              {leadHistory.map((history, idx) => (
+                <div key={history._id} className="relative pl-12 pb-6 last:pb-0">
+                  {/* Timeline dot with orange accent */}
+                  <div className="absolute left-[13px] top-1.5 w-3 h-3 rounded-full bg-orange-500 ring-4 ring-white z-10" />
 
-                    {/* Content card */}
-                    <div className="border rounded-lg p-4 bg-card shadow-sm">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-md bg-muted">
-                            {getActionIcon(history.actionType)}
+                  {/* Card */}
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+                    <div className="p-4">
+                      {/* Header with icon and action */}
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="p-2 bg-orange-50 rounded-lg">
+                          {getActionIcon(history.actionType)}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center flex-wrap gap-2">
+                            <span className="text-sm font-semibold text-orange-700">
+                              {formatActionLabel(history.actionType)}
+                            </span>
+                            <span className="text-xs text-slate-400">•</span>
+                            <span className="text-sm text-slate-600">
+                              by <span className="font-medium text-slate-800">{history.actionBy.name}</span>
+                            </span>
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              {getActionBadge(history.actionType)}
-                              <span className="text-sm font-medium">
-                                by {history.actionBy.name}
-                              </span>
-                            </div>
-                            <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {formatDate(history.createdAt)}
-                            </div>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            <span className="text-xs text-slate-500">{formatDate(history.createdAt)}</span>
                           </div>
                         </div>
                       </div>
 
                       {/* Changes content */}
-                      <div className="mt-3 pt-3 border-t">
-                        {renderChanges(history)}
-                      </div>
+                      {renderChanges(history)}
 
-                      {/* Additional info */}
-                      <div className="mt-3 pt-3 border-t">
-                        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <User className="w-3 h-3" />
-                            <span>User: {history.actionBy.name}</span>
+                      {/* Footer with user info */}
+                      <div className="mt-4 pt-3 border-t border-slate-100">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <User className="w-3 h-3 text-slate-400" />
+                            <span className="text-slate-500">{history.actionBy.name}</span>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Mail className="w-3 h-3" />
-                            <span>{history.actionBy.email}</span>
+                          <div className="flex items-center gap-1.5">
+                            <Mail className="w-3 h-3 text-slate-400" />
+                            <span className="text-slate-500 truncate">{history.actionBy.email}</span>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
 
-        {/* Fixed Footer */}
-        <DialogFooter className="px-2 py-1 border-t shrink-0">
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-slate-100 bg-white rounded-b-2xl">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="w-full sm:w-auto"
+            className="w-full rounded-xl border-slate-200 hover:bg-slate-50 hover:border-orange-200 transition-colors"
           >
             Close
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

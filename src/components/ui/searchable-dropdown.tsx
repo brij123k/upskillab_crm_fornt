@@ -22,7 +22,7 @@ import { Badge } from '@/components/ui/badge';
 export interface Option {
   value: string;
   label: string;
-  [key: string]: any; // For additional properties
+  [key: string]: any;
 }
 
 interface SearchableDropdownProps {
@@ -61,35 +61,29 @@ export function SearchableDropdown({
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Filter options based on search query
   const filteredOptions = useMemo(() => {
     if (!searchQuery.trim()) return options;
 
     const query = searchQuery.toLowerCase();
 
     return options.filter(option => {
-      // Safe check for option existence
       if (!option) return false;
 
-      // Check label safely
       if (option.label && typeof option.label === 'string' &&
         option.label.toLowerCase().includes(query)) {
         return true;
       }
 
-      // Check value safely
       if (option.value && typeof option.value === 'string' &&
         option.value.toLowerCase().includes(query)) {
         return true;
       }
 
-      // Check role safely
       if (option.role) {
         if (typeof option.role === 'string' &&
           option.role.toLowerCase().includes(query)) {
           return true;
         } else if (typeof option.role === 'object' && option.role !== null) {
-          // Check role.name safely
           if (option.role.name && typeof option.role.name === 'string' &&
             option.role.name.toLowerCase().includes(query)) {
             return true;
@@ -97,19 +91,16 @@ export function SearchableDropdown({
         }
       }
 
-      // Check empId safely
       if (option.empId && typeof option.empId === 'string' &&
         option.empId.toLowerCase().includes(query)) {
         return true;
       }
 
-      // Check email safely
       if (option.email && typeof option.email === 'string' &&
         option.email.toLowerCase().includes(query)) {
         return true;
       }
 
-      // Check any other string properties safely
       for (const key in option) {
         if (
           key !== 'value' &&
@@ -129,13 +120,11 @@ export function SearchableDropdown({
     });
   }, [options, searchQuery]);
 
-  // Find selected option
   const selectedOption = useMemo(() => {
     if (!value || !options || !Array.isArray(options)) return undefined;
     return options.find(option => option && option.value === value);
   }, [options, value]);
 
-  // Handle clear
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -147,7 +136,6 @@ export function SearchableDropdown({
     setSearchQuery("");
   };
 
-  // Get role name from option
   const getRoleName = (option: Option): string => {
     if (!option || !option.role) return '';
 
@@ -162,13 +150,12 @@ export function SearchableDropdown({
     return '';
   };
 
-  // Get role color based on role name
   const getRoleColor = (roleName: string): string => {
     const role = roleName.toLowerCase();
-    if (role.includes('admin') || role.includes('super')) return 'bg-purple-100 text-purple-800';
-    if (role.includes('manager')) return 'bg-blue-100 text-blue-800';
-    if (role.includes('lead')) return 'bg-indigo-100 text-indigo-800';
-    return 'bg-gray-100 text-gray-800';
+    if (role.includes('admin') || role.includes('super')) return 'bg-indigo-50 text-indigo-700';
+    if (role.includes('manager')) return 'bg-blue-50 text-blue-700';
+    if (role.includes('lead')) return 'bg-emerald-50 text-emerald-700';
+    return 'bg-slate-100 text-slate-700';
   };
 
   return (
@@ -180,8 +167,8 @@ export function SearchableDropdown({
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            "w-full justify-between h-auto min-h-10 px-3 py-2",
-            !selectedOption && "text-muted-foreground",
+            "w-full justify-between h-auto min-h-10 px-3 py-2 rounded-xl border-slate-200 bg-white hover:bg-slate-50 transition-colors",
+            !selectedOption && "text-slate-400",
             triggerClassName,
             className
           )}
@@ -190,14 +177,14 @@ export function SearchableDropdown({
             <div className="flex items-center gap-2 w-full">
               {selectedOption ? (
                 <>
-                  <span className="truncate font-medium text-left">
+                  <span className="truncate font-medium text-left text-slate-700">
                     {selectedOption.label || 'Unnamed'}
                   </span>
                   {showBadge && selectedOption.role && (
                     <Badge
                       variant="secondary"
                       className={cn(
-                        "text-xs py-0 px-1.5 h-5 flex-shrink-0 truncate max-w-[120px]",
+                        "text-xs py-0 px-2 h-5 flex-shrink-0 truncate max-w-[120px] rounded-lg font-medium",
                         getRoleColor(getRoleName(selectedOption))
                       )}
                     >
@@ -206,11 +193,11 @@ export function SearchableDropdown({
                   )}
                 </>
               ) : (
-                <span className="truncate">{placeholder}</span>
+                <span className="truncate text-slate-400">{placeholder}</span>
               )}
             </div>
             {selectedOption && (selectedOption.empId || selectedOption.value) && (
-              <span className="text-xs text-muted-foreground truncate w-full text-left">
+              <span className="text-xs text-slate-400 truncate w-full text-left mt-0.5">
                 ID: {selectedOption.empId || selectedOption.value}
               </span>
             )}
@@ -221,64 +208,58 @@ export function SearchableDropdown({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-6 w-6 p-0 hover:bg-transparent hover:text-foreground"
+                className="h-6 w-6 p-0 rounded-lg hover:bg-slate-100"
                 onClick={handleClear}
                 aria-label="Clear selection"
               >
-                <X className="h-3 w-3" />
+                <X className="h-3 w-3 text-slate-400" />
               </Button>
             )}
             <ChevronDown className={cn(
-              "h-4 w-4 shrink-0 opacity-50",
-              open && "rotate-180 transition-transform"
+              "h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200",
+              open && "rotate-180"
             )} />
           </div>
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className={cn("w-full p-0", contentClassName)}
+        className={cn("w-full p-0 rounded-xl border-slate-200 shadow-lg", contentClassName)}
         align="start"
         sideOffset={4}
         style={{ width: 'var(--radix-popover-trigger-width)' }}
         onWheel={(e) => {
-          // Allow wheel scrolling to propagate
           e.stopPropagation();
         }}
       >
-        <Command shouldFilter={false} className="rounded-lg">
+        <Command shouldFilter={false} className="rounded-xl overflow-hidden">
           {showSearch && (
-            <div className="flex items-center border-b px-3 py-2 bg-muted/50 sticky top-0 z-10">
+            <div className="flex items-center border-b border-slate-100 px-3 py-2 bg-slate-50/50 sticky top-0 z-10">
+              <Search className="w-4 h-4 text-slate-400 mr-2" />
               <CommandInput
                 placeholder={searchPlaceholder}
                 value={searchQuery}
                 onValueChange={setSearchQuery}
-                className="h-9 border-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground"
+                className="h-9 border-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-slate-400 text-slate-700"
                 autoFocus
               />
             </div>
           )}
 
           <div
-  className="max-h-[280px] overflow-auto"
-  style={{
-    scrollbarWidth: 'none', // Firefox
-    msOverflowStyle: 'none', // IE/Edge
-  }}
-  onWheel={(e) => {
-    // Prevent the event from bubbling up
-    e.stopPropagation();
-  }}
->
-  <style>{`
-    .max-h-\\[280px\\]::-webkit-scrollbar {
-      display: none;
-    }
-  `}</style>
+            className="max-h-[280px] overflow-auto"
+            style={{
+              scrollbarWidth: 'thin',
+              msOverflowStyle: 'auto',
+            }}
+            onWheel={(e) => {
+              e.stopPropagation();
+            }}
+          >
             <CommandList>
               <CommandGroup>
                 {filteredOptions.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <CommandEmpty className="text-muted-foreground px-4">
+                  <div className="py-12 text-center">
+                    <CommandEmpty className="text-slate-400 px-4 text-sm">
                       {emptyMessage}
                     </CommandEmpty>
                   </div>
@@ -297,28 +278,32 @@ export function SearchableDropdown({
                           setSearchQuery("");
                         }}
                         className={cn(
-                          "px-3 py-3 rounded-md cursor-pointer my-0.5",
-                          isSelected && "bg-accent"
+                          "px-4 py-3 rounded-lg cursor-pointer my-1 mx-1 transition-colors",
+                          isSelected && "bg-indigo-50 text-indigo-700",
+                          !isSelected && "hover:bg-slate-50"
                         )}
                         disabled={!option.value || !option.label}
                       >
                         <div className="flex items-center w-full">
                           <Check
                             className={cn(
-                              "mr-3 h-4 w-4 flex-shrink-0",
-                              isSelected ? "opacity-100" : "opacity-0"
+                              "mr-3 h-4 w-4 flex-shrink-0 transition-opacity",
+                              isSelected ? "opacity-100 text-indigo-600" : "opacity-0"
                             )}
                           />
                           <div className="flex flex-col w-full min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium truncate">
+                              <span className={cn(
+                                "font-medium truncate",
+                                isSelected ? "text-indigo-700" : "text-slate-700"
+                              )}>
                                 {option.label || 'Unnamed'}
                               </span>
                               {showBadge && roleName && (
                                 <Badge
                                   variant="secondary"
                                   className={cn(
-                                    "text-xs py-0 px-1.5 h-5 flex-shrink-0",
+                                    "text-xs py-0 px-2 h-5 flex-shrink-0 rounded-lg font-medium",
                                     getRoleColor(roleName)
                                   )}
                                 >
@@ -326,7 +311,7 @@ export function SearchableDropdown({
                                 </Badge>
                               )}
                             </div>
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-3 text-xs text-slate-400">
                               {option.empId && (
                                 <span className="font-mono truncate">
                                   ID: {option.empId}
@@ -358,7 +343,6 @@ export function SearchableDropdown({
   );
 }
 
-// Simple version for basic usage
 export function SimpleSearchableDropdown({
   options,
   value,
@@ -380,6 +364,7 @@ export function SimpleSearchableDropdown({
       placeholder={placeholder}
       disabled={disabled}
       showBadge={false}
+      className="rounded-xl"
     />
   );
 }

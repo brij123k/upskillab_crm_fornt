@@ -11,7 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { UserActivityPage } from '@/components/modal/UserActivityModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +21,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Activity, CalendarDays, Phone } from 'lucide-react';
 import { AssignIVRModal } from './AssignIVRModal';
-import { AttendancePage } from '../pages/AttendancePage';
 import {
   Dialog,
   DialogContent,
@@ -37,23 +35,20 @@ import {
   User, Users, Database
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { PermissionsSelector } from './PermissionsSelector';
 import { UserType, RoleType, DepartmentType, PoolType } from '@/types/user';
 import { CreateProfileModal } from './CreateProfileModal';
+import { ViewUserProfileModal } from './ViewUserProfileModal';
+import { EditUserModal } from './EditUserModal';
 import { toast } from 'sonner';
-import { SearchableDropdown } from './ui/searchable-dropdown';
-import ApiConfig from '@/config/apiConfig';
-import { getDataHandlerWithToken } from '@/config/services';
-import { MultiSelect } from './ui/multi-select';
 import { useNavigate } from 'react-router-dom';
 
 interface UsersTabProps {
   users: UserType[];
   roles: RoleType[];
   departments: DepartmentType[];
-  pools?: PoolType[]; // Add pools prop
+  pools?: PoolType[];
   loading: boolean;
-  loadingPools?: boolean; // Add loading for pools
+  loadingPools?: boolean;
   fetchingData: boolean;
   onRefresh: (query?: { status?: string }) => Promise<void>;
   onUpdateUser: (userId: string, data: any) => Promise<void>;
@@ -62,25 +57,11 @@ interface UsersTabProps {
   onCreateProfile: (userId: string, data: any) => Promise<void>;
 }
 
-interface DepartmentUser {
-  _id: string;
-  userId: {
-    _id: string;
-    name: string;
-    employeeId: number;
-    email: string;
-    role?: {
-      _id: string;
-      name: string;
-    }
-  };
-}
-
 export function UsersTab({
   users,
   roles,
   departments,
-  pools = [], // Default to empty array
+  pools = [],
   loading,
   loadingPools = false,
   fetchingData,
@@ -94,7 +75,7 @@ export function UsersTab({
   const [filters, setFilters] = useState({
     role: 'all',
     status: 'active',
-    pool: 'all', // Add pool filter
+    pool: 'all',
     search: ''
   });
   const [showFilters, setShowFilters] = useState(false);
@@ -110,30 +91,14 @@ export function UsersTab({
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [togglingBlock, setTogglingBlock] = useState<string | null>(null);
   const [creatingProfile, setCreatingProfile] = useState(false);
-  const [departmentUsers, setDepartmentUsers] = useState<DepartmentUser[]>([]);
-  const [loadingDepartmentUsers, setLoadingDepartmentUsers] = useState(false);
 
   const [ivrModalOpen, setIvrModalOpen] = useState(false);
   const [selectedIVRUser, setSelectedIVRUser] = useState<UserType | null>(null);
   const hasMountedRef = useRef(false);
   const navigate = useNavigate();
-  // Form states
-  const [editUserForm, setEditUserForm] = useState({
-    name: '',
-    email: '',
-    number: '',
-    role: '',
-    departmentId: '',
-    education: '',
-    salary: '',
-    reportingSeniorId: '',
-    poolIds: [] as string[],// Add poolId field
-    extraAccessControls: [] as Array<{ module: string; actions: string[] }>
-  });
 
   // Filter users
   const filteredUsers = users.filter(user => {
-    console.log(user,"1")
     const searchMatch =
       user.name.toLowerCase().includes(filters.search.toLowerCase()) ||
       user.email.toLowerCase().includes(filters.search.toLowerCase()) ||
@@ -142,19 +107,14 @@ export function UsersTab({
     const roleMatch = filters.role === 'all' || user.role._id === filters.role;
     const statusMatch = filters.status === 'all' || user.status === filters.status;
 
-    // Pool filter
     let poolMatch = true;
     if (filters.pool !== 'all') {
       if (filters.pool === 'none') {
-        // Check if user has no pools assigned
         poolMatch = !user.profile?.poolIds || user.profile.poolIds.length === 0;
       } else {
-        // Get all pool IDs that the user belongs to
         const userPoolIds = user.profile?.poolIds?.map(poolId =>
           typeof poolId === 'object' ? poolId._id : poolId
         ) || [];
-
-        // Check if the selected pool ID is in the user's pool IDs array
         poolMatch = userPoolIds.includes(filters.pool);
       }
     }
@@ -167,100 +127,30 @@ export function UsersTab({
       hasMountedRef.current = true;
       return;
     }
-
     onRefresh({ status: filters.status });
   }, [filters.status, onRefresh]);
 
-  const fetchDepartmentUsers = async (departmentId: string) => {
-    if (!departmentId) {
-      setDepartmentUsers([]);
-      return;
-    }
-
-    try {
-      setLoadingDepartmentUsers(true);
-      console.log('Fetching users for department:', departmentId);
-      const endpoint = ApiConfig.getUserBydepId(departmentId);
-      const response = await getDataHandlerWithToken(endpoint, { status: 'active' }, null, true);
-
-      if (response) {
-        setDepartmentUsers(response);
-      }
-    } catch (error) {
-      console.error('Error fetching department users:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch department users",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingDepartmentUsers(false);
-    }
+  const getPoolName = (poolId: any): string => {
+    if (!poolId) return 'Not Assigned';
+    if (typeof poolId === 'object' && poolId.name) return poolId.name;
+    const foundPool = pools.find(p => p._id === poolId);
+    return foundPool?.name || 'Unknown Pool';
   };
 
-  const handleEditUserOpen = (user: UserType) => {
-    setSelectedUser(user);
-
-    // Helper function to extract pool IDs regardless of data structure
-    const getPoolIds = (poolData: any): string[] => {
-      if (!poolData) return [];
-
-      // If it's an array (multiple pools)
-      if (Array.isArray(poolData)) {
-        return poolData.map(pool =>
-          typeof pool === 'object' ? pool._id : pool
-        );
-      }
-
-      // If it's a single pool (for backward compatibility)
-      const singlePoolId = typeof poolData === 'object'
-        ? poolData._id
-        : poolData;
-      return singlePoolId ? [singlePoolId] : [];
-    };
-
-    setEditUserForm({
-      name: user.name,
-      email: user.email,
-      number: user.number,
-      role: user.role._id,
-      departmentId: user.profile?.departmentId?._id || '',
-      education: user.profile?.education || '',
-      salary: user.profile?.salary?.toString() || '',
-      reportingSeniorId: user.profile?.reportingSeniorId?._id || '',
-      poolIds: getPoolIds(user.profile?.poolIds), // Handle both old and new data
-      extraAccessControls: user.profile?.extraAccessControls || []
-    });
-
-    // Fetch users for the department if it exists
-    if (user.profile?.departmentId?._id) {
-      fetchDepartmentUsers(user.profile.departmentId._id);
-    }
-
-    setEditUserOpen(true);
+  const isPoolActive = (poolId: any): boolean => {
+    if (!poolId) return false;
+    if (typeof poolId === 'object' && poolId.isActive !== undefined) return poolId.isActive;
+    const foundPool = pools.find(p => p._id === poolId);
+    return foundPool?.isActive || false;
   };
 
-  // Helper function to get pool IDs from either poolIds array or single poolId
   const getPoolIdsToDisplay = (poolData: any): string[] => {
     if (!poolData) return [];
-
-    // If it's an array (multiple pools)
     if (Array.isArray(poolData)) {
-      return poolData.map(pool =>
-        typeof pool === 'object' ? pool._id : pool
-      );
+      return poolData.map(pool => typeof pool === 'object' ? pool._id : pool);
     }
-
-    // If it's a single pool (for backward compatibility)
-    const singlePoolId = typeof poolData === 'object'
-      ? poolData._id
-      : poolData;
+    const singlePoolId = typeof poolData === 'object' ? poolData._id : poolData;
     return singlePoolId ? [singlePoolId] : [];
-  };
-
-  // Helper functions
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
   const formatDate = (dateString: string) => {
@@ -290,18 +180,6 @@ export function UsersTab({
     setIvrModalOpen(true);
   };
 
-  const handleUpdateUser = async () => {
-    if (!selectedUser) return;
-    setUpdatingUser(true);
-    try {
-      await onUpdateUser(selectedUser._id, editUserForm);
-      setEditUserOpen(false);
-      setSelectedUser(null);
-    } finally {
-      setUpdatingUser(false);
-    }
-  };
-
   const handleUpdateStatus = async () => {
     if (!selectedUser) return;
     setUpdatingStatus(true);
@@ -324,6 +202,7 @@ export function UsersTab({
   };
 
   const handleCreateProfile = async (data: any) => {
+    console.log('Data to send2:', data); 
     if (!selectedUser) return;
     setCreatingProfile(true);
     try {
@@ -335,28 +214,14 @@ export function UsersTab({
     }
   };
 
-  const getPoolName = (poolId: any): string => {
-    if (!poolId) return 'Not Assigned';
-    if (typeof poolId === 'object' && poolId.name) return poolId.name;
-
-    // Try to find pool in pools array
-    const foundPool = pools.find(p => p._id === poolId);
-    return foundPool?.name || 'Unknown Pool';
+  const handleEditClick = (user: UserType) => {
+    setSelectedUser(user);
+    setEditUserOpen(true);
   };
 
-  // New function to get all pool names
-  const getPoolNames = (poolIds: any[]): string[] => {
-    if (!poolIds || !Array.isArray(poolIds)) return [];
-    return poolIds.map(poolId => getPoolName(poolId));
-  };
-
-  const isPoolActive = (poolId: any): boolean => {
-    if (!poolId) return false;
-    if (typeof poolId === 'object' && poolId.isActive !== undefined) return poolId.isActive;
-
-    // Try to find pool in pools array
-    const foundPool = pools.find(p => p._id === poolId);
-    return foundPool?.isActive || false;
+  const handleViewProfileClick = (user: UserType) => {
+    setSelectedUser(user);
+    setProfileModalOpen(true);
   };
 
   return (
@@ -384,11 +249,7 @@ export function UsersTab({
         </Button>
 
         {showFilters && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={resetFilters}
-          >
+          <Button variant="outline" size="sm" onClick={resetFilters}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Reset Filters
           </Button>
@@ -402,10 +263,7 @@ export function UsersTab({
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label>Role</Label>
-                <Select
-                  value={filters.role}
-                  onValueChange={(value) => setFilters({ ...filters, role: value })}
-                >
+                <Select value={filters.role} onValueChange={(value) => setFilters({ ...filters, role: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="All roles" />
                   </SelectTrigger>
@@ -422,10 +280,7 @@ export function UsersTab({
 
               <div className="space-y-2">
                 <Label>Status</Label>
-                <Select
-                  value={filters.status}
-                  onValueChange={(value) => setFilters({ ...filters, status: value })}
-                >
+                <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="All statuses" />
                   </SelectTrigger>
@@ -439,26 +294,20 @@ export function UsersTab({
                 </Select>
               </div>
 
-              {/* Pool Selection - Updated for multiple pools */}
               <div className="space-y-2">
                 <Label>Pool</Label>
-                <Select
-                  value={filters.pool}
-                  onValueChange={(value) => setFilters({ ...filters, pool: value })}
-                >
+                <Select value={filters.pool} onValueChange={(value) => setFilters({ ...filters, pool: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="All pools" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Pools</SelectItem>
                     <SelectItem value="none">Not Assigned</SelectItem>
-                    {pools
-                      .filter(pool => pool.isActive)
-                      .map((pool) => (
-                        <SelectItem key={pool._id} value={pool._id}>
-                          {pool.name}
-                        </SelectItem>
-                      ))}
+                    {pools.filter(pool => pool.isActive).map((pool) => (
+                      <SelectItem key={pool._id} value={pool._id}>
+                        {pool.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -527,7 +376,6 @@ export function UsersTab({
               <TableBody>
                 {filteredUsers.map((user) => {
                   const created = formatDateTime(user.createdAt);
-
                   return (
                     <TableRow key={user._id}>
                       <TableCell>
@@ -569,7 +417,7 @@ export function UsersTab({
                       <TableCell>
                         {user.profile?.poolIds && user.profile.poolIds.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
-                            {user.profile.poolIds.map((poolId, index) => {
+                            {getPoolIdsToDisplay(user.profile.poolIds).map((poolId, index) => {
                               const poolName = getPoolName(poolId);
                               const poolActive = isPoolActive(poolId);
                               return (
@@ -633,46 +481,28 @@ export function UsersTab({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setProfileModalOpen(true);
-                              }}
-                              disabled={togglingBlock === user._id}
-                            >
+                            <DropdownMenuItem onClick={() => handleViewProfileClick(user)}>
                               <Eye className="mr-2 h-4 w-4" />
                               View Profile
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleEditUserOpen(user)}
-                              disabled={togglingBlock === user._id}
-                            >
+                            <DropdownMenuItem onClick={() => handleEditClick(user)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit User
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-  onClick={() => {
-    navigate(`/admin/user-activity/${user._id}`);
-  }}
->
-  <Activity className="mr-2 h-4 w-4" />
-  View Activity Log
-</DropdownMenuItem>
-<DropdownMenuItem
-  onClick={() => {
-    navigate(`/admin/attendance/${user._id}`);
-  }}
->
-  <CalendarDays className="mr-2 h-4 w-4" />
-  View Attendance
-</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => navigate(`/admin/user-activity/${user._id}`)}>
+                              <Activity className="mr-2 h-4 w-4" />
+                              View Activity Log
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => navigate(`/admin/attendance/${user._id}`)}>
+                              <CalendarDays className="mr-2 h-4 w-4" />
+                              View Attendance
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => {
                                 setSelectedUser(user);
                                 setSelectedStatus(user.status);
                                 setStatusModalOpen(true);
                               }}
-                              disabled={togglingBlock === user._id}
                             >
                               {user.status === 'active' ? (
                                 <CheckCircle className="mr-2 h-4 w-4" />
@@ -687,43 +517,23 @@ export function UsersTab({
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleAssignIVR(user)}
-                              disabled={togglingBlock === user._id || user.IVREnabled === true}
+                              disabled={user.IVREnabled === true}
                               className={cn(user.IVREnabled === true && "opacity-50 cursor-not-allowed")}
                             >
                               <Phone className="mr-2 h-4 w-4" />
-                              {user.IVREnabled ? (
-                                <span className="text-green-600">IVR Enabled</span>
-                              ) : (
-                                "Assign IVR Access"
-                              )}
+                              {user.IVREnabled ? "IVR Enabled" : "Assign IVR Access"}
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleToggleBlock(user._id)}
-                              disabled={togglingBlock === user._id}
-                            >
-                              {togglingBlock === user._id ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              ) : user.isBlocked ? (
+                            <DropdownMenuItem onClick={() => handleToggleBlock(user._id)}>
+                              {user.isBlocked ? (
                                 <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
                               ) : (
                                 <Ban className="mr-2 h-4 w-4 text-destructive" />
                               )}
-                              <span className={cn(
-                                togglingBlock !== user._id && (
-                                  user.isBlocked ? "text-green-600" : "text-destructive"
-                                )
-                              )}>
-                                {togglingBlock === user._id ? 'Updating...' :
-                                  user.isBlocked ? 'Unblock User' : 'Block User'}
+                              <span className={user.isBlocked ? "text-green-600" : "text-destructive"}>
+                                {user.isBlocked ? 'Unblock User' : 'Block User'}
                               </span>
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                // Add password reset logic here
-                                toast.info("Password reset feature coming soon");
-                              }}
-                              disabled={togglingBlock === user._id}
-                            >
+                            <DropdownMenuItem onClick={() => toast.info("Password reset feature coming soon")}>
                               <Key className="mr-2 h-4 w-4" />
                               Reset Password
                             </DropdownMenuItem>
@@ -739,611 +549,36 @@ export function UsersTab({
         </CardContent>
       </Card>
 
+      {/* View Profile Modal */}
+      <ViewUserProfileModal
+        open={profileModalOpen}
+        onOpenChange={setProfileModalOpen}
+        selectedUser={selectedUser}
+        pools={pools}
+        onEditClick={() => {
+          setProfileModalOpen(false);
+          if (selectedUser) {
+            handleEditClick(selectedUser);
+          }
+        }}
+        onCreateProfileClick={() => {
+          setProfileModalOpen(false);
+          setProfileCreateModalOpen(true);
+        }}
+      />
+
       {/* Edit User Modal */}
-      <Dialog open={editUserOpen} onOpenChange={setEditUserOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-          {selectedUser && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Edit User: {selectedUser.name}</DialogTitle>
-                <DialogDescription>
-                  Update user information and permissions.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 py-4">
-                {/* Basic Information */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Name *</Label>
-                    <Input
-                      value={editUserForm.name}
-                      onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
-                      placeholder="John Doe"
-                      disabled={updatingUser}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Email *</Label>
-                    <Input
-                      type="email"
-                      value={editUserForm.email}
-                      onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
-                      placeholder="john@company.com"
-                      disabled={updatingUser}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Phone Number *</Label>
-                    <Input
-                      value={editUserForm.number}
-                      onChange={(e) => setEditUserForm({ ...editUserForm, number: e.target.value })}
-                      placeholder="1234567890"
-                      disabled={updatingUser}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Role *</Label>
-                    <Select
-                      value={editUserForm.role}
-                      onValueChange={(value) => setEditUserForm({ ...editUserForm, role: value })}
-                      disabled={updatingUser}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {roles.map((role) => (
-                          <SelectItem key={role._id} value={role._id}>
-                            {role.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Current Role Permissions Display */}
-                {selectedUser.role.permissions && selectedUser.role.permissions.length > 0 && (
-                  <div className="space-y-3 border rounded-lg p-4">
-                    <h4 className="font-medium text-sm">Current Role Permissions</h4>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      These permissions come from the user's role ({selectedUser.role.name}) and cannot be edited here.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedUser.role.permissions.map((perm, idx) => (
-                        <div key={idx} className="text-xs">
-                          <Badge variant="outline" className="mb-1">
-                            {perm.module}
-                          </Badge>
-                          <div className="flex flex-wrap gap-1 ml-2">
-                            {perm.actions.map((action, actionIdx) => (
-                              <Badge key={actionIdx} variant="secondary" className="text-xs">
-                                {action}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Profile Details - Only if user has a profile */}
-                {selectedUser.profile && (
-                  <div className="space-y-4 border-t pt-4">
-                    <h4 className="font-medium">Profile Details</h4>
-
-                    {/* Department Selection */}
-                    <div className="space-y-2">
-                      <Label>Department</Label>
-                      <Select
-                        value={editUserForm.departmentId}
-                        onValueChange={(value) => {
-                          setEditUserForm({
-                            ...editUserForm,
-                            departmentId: value,
-                            reportingSeniorId: '' // Reset reporting senior when department changes
-                          });
-                          // Fetch users for the selected department
-                          if (value) {
-                            fetchDepartmentUsers(value);
-                          }
-                        }}
-                        disabled={updatingUser}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select department" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {departments.map((dept) => (
-                            <SelectItem key={dept._id} value={dept._id}>
-                              {dept.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Multi-Pool Selection - Updated for multiple pools */}
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Database className="w-4 h-4" />
-                        Pools
-                      </Label>
-                      <MultiSelect
-                        options={pools
-                          .filter(pool => pool.isActive)
-                          .map(pool => ({
-                            value: pool._id,
-                            label: pool.name,
-                            disabled: !pool.isActive
-                          }))}
-                        selected={editUserForm.poolIds}
-                        onChange={(selectedValues) => setEditUserForm({
-                          ...editUserForm,
-                          poolIds: selectedValues
-                        })}
-                        placeholder="Select pools..."
-                        loading={loadingPools}
-                        disabled={updatingUser}
-                        emptyMessage="No active pools available"
-                      />
-
-                      {/* Display selected pools as badges */}
-                      {editUserForm.poolIds.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {editUserForm.poolIds.map((poolId) => {
-                            const pool = pools.find(p => p._id === poolId);
-                            return pool ? (
-                              <Badge
-                                key={poolId}
-                                variant="secondary"
-                                className="text-xs bg-blue-50 text-blue-700 border-blue-200"
-                              >
-                                <Database className="w-3 h-3 mr-1" />
-                                {pool.name}
-                              </Badge>
-                            ) : null;
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Salary */}
-                    <div className="space-y-2">
-                      <Label>Salary</Label>
-                      <Input
-                        type="number"
-                        value={editUserForm.salary}
-                        onChange={(e) => setEditUserForm({ ...editUserForm, salary: e.target.value })}
-                        placeholder="e.g., 50000"
-                        disabled={updatingUser}
-                      />
-                    </div>
-
-                    {/* Education */}
-                    <div className="space-y-2">
-                      <Label>Education</Label>
-                      <Input
-                        value={editUserForm.education}
-                        onChange={(e) => setEditUserForm({ ...editUserForm, education: e.target.value })}
-                        placeholder="e.g., Bachelor's in Computer Science"
-                        disabled={updatingUser}
-                      />
-                    </div>
-
-                    {/* Reporting Senior */}
-                    <div className="space-y-2">
-                      <Label>Reporting Senior</Label>
-                      {!editUserForm.departmentId ? (
-                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                          <p className="text-sm text-yellow-800">
-                            Please select a department first to see available seniors
-                          </p>
-                        </div>
-                      ) : (
-                        <>
-                          <SearchableDropdown
-                            options={[
-                              { value: "", label: "Select reporting senior..." },
-                              ...departmentUsers
-                                .filter((user) => user.userId && user.userId._id)
-                                .map(user => ({
-                                  value: user.userId._id,
-                                  label: user.userId.name,
-                                  empId: user.userId.employeeId,
-                                  email: user.userId.email,
-                                  role: user.userId.role?.name
-                                }))
-                            ]}
-                            value={editUserForm.reportingSeniorId}
-                            onValueChange={(value) => setEditUserForm({ ...editUserForm, reportingSeniorId: value })}
-                            placeholder="Select reporting senior"
-                            searchPlaceholder="Search by name, email, or role..."
-                            emptyMessage={loadingDepartmentUsers ? "Loading users..." : "No users found in this department"}
-                            disabled={updatingUser || loadingDepartmentUsers || departmentUsers.length === 0}
-                            allowClear
-                            onClear={() => setEditUserForm({ ...editUserForm, reportingSeniorId: "" })}
-                            triggerClassName="h-10 sm:h-11 text-sm sm:text-base"
-                            contentClassName="w-full sm:max-w-[var(--radix-popover-trigger-width)]"
-                          />
-
-                          {/* Show loading state */}
-                          {loadingDepartmentUsers && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                              Loading department users...
-                            </div>
-                          )}
-
-                          {/* Show user count */}
-                          {!loadingDepartmentUsers && departmentUsers.length > 0 && (
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                              <Users className="w-3 h-3" />
-                              {departmentUsers.length} user{departmentUsers.length !== 1 ? 's' : ''} available
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Extra Access Controls */}
-                <div className="space-y-4 border-t pt-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Extra Access Controls</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Grant additional permissions beyond the user's role
-                      </p>
-                    </div>
-                    {editUserForm.extraAccessControls.length > 0 && (
-                      <Badge variant="outline">
-                        {editUserForm.extraAccessControls.length} modules
-                      </Badge>
-                    )}
-                  </div>
-
-                  {selectedUser.profile?.extraAccessControls && selectedUser.profile.extraAccessControls.length > 0 && (
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm text-blue-700">
-                        <strong>Current extra access controls:</strong> User already has {selectedUser.profile.extraAccessControls.length} extra permission module(s).
-                      </p>
-                    </div>
-                  )}
-
-                  <PermissionsSelector
-                    permissions={editUserForm.extraAccessControls}
-                    onChange={(perms) => setEditUserForm({ ...editUserForm, extraAccessControls: perms })}
-                    disabled={updatingUser}
-                    title=""
-                    description="Select modules and actions to add extra permissions"
-                  />
-
-                  {editUserForm.extraAccessControls.length > 0 && (
-                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <h5 className="text-sm font-medium text-green-800 mb-2">Selected Extra Permissions:</h5>
-                      <div className="space-y-2">
-                        {editUserForm.extraAccessControls.map((control, idx) => (
-                          <div key={idx} className="text-sm">
-                            <div className="font-medium text-green-700">
-                              {control.module.charAt(0).toUpperCase() + control.module.slice(1)}:
-                            </div>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {control.actions.map((action, actionIdx) => (
-                                <Badge key={actionIdx} variant="secondary" className="text-xs bg-green-100 text-green-800">
-                                  {action}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <DialogFooter className="gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setEditUserOpen(false)}
-                  disabled={updatingUser}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleUpdateUser}
-                  disabled={updatingUser}
-                  className="min-w-[120px]"
-                >
-                  {updatingUser ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Updating...
-                    </>
-                  ) : (
-                    'Update User'
-                  )}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-
-      {/* Profile Modal */}
-      <Dialog open={profileModalOpen} onOpenChange={setProfileModalOpen}>
-        <DialogContent className="sm:max-w-[550px] max-h-[90vh] h-auto overflow-hidden flex flex-col p-0">
-          {selectedUser && (
-            <>
-              {/* Fixed Header */}
-              <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
-                <DialogTitle className="text-lg sm:text-xl">User Profile</DialogTitle>
-                <DialogDescription className="text-sm sm:text-base">
-                  Profile details for {selectedUser.name}
-                </DialogDescription>
-              </DialogHeader>
-
-              {/* Scrollable Content Area */}
-              <div className="flex-1 overflow-y-auto px-6 py-4">
-                <div className="space-y-6">
-                  {/* User Basic Info - Avatar and Name */}
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
-                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-primary/10 flex items-center justify-center mx-auto sm:mx-0">
-                      <span className="text-3xl sm:text-4xl font-medium text-primary">
-                        {getInitials(selectedUser.name)}
-                      </span>
-                    </div>
-                    <div className="text-center sm:text-left">
-                      <h3 className="text-xl sm:text-2xl font-semibold">{selectedUser.name}</h3>
-                      <p className="text-sm sm:text-base text-muted-foreground">{selectedUser.email}</p>
-                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2">
-                        <Badge variant="outline" className="text-xs">
-                          ID: {selectedUser.employeeId}
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-xs",
-                            selectedUser.status === 'active' && 'border-green-500 text-green-700 bg-green-50',
-                            selectedUser.status === 'inactive' && 'border-gray-500 text-gray-700 bg-gray-50',
-                            selectedUser.status === 'probation' && 'border-yellow-500 text-yellow-700 bg-yellow-50',
-                            selectedUser.status === 'resigned' && 'border-red-500 text-red-700 bg-red-50'
-                          )}
-                        >
-                          {selectedUser.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* User Details Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/30 p-4 rounded-lg">
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Phone Number</Label>
-                      <p className="text-sm font-medium mt-1">{selectedUser.number || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Role</Label>
-                      <p className="text-sm font-medium mt-1">
-                        {selectedUser.role.name}
-                        {selectedUser.role.isSuperAdmin && (
-                          <Badge variant="secondary" className="ml-2 text-xs bg-purple-100 text-purple-800">
-                            Super Admin
-                          </Badge>
-                        )}
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Dashboard Access</Label>
-                      <p className="text-sm font-medium mt-1">
-                        {selectedUser.isDashboardEnabled ? (
-                          <span className="text-green-600">Enabled</span>
-                        ) : (
-                          <span className="text-red-600">Disabled</span>
-                        )}
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Member Since</Label>
-                      <p className="text-sm font-medium mt-1">{formatDate(selectedUser.createdAt)}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Last Login</Label>
-                      <p className="text-sm font-medium mt-1">
-                        {selectedUser.lastLoginAt ? formatDate(selectedUser.lastLoginAt) : 'Never'}
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Account Status</Label>
-                      <div className="mt-1">
-                        {selectedUser.isBlocked ? (
-                          <Badge variant="destructive" className="text-xs">Blocked</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs border-green-500 text-green-700">Active</Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Profile Details Section */}
-                  {selectedUser.profile ? (
-                    <div className="space-y-4 border rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-base">Profile Details</h4>
-                        <Badge variant="outline" className="text-xs">
-                          Profile Created: {formatDate(selectedUser.profile.createdAt)}
-                        </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="bg-muted/20 p-3 rounded-md">
-                          <Label className="text-xs text-muted-foreground">Department</Label>
-                          <p className="text-sm font-medium mt-1">{selectedUser.profile.departmentId?.name || 'N/A'}</p>
-                        </div>
-                        <div className="bg-muted/20 p-3 rounded-md">
-                          <Label className="text-xs text-muted-foreground">Education</Label>
-                          <p className="text-sm font-medium mt-1">{selectedUser.profile.education || 'N/A'}</p>
-                        </div>
-                        <div className="bg-muted/20 p-3 rounded-md">
-                          <Label className="text-xs text-muted-foreground">Salary</Label>
-                          <p className="text-sm font-medium mt-1">
-                            {selectedUser.profile.salary ? `₹${selectedUser.profile.salary.toLocaleString()}` : 'N/A'}
-                          </p>
-                        </div>
-
-                        {/* Multi-Pool Information - Updated for multiple pools */}
-                        {(selectedUser.profile.poolIds) && (
-                          <div className="bg-muted/20 p-3 rounded-md col-span-2">
-                            <Label className="text-xs text-muted-foreground flex items-center gap-1 mb-2">
-                              <Database className="w-3 h-3" />
-                              Pools
-                            </Label>
-                            <div className="flex flex-wrap gap-2">
-                              {getPoolIdsToDisplay(selectedUser.profile.poolIds || selectedUser.profile.poolId).map((poolId, index) => {
-                                const poolName = getPoolName(poolId);
-                                const poolActive = isPoolActive(poolId);
-                                return (
-                                  <Badge
-                                    key={index}
-                                    variant="outline"
-                                    className={cn(
-                                      "flex items-center gap-1",
-                                      poolActive
-                                        ? "bg-blue-50 text-blue-700 border-blue-200"
-                                        : "bg-gray-50 text-gray-500 border-gray-200"
-                                    )}
-                                  >
-                                    <Database className="w-3 h-3" />
-                                    {poolName}
-                                  </Badge>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="bg-muted/20 p-3 rounded-md col-span-2">
-                          <Label className="text-xs text-muted-foreground">Reporting Senior</Label>
-                          <div className="flex items-center gap-2 mt-1">
-                            {selectedUser.profile.reportingSeniorId ? (
-                              <>
-                                <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
-                                  <span className="text-xs font-medium">
-                                    {selectedUser.profile.reportingSeniorId.name?.charAt(0) || 'S'}
-                                  </span>
-                                </div>
-                                <div>
-                                  <p className="text-sm font-medium">{selectedUser.profile.reportingSeniorId.name}</p>
-                                </div>
-                              </>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">No reporting senior assigned</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Extra Access Controls */}
-                      {selectedUser.profile.extraAccessControls && selectedUser.profile.extraAccessControls.length > 0 && (
-                        <div className="border-t pt-4 mt-2">
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-medium text-sm">Extra Access Controls</h4>
-                            <Badge variant="secondary" className="text-xs">
-                              {selectedUser.profile.extraAccessControls.length} modules
-                            </Badge>
-                          </div>
-                          <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
-                            {selectedUser.profile.extraAccessControls.map((control, idx) => (
-                              <div key={idx} className="bg-blue-50/50 p-3 rounded-md border border-blue-100">
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="text-xs font-medium text-blue-700 uppercase tracking-wider">
-                                    {control.module}
-                                  </span>
-                                </div>
-                                <div className="flex flex-wrap gap-1">
-                                  {control.actions.map((action, actionIdx) => (
-                                    <Badge key={actionIdx} variant="secondary" className="text-xs bg-blue-100 text-blue-800">
-                                      {action}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                      <User className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                      <h4 className="text-base font-medium mb-1">No Profile Found</h4>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        This user doesn't have a profile yet. Create one to add department, salary, and other details.
-                      </p>
-                      <Button
-                        onClick={() => {
-                          setProfileModalOpen(false);
-                          setProfileCreateModalOpen(true);
-                        }}
-                        className="w-full sm:w-auto"
-                      >
-                        <User className="w-4 h-4 mr-2" />
-                        Create Profile
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Role Permissions Summary */}
-                  {selectedUser.role.permissions && selectedUser.role.permissions.length > 0 && (
-                    <div className="border rounded-lg p-4 bg-muted/10">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium text-sm">Role Permissions</h4>
-                        <Badge variant="outline" className="text-xs">
-                          {selectedUser.role.name}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground mb-2">
-                        This user has {selectedUser.role.permissions.reduce((acc, p) => acc + p.actions.length, 0)} permissions across {selectedUser.role.permissions.length} modules
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {selectedUser.role.permissions.slice(0, 3).map((perm, idx) => (
-                          <Badge key={idx} variant="outline" className="text-xs bg-background">
-                            {perm.module} ({perm.actions.length})
-                          </Badge>
-                        ))}
-                        {selectedUser.role.permissions.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{selectedUser.role.permissions.length - 3} more
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Fixed Footer */}
-              <DialogFooter className="px-6 py-4 border-t shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <Button
-                  variant="outline"
-                  onClick={() => setProfileModalOpen(false)}
-                  className="w-full sm:w-auto"
-                >
-                  Close
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      <EditUserModal
+        open={editUserOpen}
+        onOpenChange={setEditUserOpen}
+        selectedUser={selectedUser}
+        roles={roles}
+        departments={departments}
+        pools={pools}
+        loadingPools={loadingPools}
+        updatingUser={updatingUser}
+        onUpdateUser={onUpdateUser}
+      />
 
       {/* Status Update Modal */}
       <Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
@@ -1352,46 +587,20 @@ export function UsersTab({
             <>
               <DialogHeader>
                 <DialogTitle>Update Status</DialogTitle>
-                <DialogDescription>
-                  Update status for {selectedUser.name}
-                </DialogDescription>
+                <DialogDescription>Update status for {selectedUser.name}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
                   <Label>Select Status</Label>
-                  <Select
-                    value={selectedStatus}
-                    onValueChange={(value: any) => setSelectedStatus(value)}
-                    disabled={updatingStatus}
-                  >
+                  <Select value={selectedStatus} onValueChange={(value: any) => setSelectedStatus(value)} disabled={updatingStatus}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="active">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                          Active
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="inactive">
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-gray-600" />
-                          Inactive
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="probation">
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-yellow-600" />
-                          Probation
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="resigned">
-                        <div className="flex items-center gap-2">
-                          <LogOut className="w-4 h-4 text-red-600" />
-                          Resigned
-                        </div>
-                      </SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="probation">Probation</SelectItem>
+                      <SelectItem value="resigned">Resigned</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1400,7 +609,7 @@ export function UsersTab({
                 <Button variant="outline" onClick={() => setStatusModalOpen(false)} disabled={updatingStatus}>
                   Cancel
                 </Button>
-                <Button onClick={() => handleUpdateStatus()} disabled={updatingStatus}>
+                <Button onClick={handleUpdateStatus} disabled={updatingStatus}>
                   {updatingStatus ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1429,67 +638,13 @@ export function UsersTab({
         onSubmit={handleCreateProfile}
       />
 
+      {/* Assign IVR Modal */}
       <AssignIVRModal
-  open={ivrModalOpen}
-  onOpenChange={setIvrModalOpen}
-  user={selectedIVRUser}
-  onSuccess={() => {
-    onRefresh();
-  }}
-/>
+        open={ivrModalOpen}
+        onOpenChange={setIvrModalOpen}
+        user={selectedIVRUser}
+        onSuccess={() => onRefresh()}
+      />
     </div>
   );
 }
-
-type KraComparison = {
-  roleId: string | null;
-  userId: string;
-  status: string;
-  appliedCriteria: string;
-  metrics: {
-    answeredCalls: number;
-    talkTime: number;
-    dialCalls: number;
-    bookings: number;
-    demoConducts: number;
-  };
-  thresholds: {
-    answeredCalls: number;
-    talkTime: number;
-    dialCalls: number;
-    bookings: number;
-    demoConducts: number;
-  } | null;
-  reason: string;
-};
-
-type KraConfig = {
-  _id?: string;
-  roleId: {
-    _id: string;
-    name: string;
-  };
-  fullDayAnsweredCalls: number;
-  fullDayTalkTime: number;
-  fullDayDialCalls: number;
-  fullDayBookings: number;
-  fullDayDemoConducts: number;
-  halfDayAnsweredCalls: number;
-  halfDayTalkTime: number;
-  halfDayDialCalls: number;
-  halfDayBookings: number;
-  halfDayDemoConducts: number;
-};
-
-const DEFAULT_KRA = {
-  fullDayAnsweredCalls: '0',
-  fullDayTalkTime: '0',
-  fullDayDialCalls: '0',
-  fullDayBookings: '0',
-  fullDayDemoConducts: '0',
-  halfDayAnsweredCalls: '0',
-  halfDayTalkTime: '0',
-  halfDayDialCalls: '0',
-  halfDayBookings: '0',
-  halfDayDemoConducts: '0',
-};

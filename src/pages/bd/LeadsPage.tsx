@@ -235,6 +235,9 @@ export function BDLeadsPage() {
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [pools, setPools] = useState<PoolType[]>([]);
   const [loadingPools, setLoadingPools] = useState(false);
+  const [changePoolModalOpen, setChangePoolModalOpen] = useState(false);
+const [selectedPoolId, setSelectedPoolId] = useState<string>('');
+const [changingPool, setChangingPool] = useState(false);
   // Filters
   const [filters, setFilters] = useState<Filters>({
     search: '',
@@ -986,6 +989,55 @@ export function BDLeadsPage() {
     setBulkLeads(newLeads);
   };
 
+
+  // Add handler for pool change
+const handleChangePool = async () => {
+  if (selectedLeads.length === 0) {
+    toast({
+      title: "Error",
+      description: "Please select at least one lead",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  if (!selectedPoolId) {
+    toast({
+      title: "Error",
+      description: "Please select a pool",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  try {
+    setChangingPool(true);
+    const response = await patchTokenDataHandler("poolChange", {
+      leadIds: selectedLeads,
+      poolId: selectedPoolId
+    });
+
+    toast({
+      title: "Success",
+      description: response?.message || "Leads moved to pool successfully",
+    });
+
+    setChangePoolModalOpen(false);
+    setSelectedPoolId('');
+    setSelectedLeads([]);
+    setIsAssignmentMode(false);
+    fetchLeads(); // Refresh leads
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.response?.data?.message || "Failed to change pool",
+      variant: "destructive",
+    });
+  } finally {
+    setChangingPool(false);
+  }
+};
+
   // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -1337,38 +1389,34 @@ export function BDLeadsPage() {
         <div className="flex items-center gap-2">
           {hasPermission(permissions, 'leads', 'assign') && (
             isAssignmentMode ? (
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="bg-blue-50">
-                  {selectedLeads.length} leads selected
-                </Badge>
-                <Button
-                  variant="outline"
-                  onClick={toggleAssignmentMode}
-                  disabled={assigningLeads}
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Cancel Selection
-                </Button>
-                <Button
-                  onClick={() => setAssignModalOpen(true)}
-                  disabled={selectedLeads.length === 0 || assigningLeads}
-                >
-                  {assigningLeads ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Users className="w-4 h-4 mr-2" />
-                  )}
-                  Assign Selected ({selectedLeads.length})
-                </Button>
-              </div>
-            ) : (
-
-              <Button onClick={toggleAssignmentMode}>
-                <Users className="w-4 h-4 mr-2" />
-                Lead Assignments
-              </Button>
-            )
-          )}
+  <div className="flex items-center gap-2">
+    <Badge variant="outline" className="bg-blue-50">
+      {selectedLeads.length} leads selected
+    </Badge>
+    <Button variant="outline" onClick={toggleAssignmentMode} disabled={assigningLeads}>
+      <X className="w-4 h-4 mr-2" />
+      Cancel Selection
+    </Button>
+    <Button onClick={() => setAssignModalOpen(true)} disabled={selectedLeads.length === 0 || assigningLeads}>
+      {assigningLeads ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Users className="w-4 h-4 mr-2" />}
+      Assign Selected ({selectedLeads.length})
+    </Button>
+    {/* NEW BUTTON */}
+    <Button 
+      onClick={() => setChangePoolModalOpen(true)} 
+      disabled={selectedLeads.length === 0 || changingPool}
+      variant="outline"
+    >
+      <Database className="w-4 h-4 mr-2" />
+      Change Pool ({selectedLeads.length})
+    </Button>
+  </div>
+) : (
+  <Button onClick={toggleAssignmentMode}>
+    <Users className="w-4 h-4 mr-2" />
+    Select Leads
+  </Button>
+))}
 
           {hasPermission(permissions, 'leads', 'update') && (
             <Button
@@ -3241,6 +3289,84 @@ export function BDLeadsPage() {
   </DialogContent>
 </Dialog>
 
+<Dialog open={changePoolModalOpen} onOpenChange={setChangePoolModalOpen}>
+  <DialogContent className="sm:max-w-[500px]">
+    <DialogHeader>
+      <DialogTitle>Change Pool for Leads</DialogTitle>
+      <DialogDescription>
+        Move {selectedLeads.length} selected lead(s) to a different pool.
+      </DialogDescription>
+    </DialogHeader>
+    <div className="space-y-4 py-4">
+      <div className="space-y-2">
+        <Label>Select Pool *</Label>
+        <Select
+          value={selectedPoolId}
+          onValueChange={setSelectedPoolId}
+          disabled={changingPool || loadingPools}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Choose a pool" />
+          </SelectTrigger>
+          <SelectContent>
+            {loadingPools ? (
+              <div className="py-2 text-center">
+                <Loader2 className="w-4 h-4 mx-auto animate-spin" />
+              </div>
+            ) : (
+              pools
+                .filter(pool => pool.isActive)
+                .map((pool) => (
+                  <SelectItem key={pool._id} value={pool._id}>
+                    {pool.name}
+                  </SelectItem>
+                ))
+            )}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Optional: Show selected leads preview */}
+      <div className="p-3 bg-muted/50 rounded-lg max-h-40 overflow-y-auto">
+        <p className="text-sm font-medium mb-2">Selected Leads:</p>
+        <div className="space-y-1">
+          {leads
+            .filter(lead => selectedLeads.includes(lead._id))
+            .slice(0, 5)
+            .map(lead => (
+              <div key={lead._id} className="text-sm">
+                {lead.name} (#{lead.leadId})
+              </div>
+            ))}
+          {selectedLeads.length > 5 && (
+            <div className="text-xs text-muted-foreground">
+              + {selectedLeads.length - 5} more
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setChangePoolModalOpen(false)} disabled={changingPool}>
+        Cancel
+      </Button>
+      <Button onClick={handleChangePool} disabled={!selectedPoolId || changingPool}>
+        {changingPool ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Moving...
+          </>
+        ) : (
+          <>
+            <Database className="mr-2 h-4 w-4" />
+            Move to Pool
+          </>
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
       {/* Change Stage Modal */}
       <ChangeStageModal
         open={changeStageModalOpen}
@@ -3259,6 +3385,8 @@ export function BDLeadsPage() {
           fetchLeads(); // Refresh leads after merge
         }}
       />
+
+
 
       <LeadHistoryModal
         open={historyModalOpen}

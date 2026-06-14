@@ -1,4 +1,3 @@
-// pages/LeadsPage.tsx
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -232,6 +231,13 @@ export function LeadsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalLeads, setTotalLeads] = useState(0);
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+  // Add near other state declarations (around line 180)
+const [bulkSearchOpen, setBulkSearchOpen] = useState(false);
+const [bulkSearchInput, setBulkSearchInput] = useState('');
+const [bulkSearchLoading, setBulkSearchLoading] = useState(false);
+const [changePoolModalOpen, setChangePoolModalOpen] = useState(false);
+const [selectedPoolId, setSelectedPoolId] = useState<string>('');
+const [changingPool, setChangingPool] = useState(false);
   // Filters
   const [pools, setPools] = useState<PoolType[]>([]);
   const [loadingPools, setLoadingPools] = useState(false);
@@ -312,44 +318,125 @@ export function LeadsPage() {
 
   const [assignUserId, setAssignUserId] = useState<string>('');
 
+
+  // Handle bulk search
+const handleBulkSearch = async () => {
+  if (!bulkSearchInput.trim()) {
+    toast({
+      title: "Error",
+      description: "Please enter at least one Lead ID or Phone Number",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  try {
+    setBulkSearchLoading(true);
+    
+    // Parse the input - split by comma and trim
+    const searchValues = bulkSearchInput
+      .split(',')
+      .map(item => item.trim())
+      .filter(item => item.length > 0);
+    
+    if (searchValues.length === 0) {
+      toast({
+        title: "Error",
+        description: "No valid search values found",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Join values with comma for the API
+    const bulkSearchParam = searchValues.join(',');
+    
+    // Build query params with bulk search
+    const queryParams: Record<string, any> = {
+      bulkSearch: bulkSearchParam,
+      page: 1,
+      limit: 100 // Show more results for bulk search
+    };
+    
+    // Apply other active filters (optional - you can decide to keep or ignore other filters)
+    if (filters.status && filters.status !== "all") queryParams.status = filters.status;
+    if (filters.source && filters.source !== "all") queryParams.source = filters.source;
+    if (filters.stageId && filters.stageId !== "all") queryParams.stageId = filters.stageId;
+    if (filters.poolId && filters.poolId !== "all") queryParams.poolId = filters.poolId;
+    
+    const response = await getDataHandlerWithToken("getAllLeads", queryParams, null);
+    
+    if (response?.data) {
+      setLeads(response.data);
+      setTotalLeads(response.meta.total);
+      setTotalPages(response.meta.totalPages);
+      setPage(1); // Reset to first page
+      
+      toast({
+        title: "Bulk Search Complete",
+        description: `Found ${response.data.length} leads matching your search`,
+      });
+    }
+    
+    // Close modal after search
+    setBulkSearchOpen(false);
+    setBulkSearchInput('');
+    
+  } catch (error: any) {
+    console.error("Bulk search error:", error);
+    toast({
+      title: "Error",
+      description: error.response?.data?.message || "Failed to perform bulk search",
+      variant: "destructive",
+    });
+  } finally {
+    setBulkSearchLoading(false);
+  }
+};
+
+
   // Build query params
   const buildQueryParams = () => {
-    const params: Record<string, any> = {};
+  const params: Record<string, any> = {};
 
-    // Pagination
-    params.page = page;
-    params.limit = limit;
+  // Pagination - but skip if bulk search is active? 
+  // Actually keep pagination but bulk search will show first page
+  params.page = page;
+  params.limit = limit;
 
-    // Filters (only add if value exists and is not "all")
-    if (filters.search && filters.search !== "all") params.search = filters.search;
-    if (filters.status && filters.status !== "all") params.status = filters.status;
-    if (filters.source && filters.source !== "all") params.source = filters.source;
-    if (filters.source_compain && filters.source_compain !== "all") params.source_compain = filters.source_compain;
-    if (filters.stageId && filters.stageId !== "all") params.stageId = filters.stageId;
-    if (filters.poolId && filters.poolId !== "all") params.poolId = filters.poolId;
-    if (filters.location) params.location = filters.location;
-    if (filters.assignedTo && filters.assignedTo !== "all") params.assignedTo = filters.assignedTo;
-    if (filters.modifiedBy && filters.modifiedBy !== "all") params.modifiedBy = filters.modifiedBy;
+  // Bulk search takes precedence if bulkSearchOpen is true? 
+  // Better to handle separately in handleBulkSearch
+  
+  // Filters (only add if value exists and is not "all")
+  if (filters.search && filters.search !== "all") params.search = filters.search;
+  if (filters.status && filters.status !== "all") params.status = filters.status;
+  if (filters.source && filters.source !== "all") params.source = filters.source;
+  if (filters.source_compain && filters.source_compain !== "all") params.source_compain = filters.source_compain;
+  if (filters.stageId && filters.stageId !== "all") params.stageId = filters.stageId;
+  if (filters.poolId && filters.poolId !== "all") params.poolId = filters.poolId;
+  if (filters.location) params.location = filters.location;
+  if (filters.assignedTo && filters.assignedTo !== "all") params.assignedTo = filters.assignedTo;
+  if (filters.modifiedBy && filters.modifiedBy !== "all") params.modifiedBy = filters.modifiedBy;
 
-    if (filters.isActive && filters.isActive !== "all") {
-      params.isActive = filters.isActive === "true" ? true :
-        filters.isActive === "false" ? false : filters.isActive;
-    }
+  if (filters.isActive && filters.isActive !== "all") {
+    params.isActive = filters.isActive === "true" ? true :
+      filters.isActive === "false" ? false : filters.isActive;
+  }
 
-    if (filters.sort && filters.sort !== "all") params.sort = filters.sort;
+  if (filters.sort && filters.sort !== "all") params.sort = filters.sort;
 
-    if (filters.dateFilter && filters.dateFilter !== "all") {
-      params.dateFilter = filters.dateFilter;
-    }
+  if (filters.dateFilter && filters.dateFilter !== "all") {
+    params.dateFilter = filters.dateFilter;
+  }
 
-    if (filters.fromDate && filters.fromDate !== "all") params.fromDate = filters.fromDate;
-    if (filters.toDate && filters.toDate !== "all") params.toDate = filters.toDate;
-    if (filters.assignedDateFilter && filters.assignedDateFilter !== "all") params.assignedDateFilter = filters.assignedDateFilter;
-    if (filters.assignedDateFrom && filters.assignedDateFrom !== "all") params.assignedDateFrom = filters.assignedDateFrom;
-    if (filters.assignedDateTo && filters.assignedDateTo !== "all") params.assignedDateTo = filters.assignedDateTo;
+  if (filters.fromDate && filters.fromDate !== "all") params.fromDate = filters.fromDate;
+  if (filters.toDate && filters.toDate !== "all") params.toDate = filters.toDate;
+  if (filters.assignedDateFilter && filters.assignedDateFilter !== "all") params.assignedDateFilter = filters.assignedDateFilter;
+  if (filters.assignedDateFrom && filters.assignedDateFrom !== "all") params.assignedDateFrom = filters.assignedDateFrom;
+  if (filters.assignedDateTo && filters.assignedDateTo !== "all") params.assignedDateTo = filters.assignedDateTo;
 
-    return params;
-  };
+  return params;
+};
 
   // Fetch leads with filters
   const fetchLeads = async () => {
@@ -793,6 +880,52 @@ useEffect(() => {
     }
   };
 
+  const handleChangePool = async () => {
+  if (selectedLeads.length === 0) {
+    toast({
+      title: "Error",
+      description: "Please select at least one lead",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  if (!selectedPoolId) {
+    toast({
+      title: "Error",
+      description: "Please select a pool",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  try {
+    setChangingPool(true);
+    const response = await patchTokenDataHandler("poolChange", {
+      leadIds: selectedLeads,
+      poolId: selectedPoolId
+    });
+
+    toast({
+      title: "Success",
+      description: response?.message || "Leads moved to pool successfully",
+    });
+
+    setChangePoolModalOpen(false);
+    setSelectedPoolId('');
+    setSelectedLeads([]);
+    setIsAssignmentMode(false);
+    fetchLeads(); // Refresh leads
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.response?.data?.message || "Failed to change pool",
+      variant: "destructive",
+    });
+  } finally {
+    setChangingPool(false);
+  }
+};
   // View lead details
   const handleViewLead = (lead: LeadType) => {
     setSelectedLead(lead);
@@ -1243,36 +1376,34 @@ const handleEditLead = (lead: LeadType) => {
         </div>
         <div className="flex items-center gap-2">
           {isAssignmentMode ? (
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="bg-blue-50">
-                {selectedLeads.length} leads selected
-              </Badge>
-              <Button
-                variant="outline"
-                onClick={toggleAssignmentMode}
-                disabled={assigningLeads}
-              >
-                <X className="w-4 h-4 mr-2" />
-                Cancel Selection
-              </Button>
-              <Button
-                onClick={() => setAssignModalOpen(true)}
-                disabled={selectedLeads.length === 0 || assigningLeads}
-              >
-                {assigningLeads ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Users className="w-4 h-4 mr-2" />
-                )}
-                Assign Selected ({selectedLeads.length})
-              </Button>
-            </div>
-          ) : (
-            <Button onClick={toggleAssignmentMode}>
-              <Users className="w-4 h-4 mr-2" />
-              Lead Assignment
-            </Button>
-          )}
+  <div className="flex items-center gap-2">
+    <Badge variant="outline" className="bg-blue-50">
+      {selectedLeads.length} leads selected
+    </Badge>
+    <Button variant="outline" onClick={toggleAssignmentMode} disabled={assigningLeads}>
+      <X className="w-4 h-4 mr-2" />
+      Cancel Selection
+    </Button>
+    <Button onClick={() => setAssignModalOpen(true)} disabled={selectedLeads.length === 0 || assigningLeads}>
+      {assigningLeads ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Users className="w-4 h-4 mr-2" />}
+      Assign Selected ({selectedLeads.length})
+    </Button>
+    {/* NEW BUTTON */}
+    <Button 
+      onClick={() => setChangePoolModalOpen(true)} 
+      disabled={selectedLeads.length === 0 || changingPool}
+      variant="outline"
+    >
+      <Database className="w-4 h-4 mr-2" />
+      Change Pool ({selectedLeads.length})
+    </Button>
+  </div>
+) : (
+  <Button onClick={toggleAssignmentMode}>
+    <Users className="w-4 h-4 mr-2" />
+    Lead Assignment
+  </Button>
+)}
           <Button
             variant="outline"
             onClick={() => setDuplicateModalOpen(true)}
@@ -1280,6 +1411,13 @@ const handleEditLead = (lead: LeadType) => {
             <CopyCheck className="w-4 h-4 mr-2" />
             Find Duplicates
           </Button>
+          <Button
+  variant="outline"
+  onClick={() => setBulkSearchOpen(true)}
+>
+  <Search className="w-4 h-4 mr-2" />
+  Bulk Search
+</Button>
 
           <Dialog open={bulkLeadOpen} onOpenChange={setBulkLeadOpen}>
             <DialogTrigger asChild>
@@ -3049,6 +3187,151 @@ const handleEditLead = (lead: LeadType) => {
           fetchLeads(); // Refresh leads after merge
         }}
       />
+
+      {/* Bulk Search Modal */}
+<Dialog open={bulkSearchOpen} onOpenChange={setBulkSearchOpen}>
+  <DialogContent className="sm:max-w-[600px]">
+    <DialogHeader>
+      <DialogTitle className="text-lg sm:text-xl">Bulk Search Leads</DialogTitle>
+      <DialogDescription className="text-sm sm:text-base">
+        Search multiple leads by entering Lead IDs and/or Phone Numbers separated by commas.
+      </DialogDescription>
+    </DialogHeader>
+    
+    <div className="space-y-4 py-4">
+      <div className="space-y-2">
+        <Label className="text-sm sm:text-base">Lead IDs / Phone Numbers *</Label>
+        <textarea
+          value={bulkSearchInput}
+          onChange={(e) => setBulkSearchInput(e.target.value)}
+          placeholder="Enter Lead IDs and/or Phone Numbers separated by commas&#10;Example: 1001, 1002, 9876543210, 9999999999"
+          className="w-full min-h-[150px] p-3 border rounded-md text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+          disabled={bulkSearchLoading}
+        />
+        <p className="text-xs text-muted-foreground">
+          You can mix Lead IDs and Phone Numbers. The system will search for leads matching any of these values.
+        </p>
+      </div>
+    </div>
+    
+    <DialogFooter className="gap-2">
+      <Button
+        variant="outline"
+        onClick={() => {
+          setBulkSearchOpen(false);
+          setBulkSearchInput('');
+        }}
+        disabled={bulkSearchLoading}
+      >
+        Cancel
+      </Button>
+      <Button
+        onClick={handleBulkSearch}
+        disabled={bulkSearchLoading || !bulkSearchInput.trim()}
+      >
+        {bulkSearchLoading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Searching...
+          </>
+        ) : (
+          <>
+            <Search className="mr-2 h-4 w-4" />
+            Search Leads
+          </>
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
+{/* Change Pool Modal */}
+<Dialog open={changePoolModalOpen} onOpenChange={setChangePoolModalOpen}>
+  <DialogContent className="sm:max-w-[500px]">
+    <DialogHeader>
+      <DialogTitle>Change Pool for Leads</DialogTitle>
+      <DialogDescription>
+        Move {selectedLeads.length} selected lead(s) to a different pool.
+      </DialogDescription>
+    </DialogHeader>
+    <div className="space-y-4 py-4">
+      <div className="space-y-2">
+        <Label>Select Pool *</Label>
+        <Select
+          value={selectedPoolId}
+          onValueChange={setSelectedPoolId}
+          disabled={changingPool || loadingPools}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Choose a pool" />
+          </SelectTrigger>
+          <SelectContent>
+            {loadingPools ? (
+              <div className="py-2 text-center">
+                <Loader2 className="w-4 h-4 mx-auto animate-spin" />
+              </div>
+            ) : (
+              pools
+                .filter(pool => pool.isActive)
+                .map((pool) => (
+                  <SelectItem key={pool._id} value={pool._id}>
+                    {pool.name}
+                  </SelectItem>
+                ))
+            )}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Optional: Show selected leads preview */}
+      <div className="p-3 bg-muted/50 rounded-lg max-h-40 overflow-y-auto">
+        <p className="text-sm font-medium mb-2">Selected Leads:</p>
+        <div className="space-y-1">
+          {leads
+            .filter(lead => selectedLeads.includes(lead._id))
+            .slice(0, 5)
+            .map(lead => (
+              <div key={lead._id} className="text-sm">
+                {lead.name} (#{lead.leadId})
+              </div>
+            ))}
+          {selectedLeads.length > 5 && (
+            <div className="text-xs text-muted-foreground">
+              + {selectedLeads.length - 5} more
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setChangePoolModalOpen(false)} disabled={changingPool}>
+        Cancel
+      </Button>
+      <Button onClick={handleChangePool} disabled={!selectedPoolId || changingPool}>
+        {changingPool ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Moving...
+          </>
+        ) : (
+          <>
+            <Database className="mr-2 h-4 w-4" />
+            Move to Pool
+          </>
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
+{/* Duplicate Leads Modal - existing */}
+<DuplicateLeadsModal
+  open={duplicateModalOpen}
+  onOpenChange={setDuplicateModalOpen}
+  onMergeSuccess={() => {
+    fetchLeads(); // Refresh leads after merge
+  }}
+/>
     </div>
   );
 }
