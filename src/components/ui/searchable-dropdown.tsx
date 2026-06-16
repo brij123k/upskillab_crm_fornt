@@ -245,12 +245,9 @@ export function SearchableDropdown({
             </div>
           )}
 
+          {/* Custom scroll container – hide scrollbar, smooth scrolling */}
           <div
-            className="max-h-[280px] overflow-auto"
-            style={{
-              scrollbarWidth: 'thin',
-              msOverflowStyle: 'auto',
-            }}
+            className="max-h-[280px] overflow-y-auto scroll-smooth hide-scrollbar"
             onWheel={(e) => {
               e.stopPropagation();
             }}

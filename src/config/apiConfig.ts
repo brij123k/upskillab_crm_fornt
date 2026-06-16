@@ -59,6 +59,9 @@ const ApiConfig = {
   getcallLogReview:(callId:string)=> `${url}/call-logs/callLogReview/${callId}`,
   // notifications
 
+  getFollowUp:`${url}/lead-schedules`,
+  markFollowUp:(scheduleId:string)=>`${url}/lead-schedules/${scheduleId}/complete`,
+  
   notification:`${url}/notifications`,
   notificationUnreadCount:`${url}/notifications/unread-count`,
   readNotification:(id)=>`${url}/notifications/${id}/read`,

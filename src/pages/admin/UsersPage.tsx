@@ -848,17 +848,17 @@ export function UsersPage() {
     }
   };
 
-  return (
+return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Users Management</h1>
-          <p className="text-muted-foreground">Manage users, roles, departments, pools, and stages</p>
+          <h1 className="text-2xl font-bold text-slate-800">Users Management</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Manage users, roles, departments, pools, and stages</p>
         </div>
         <div className="flex items-center gap-2">
           {fetchingData && (
-            <div className="flex items-center text-sm text-muted-foreground">
+            <div className="flex items-center text-xs text-slate-400">
               <Loader2 className="w-3 h-3 mr-1 animate-spin" />
               Refreshing...
             </div>
@@ -868,8 +868,9 @@ export function UsersPage() {
             size="sm"
             onClick={fetchAllData}
             disabled={fetchingData}
+            className="rounded-lg border-slate-200"
           >
-            <RefreshCw className={cn("w-4 h-4 mr-2", fetchingData && "animate-spin")} />
+            <RefreshCw className={cn("w-3.5 h-3.5 mr-1", fetchingData && "animate-spin")} />
             Refresh
           </Button>
 
@@ -883,40 +884,36 @@ export function UsersPage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
-        <TabsList className="flex flex-wrap">
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <User className="w-4 h-4" />
-            Users
-          </TabsTrigger>
-          <TabsTrigger value="roles" className="flex items-center gap-2">
-            <Shield className="w-4 h-4" />
-            Roles
-          </TabsTrigger>
-          <TabsTrigger value="departments" className="flex items-center gap-2">
-            <Building className="w-4 h-4" />
-            Departments
-          </TabsTrigger>
-          <TabsTrigger value="pools" className="flex items-center gap-2">
-            <Database className="w-4 h-4" />
-            Pools
-          </TabsTrigger>
-          <TabsTrigger value="stages" className="flex items-center gap-2">
-            <GitBranch className="w-4 h-4" />
-            Stages
-          </TabsTrigger>
-          <TabsTrigger value="loanpartners" className="flex items-center gap-2">
-            <HandCoins className="w-4 h-4" />
-            Loan Partners
-          </TabsTrigger>
-          <TabsTrigger value="kra" className="flex items-center gap-2">
-            <Database className="w-4 h-4" />
-            KRA
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-      {/* Users Tab */}
+      {/* Tabs – redesigned */}
+      <div className="border-b border-slate-200">
+        <div className="flex flex-wrap gap-2 pb-2">
+          {[
+            { id: 'users', label: 'Users', icon: User },
+            { id: 'roles', label: 'Roles', icon: Shield },
+            { id: 'departments', label: 'Departments', icon: Building },
+            { id: 'pools', label: 'Pools', icon: Database },
+            { id: 'stages', label: 'Stages', icon: GitBranch },
+            { id: 'loanpartners', label: 'Loan Partners', icon: HandCoins },
+            { id: 'kra', label: 'KRA', icon: Database },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={cn(
+                "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all",
+                activeTab === tab.id
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              )}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content area – each tab renders its component exactly as before */}
       {activeTab === 'users' && (
         <UsersTab
           users={users}
@@ -934,7 +931,6 @@ export function UsersPage() {
         />
       )}
 
-      {/* Roles Tab */}
       {activeTab === 'roles' && (
         <RolesTab
           roles={roles}
@@ -944,7 +940,6 @@ export function UsersPage() {
         />
       )}
 
-      {/* Departments Tab */}
       {activeTab === 'departments' && (
         <DepartmentsTab
           departments={departments}
@@ -954,7 +949,6 @@ export function UsersPage() {
         />
       )}
 
-      {/* Pools Tab */}
       {activeTab === 'pools' && (
         <PoolsTab
           pools={pools}
@@ -969,7 +963,6 @@ export function UsersPage() {
         />
       )}
 
-      {/* Stages Tab */}
       {activeTab === 'stages' && (
         <StagesTab
           stages={stages}
@@ -1005,7 +998,6 @@ export function UsersPage() {
           onDeleteKra={handleDeleteKra}
         />
       )}
-
     </div>
   );
 }

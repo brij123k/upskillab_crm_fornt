@@ -10,8 +10,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Pencil, Plus, Loader2, RefreshCw, GripVertical, Calendar, Clock, Hash } from 'lucide-react';
+import { Pencil, Plus, Loader2, RefreshCw, Hash } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 
@@ -43,31 +42,18 @@ export function StagesTab({
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedStage, setSelectedStage] = useState<StageType | null>(null);
-    const [formData, setFormData] = useState({
-        name: '',
-        order: 1
-    });
+    const [editOrder, setEditOrder] = useState<number>(1);
+    const [formData, setFormData] = useState({ name: '', order: 1 });
     const [submitting, setSubmitting] = useState(false);
 
-    const handleInputChange = (field: string, value: string | number) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
-    };
-
     const resetForm = () => {
-        setFormData({
-            name: '',
-            order: 1
-        });
+        setFormData({ name: '', order: 1 });
     };
 
     const handleAddSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.name.trim()) {
-            toast({
-                title: "Error",
-                description: "Stage name is required",
-                variant: "destructive",
-            });
+            toast({ title: "Error", description: "Stage name is required", variant: "destructive" });
             return;
         }
         try {
@@ -75,40 +61,9 @@ export function StagesTab({
             await onAddStage(formData);
             resetForm();
             setIsAddModalOpen(false);
-            toast({
-                title: "Success",
-                description: "Stage created successfully",
-            });
+            toast({ title: "Success", description: "Stage created successfully" });
         } catch (error) {
-            // Error is handled in the parent
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleEditSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!formData.name.trim() || !selectedStage) {
-            toast({
-                title: "Error",
-                description: "Stage name is required",
-                variant: "destructive",
-            });
-            return;
-        }
-
-        try {
-            setSubmitting(true);
-            await onUpdateStage(selectedStage._id, formData);
-            resetForm();
-            setSelectedStage(null);
-            setIsEditModalOpen(false);
-            toast({
-                title: "Success",
-                description: "Stage updated successfully",
-            });
-        } catch (error) {
-            // Error is handled in the parent
+            // Error handled in parent
         } finally {
             setSubmitting(false);
         }
@@ -116,37 +71,33 @@ export function StagesTab({
 
     const openEditModal = (stage: StageType) => {
         setSelectedStage(stage);
-        setFormData({
-            name: stage.name,
-            order: stage.order
-        });
+        setEditOrder(stage.order);
         setIsEditModalOpen(true);
     };
 
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        return {
-            date: date.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-            }),
-            time: date.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-            })
-        };
+    const handleEditSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedStage) return;
+        try {
+            setSubmitting(true);
+            await onUpdateStage(selectedStage._id, { name: selectedStage.name, order: editOrder });
+            setIsEditModalOpen(false);
+            setSelectedStage(null);
+            toast({ title: "Success", description: "Stage order updated successfully" });
+        } catch (error) {
+            // Error handled in parent
+        } finally {
+            setSubmitting(false);
+        }
     };
 
-    // Sort stages by order
     const sortedStages = [...stages].sort((a, b) => a.order - b.order);
 
     if (loading) {
         return (
-            <Card>
+            <Card className="rounded-xl border-slate-200">
                 <CardContent className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
                 </CardContent>
             </Card>
         );
@@ -154,73 +105,60 @@ export function StagesTab({
 
     return (
         <>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Lead Stages</CardTitle>
+            <Card className="rounded-xl border-slate-200 shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-slate-100 px-6 py-4">
+                    <CardTitle className="text-base font-semibold text-slate-800">Lead Stages</CardTitle>
                     <div className="flex items-center gap-2">
                         {fetchingData && (
-                            <div className="flex items-center text-sm text-muted-foreground">
+                            <div className="flex items-center text-xs text-slate-400">
                                 <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                                 Refreshing...
                             </div>
                         )}
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={onRefresh}
-                            disabled={fetchingData}
-                        >
-                            <RefreshCw className={cn("w-4 h-4 mr-2", fetchingData && "animate-spin")} />
+                        <Button variant="outline" size="sm" onClick={onRefresh} disabled={fetchingData} className="rounded-lg border-slate-200">
+                            <RefreshCw className={cn("w-3.5 h-3.5 mr-1", fetchingData && "animate-spin")} />
                             Refresh
                         </Button>
                         <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
                             <DialogTrigger asChild>
-                                <Button size="sm">
-                                    <Plus className="w-4 h-4 mr-2" />
+                                <Button size="sm" className="rounded-lg bg-orange-500 hover:bg-orange-600 text-white">
+                                    <Plus className="w-3.5 h-3.5 mr-1" />
                                     Add Stage
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Create New Stage</DialogTitle>
+                            <DialogContent className="sm:max-w-[500px] rounded-2xl border-slate-200 p-0 overflow-hidden">
+                                <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
+                                    <DialogTitle className="text-xl font-bold text-slate-800">Create New Stage</DialogTitle>
                                 </DialogHeader>
-                                <form onSubmit={handleAddSubmit} className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="name">Stage Name</Label>
+                                <form onSubmit={handleAddSubmit} className="px-6 py-4 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-4">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-sm font-medium text-slate-700">Stage Name *</Label>
                                         <Input
-                                            id="name"
                                             value={formData.name}
-                                            onChange={(e) => handleInputChange('name', e.target.value)}
-                                            placeholder="Enter stage name"
+                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                            placeholder="e.g., New Lead"
                                             disabled={submitting}
+                                            className="h-10 rounded-xl border-slate-200 focus:ring-orange-500"
                                             autoFocus
                                         />
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="order">Order</Label>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-sm font-medium text-slate-700">Order *</Label>
                                         <Input
-                                            id="order"
                                             type="number"
                                             min="1"
                                             value={formData.order}
-                                            onChange={(e) => handleInputChange('order', parseInt(e.target.value) || 1)}
+                                            onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 1 })}
                                             placeholder="Enter order number"
                                             disabled={submitting}
+                                            className="h-10 rounded-xl border-slate-200 focus:ring-orange-500"
                                         />
                                     </div>
-                                    <div className="flex justify-end gap-2">
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => {
-                                                setIsAddModalOpen(false);
-                                                resetForm();
-                                            }}
-                                            disabled={submitting}
-                                        >
+                                    <div className="flex justify-end gap-3 pt-2">
+                                        <Button type="button" variant="outline" onClick={() => { setIsAddModalOpen(false); resetForm(); }} disabled={submitting} className="rounded-xl border-slate-200">
                                             Cancel
                                         </Button>
-                                        <Button type="submit" disabled={submitting}>
+                                        <Button type="submit" disabled={submitting} className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white">
                                             {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                                             Create
                                         </Button>
@@ -230,139 +168,92 @@ export function StagesTab({
                         </Dialog>
                     </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-5">
                     {sortedStages.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground">
-                            <div className="text-6xl mb-4">🎯</div>
-                            <h3 className="text-lg font-semibold mb-2">No stages found</h3>
-                            <p className="text-sm text-muted-foreground mb-4">
-                                Create your first stage to get started.
-                            </p>
-                            <Button onClick={() => setIsAddModalOpen(true)}>
+                        <div className="text-center py-12">
+                            <div className="text-5xl mb-3">🎯</div>
+                            <h3 className="text-base font-semibold text-slate-800 mb-1">No stages found</h3>
+                            <p className="text-sm text-slate-500 mb-4">Create your first stage to get started.</p>
+                            <Button onClick={() => setIsAddModalOpen(true)} className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white">
                                 <Plus className="w-4 h-4 mr-2" />
                                 Create Your First Stage
                             </Button>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {sortedStages.map((stage) => {
-                                const created = formatDate(stage.createdAt);
-                                return (
-                                    <Card 
-                                        key={stage._id} 
-                                        className="relative overflow-hidden transition-all duration-200 hover:shadow-lg"
+                        <div className="flex flex-wrap gap-3">
+                            {sortedStages.map((stage) => (
+                                <div
+                                    key={stage._id}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow"
+                                >
+                                    <Hash className="w-3.5 h-3.5 text-slate-400" />
+                                    <span className="text-sm font-medium text-slate-700">{stage.order}</span>
+                                    <span className="text-slate-800 font-medium">{stage.name}</span>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 rounded-full text-slate-400 hover:text-orange-600 hover:bg-orange-50 ml-1"
+                                        onClick={() => openEditModal(stage)}
                                     >
-                                        {/* Order indicator strip */}
-                                        <div 
-                                            className="absolute top-0 left-0 w-1 h-full bg-primary/60"
-                                            style={{
-                                                background: `linear-gradient(to bottom, hsl(var(--primary)), hsl(var(--primary)/0.6))`
-                                            }}
-                                        />
-                                        
-                                        <CardContent className="p-5">
-                                            {/* Header with Name and Actions */}
-                                            <div className="flex items-start justify-between mb-3">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <Badge variant="outline" className="bg-primary/5">
-                                                            <Hash className="w-3 h-3 mr-1" />
-                                                            Order {stage.order}
-                                                        </Badge>
-                                                    </div>
-                                                    <h3 className="font-semibold text-lg truncate pr-2">
-                                                        {stage.name}
-                                                    </h3>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8"
-                                                        onClick={() => openEditModal(stage)}
-                                                        title="Edit stage"
-                                                    >
-                                                        <Pencil className="w-4 h-4" />
-                                                    </Button>
-                                                </div>
-                                            </div>
-
-                                            {/* Creation Date and Time */}
-                                            <div className="space-y-1.5 mt-4 text-sm text-muted-foreground">
-                                                <div className="flex items-center gap-2">
-                                                    <Calendar className="w-3.5 h-3.5" />
-                                                    <span>{created.date}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Clock className="w-3.5 h-3.5" />
-                                                    <span>{created.time}</span>
-                                                </div>
-                                            </div>
-
-                                            {/* ID for reference */}
-                                            <div className="mt-3 text-xs text-muted-foreground/50 truncate">
-                                                ID: {stage._id.slice(-8)}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })}
+                                        <Pencil className="w-3.5 h-3.5" />
+                                    </Button>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </CardContent>
             </Card>
 
-            {/* Edit Modal */}
+            {/* Edit Modal – only order is editable */}
             <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Edit Stage</DialogTitle>
+                <DialogContent className="sm:max-w-[500px] rounded-2xl border-slate-200 p-0 overflow-hidden">
+                    <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
+                        <DialogTitle className="text-xl font-bold text-slate-800">Change Stage Order</DialogTitle>
                     </DialogHeader>
-                    <form onSubmit={handleEditSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="edit-name">Stage Name</Label>
+                    <form onSubmit={handleEditSubmit} className="px-6 py-4 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-4">
+                        <div className="space-y-1.5">
+                            <Label className="text-sm font-medium text-slate-700">Stage Name</Label>
                             <Input
-                                id="edit-name"
-                                value={formData.name}
-                                onChange={(e) => handleInputChange('name', e.target.value)}
-                                placeholder="Enter stage name"
+                                value={selectedStage?.name || ''}
+                                disabled
+                                className="h-10 rounded-xl border-slate-200 bg-slate-50 text-slate-500"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-sm font-medium text-slate-700">New Order *</Label>
+                            <Input
+                                type="number"
+                                min="1"
+                                value={editOrder}
+                                onChange={(e) => setEditOrder(parseInt(e.target.value) || 1)}
+                                placeholder="Enter new order number"
                                 disabled={submitting}
+                                className="h-10 rounded-xl border-slate-200 focus:ring-orange-500"
                                 autoFocus
                             />
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="edit-order">Order</Label>
-                            <Input
-                                id="edit-order"
-                                type="number"
-                                min="1"
-                                value={formData.order}
-                                onChange={(e) => handleInputChange('order', parseInt(e.target.value) || 1)}
-                                placeholder="Enter order number"
-                                disabled={submitting}
-                            />
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => {
-                                    setIsEditModalOpen(false);
-                                    resetForm();
-                                    setSelectedStage(null);
-                                }}
-                                disabled={submitting}
-                            >
+                        <div className="flex justify-end gap-3 pt-2">
+                            <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)} disabled={submitting} className="rounded-xl border-slate-200">
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={submitting}>
+                            <Button type="submit" disabled={submitting} className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white">
                                 {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                Update
+                                Update Order
                             </Button>
                         </div>
                     </form>
                 </DialogContent>
             </Dialog>
+
+            <style>{`
+                .custom-scrollbar {
+                    scrollbar-width: none;
+                    -ms-overflow-style: none;
+                }
+                .custom-scrollbar::-webkit-scrollbar {
+                    display: none;
+                }
+            `}</style>
         </>
     );
 }

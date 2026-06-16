@@ -78,6 +78,7 @@ poolIds?: string[] | PoolType[];
 export interface PoolType {
   _id: string;
   name: string;
+  shortName: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

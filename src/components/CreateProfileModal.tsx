@@ -26,6 +26,7 @@ import { DocumentsUpload } from './DocumentUpload';
 import { getDataHandlerWithToken, postDataHandlerWithTokenFormData } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface DepartmentUser {
   _id: string;
@@ -144,7 +145,6 @@ export function CreateProfileModal({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Create preview immediately
     const previewUrl = URL.createObjectURL(file);
     setProfileImagePreview(previewUrl);
 
@@ -155,17 +155,13 @@ export function CreateProfileModal({
       setUploadingProfileImage(true);
       const response = await postDataHandlerWithTokenFormData(ApiConfig.uploadImage, formData, true);
       
-      console.log('Upload response:', response); // Debug log
-      
       if (response?.success && response?.data?.url) {
-        // Set the URL from response
         setProfileForm({ ...profileForm, profileImage: response.data.url });
         toast({
           title: "Success",
           description: response?.message || "Profile image uploaded successfully",
         });
       } else {
-        // If upload fails, clear preview
         setProfileImagePreview('');
         toast({
           title: "Error",
@@ -183,7 +179,6 @@ export function CreateProfileModal({
       });
     } finally {
       setUploadingProfileImage(false);
-      // Clean up the preview URL after upload is complete
       setTimeout(() => {
         if (previewUrl) URL.revokeObjectURL(previewUrl);
       }, 1000);
@@ -214,8 +209,6 @@ export function CreateProfileModal({
         control => control.actions.length > 0
       )
     };
-    
-    console.log('Data to send:', dataToSend);
     
     try {
       await onSubmit(dataToSend);
@@ -318,295 +311,328 @@ export function CreateProfileModal({
   }));
 
   const isFormValid = profileForm.departmentId && profileForm.salary;
-
-  // Get the image to display (preview first, then uploaded URL)
   const displayImage = profileImagePreview || profileForm.profileImage;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Create Profile for {selectedUser.name}</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="sm:max-w-[900px] rounded-2xl border-slate-200 p-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
+          <DialogTitle className="text-xl font-bold text-slate-800">Create Profile for {selectedUser.name}</DialogTitle>
+          <DialogDescription className="text-sm text-slate-500">
             Fill in the complete details to create the user profile
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="flex flex-wrap h-auto gap-1">
-            <TabsTrigger value="basic" className="flex items-center gap-1">
-              <UserCircle className="w-3 h-3" />
-              Basic
-            </TabsTrigger>
-            <TabsTrigger value="address" className="flex items-center gap-1">
-              <MapPin className="w-3 h-3" />
-              Address
-            </TabsTrigger>
-            <TabsTrigger value="bank" className="flex items-center gap-1">
-              <Landmark className="w-3 h-3" />
-              Bank
-            </TabsTrigger>
-            <TabsTrigger value="education" className="flex items-center gap-1">
-              <GraduationCap className="w-3 h-3" />
-              Education
-            </TabsTrigger>
-            <TabsTrigger value="documents" className="flex items-center gap-1">
-              <FileText className="w-3 h-3" />
-              Documents
-            </TabsTrigger>
-            <TabsTrigger value="permissions" className="flex items-center gap-1">
-              <Lock className="w-3 h-3" />
-              Permissions
-            </TabsTrigger>
-          </TabsList>
+        <div className="px-6 py-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="flex flex-wrap h-auto gap-1 border-b border-slate-200 pb-2 mb-4 bg-transparent">
+              <TabsTrigger 
+                value="basic" 
+                className="flex items-center gap-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+              >
+                <UserCircle className="w-3 h-3" />
+                Basic
+              </TabsTrigger>
+              <TabsTrigger 
+                value="address" 
+                className="flex items-center gap-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+              >
+                <MapPin className="w-3 h-3" />
+                Address
+              </TabsTrigger>
+              <TabsTrigger 
+                value="bank" 
+                className="flex items-center gap-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+              >
+                <Landmark className="w-3 h-3" />
+                Bank
+              </TabsTrigger>
+              <TabsTrigger 
+                value="education" 
+                className="flex items-center gap-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+              >
+                <GraduationCap className="w-3 h-3" />
+                Education
+              </TabsTrigger>
+              <TabsTrigger 
+                value="documents" 
+                className="flex items-center gap-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+              >
+                <FileText className="w-3 h-3" />
+                Documents
+              </TabsTrigger>
+              <TabsTrigger 
+                value="permissions" 
+                className="flex items-center gap-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+              >
+                <Lock className="w-3 h-3" />
+                Permissions
+              </TabsTrigger>
+            </TabsList>
 
-          <div className="mt-4 space-y-4">
-            <TabsContent value="basic" className="space-y-4">
-              {/* Profile Image Upload */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <UserCircle className="w-4 h-4" />
-                    Profile Image
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-4">
-                    {displayImage ? (
-                      <div className="relative">
-                        <img
-                          src={displayImage}
-                          alt="Profile preview"
-                          className="w-20 h-20 rounded-full object-cover border-2 border-primary/20"
+            <div className="space-y-4">
+              <TabsContent value="basic" className="space-y-4">
+                {/* Profile Image Upload */}
+                <Card className="rounded-xl border-slate-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                      <UserCircle className="w-4 h-4 text-orange-500" />
+                      Profile Image
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center gap-4">
+                      {displayImage ? (
+                        <div className="relative">
+                          <img
+                            src={displayImage}
+                            alt="Profile preview"
+                            className="w-20 h-20 rounded-full object-cover border-2 border-orange-200"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-white shadow-md hover:bg-red-50 hover:text-red-600"
+                            onClick={handleRemoveProfileImage}
+                            disabled={creatingProfile || uploadingProfileImage}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center border-2 border-dashed border-slate-300">
+                          <UserCircle className="w-10 h-10 text-slate-400" />
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <input
+                          type="file"
+                          id="profile-image"
+                          accept="image/*"
+                          onChange={handleProfileImageUpload}
+                          disabled={creatingProfile || uploadingProfileImage}
+                          className="hidden"
                         />
                         <Button
                           type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-background shadow-md hover:bg-destructive hover:text-destructive-foreground"
-                          onClick={handleRemoveProfileImage}
+                          variant="outline"
+                          onClick={() => document.getElementById('profile-image')?.click()}
                           disabled={creatingProfile || uploadingProfileImage}
+                          className="rounded-lg border-slate-200"
                         >
-                          <X className="w-3 h-3" />
+                          {uploadingProfileImage ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4 mr-2" />
+                              {profileForm.profileImage ? 'Change Image' : 'Upload Profile Image'}
+                            </>
+                          )}
                         </Button>
+                        {uploadingProfileImage && (
+                          <p className="text-xs text-slate-500 mt-2">Uploading image, please wait...</p>
+                        )}
                       </div>
-                    ) : (
-                      <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center border-2 border-dashed">
-                        <UserCircle className="w-10 h-10 text-muted-foreground" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Basic Information */}
+                <Card className="rounded-xl border-slate-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base font-semibold text-slate-800">Basic Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium text-slate-700">Department *</Label>
+                        <Select 
+                          value={profileForm.departmentId} 
+                          onValueChange={handleDepartmentChange}
+                          disabled={creatingProfile || loadingDepartments}
+                        >
+                          <SelectTrigger className="h-10 rounded-lg border-slate-200">
+                            <SelectValue placeholder="Select department" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-lg">
+                            {loadingDepartments ? (
+                              <div className="py-2 text-center">
+                                <Loader2 className="w-4 h-4 mx-auto animate-spin" />
+                              </div>
+                            ) : (
+                              departments.map((dept) => (
+                                <SelectItem key={dept._id} value={dept._id}>
+                                  {dept.name}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
                       </div>
-                    )}
-                    <div className="flex-1">
-                      <input
-                        type="file"
-                        id="profile-image"
-                        accept="image/*"
-                        onChange={handleProfileImageUpload}
-                        disabled={creatingProfile || uploadingProfileImage}
-                        className="hidden"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => document.getElementById('profile-image')?.click()}
-                        disabled={creatingProfile || uploadingProfileImage}
-                        className="w-full sm:w-auto"
-                      >
-                        {uploadingProfileImage ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Uploading...
-                          </>
+
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium text-slate-700">Salary *</Label>
+                        <Input
+                          type="number"
+                          value={profileForm.salary}
+                          onChange={(e) => setProfileForm({...profileForm, salary: e.target.value})}
+                          placeholder="Monthly salary"
+                          disabled={creatingProfile}
+                          className="h-10 rounded-lg border-slate-200 focus:ring-orange-500"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium text-slate-700">Education</Label>
+                        <Input
+                          value={profileForm.education}
+                          onChange={(e) => setProfileForm({...profileForm, education: e.target.value})}
+                          placeholder="Highest qualification"
+                          disabled={creatingProfile}
+                          className="h-10 rounded-lg border-slate-200 focus:ring-orange-500"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium text-slate-700">Pools</Label>
+                        <MultiSelect
+                          options={pools
+                            .filter(pool => pool.isActive)
+                            .map(pool => ({
+                              value: pool._id,
+                              label: pool.name,
+                              disabled: !pool.isActive
+                            }))}
+                          selected={profileForm.poolIds}
+                          onChange={(selectedValues) => setProfileForm({ 
+                            ...profileForm, 
+                            poolIds: selectedValues 
+                          })}
+                          placeholder="Select pools..."
+                          loading={loadingPools}
+                          disabled={creatingProfile}
+                          emptyMessage="No active pools available"
+                          className="rounded-lg border-slate-200"
+                        />
+                      </div>
+
+                      <div className="space-y-1 md:col-span-2">
+                        <Label className="text-sm font-medium text-slate-700">Reporting Senior</Label>
+                        {!profileForm.departmentId ? (
+                          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <p className="text-sm text-amber-800">
+                              Please select a department first to see available seniors
+                            </p>
+                          </div>
                         ) : (
                           <>
-                            <Upload className="w-4 h-4 mr-2" />
-                            {profileForm.profileImage ? 'Change Image' : 'Upload Profile Image'}
+                            <SearchableDropdown
+                              options={[
+                                { value: "", label: "Select reporting senior..." },
+                                ...userOptions
+                              ]}
+                              value={profileForm.reportingSeniorId}
+                              onValueChange={(value) => setProfileForm({...profileForm, reportingSeniorId: value})}
+                              placeholder="Select reporting senior"
+                              searchPlaceholder="Search by name, email, or role..."
+                              emptyMessage={loadingUsers ? "Loading users..." : "No users found in this department"}
+                              disabled={creatingProfile || loadingUsers || departmentUsers.length === 0}
+                              allowClear
+                              onClear={() => setProfileForm({...profileForm, reportingSeniorId: ""})}
+                              triggerClassName="h-10 rounded-lg border-slate-200"
+                              contentClassName="rounded-lg"
+                            />
+                            {profileForm.departmentId && loadingUsers && (
+                              <div className="flex items-center gap-2 text-sm text-slate-500 mt-1">
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Loading department users...
+                              </div>
+                            )}
                           </>
                         )}
-                      </Button>
-                      {uploadingProfileImage && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Uploading image, please wait...
-                        </p>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-              {/* Department Selection */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Basic Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label>Department *</Label>
-                      <Select 
-                        value={profileForm.departmentId} 
-                        onValueChange={handleDepartmentChange}
-                        disabled={creatingProfile || loadingDepartments}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select department" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {loadingDepartments ? (
-                            <div className="py-2 text-center">
-                              <Loader2 className="w-4 h-4 mx-auto animate-spin" />
-                            </div>
-                          ) : (
-                            departments.map((dept) => (
-                              <SelectItem key={dept._id} value={dept._id}>
-                                {dept.name}
-                              </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
+              <TabsContent value="address">
+                <AddressForm
+                  value={profileForm.address}
+                  onChange={(address) => setProfileForm({...profileForm, address})}
+                  disabled={creatingProfile}
+                />
+              </TabsContent>
 
-                    <div className="space-y-1">
-                      <Label>Salary *</Label>
-                      <Input
-                        type="number"
-                        value={profileForm.salary}
-                        onChange={(e) => setProfileForm({...profileForm, salary: e.target.value})}
-                        placeholder="Monthly salary"
-                        disabled={creatingProfile}
-                      />
-                    </div>
+              <TabsContent value="bank">
+                <BankDetailsForm
+                  value={profileForm.bankDetails}
+                  onChange={(bankDetails) => setProfileForm({...profileForm, bankDetails})}
+                  disabled={creatingProfile}
+                />
+              </TabsContent>
 
-                    <div className="space-y-1">
-                      <Label>Education</Label>
-                      <Input
-                        value={profileForm.education}
-                        onChange={(e) => setProfileForm({...profileForm, education: e.target.value})}
-                        placeholder="Highest qualification"
-                        disabled={creatingProfile}
-                      />
-                    </div>
+              <TabsContent value="education">
+                <EducationalDetailsForm
+                  value={profileForm.educationalDetails}
+                  onChange={(educationalDetails) => setProfileForm({...profileForm, educationalDetails})}
+                  disabled={creatingProfile}
+                />
+              </TabsContent>
 
-                    <div className="space-y-1">
-                      <Label>Pools</Label>
-                      <MultiSelect
-                        options={pools
-                          .filter(pool => pool.isActive)
-                          .map(pool => ({
-                            value: pool._id,
-                            label: pool.name,
-                            disabled: !pool.isActive
-                          }))}
-                        selected={profileForm.poolIds}
-                        onChange={(selectedValues) => setProfileForm({ 
-                          ...profileForm, 
-                          poolIds: selectedValues 
-                        })}
-                        placeholder="Select pools..."
-                        loading={loadingPools}
-                        disabled={creatingProfile}
-                        emptyMessage="No active pools available"
-                      />
-                    </div>
+              <TabsContent value="documents">
+                <DocumentsUpload
+                  value={profileForm.documents}
+                  onChange={(documents) => setProfileForm({...profileForm, documents})}
+                  disabled={creatingProfile}
+                />
+              </TabsContent>
 
-                    <div className="space-y-1 md:col-span-2">
-                      <Label>Reporting Senior</Label>
-                      {!profileForm.departmentId ? (
-                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                          <p className="text-sm text-yellow-800">
-                            Please select a department first to see available seniors
-                          </p>
-                        </div>
-                      ) : (
-                        <>
-                          <SearchableDropdown
-                            options={[
-                              { value: "", label: "Select reporting senior..." },
-                              ...userOptions
-                            ]}
-                            value={profileForm.reportingSeniorId}
-                            onValueChange={(value) => setProfileForm({...profileForm, reportingSeniorId: value})}
-                            placeholder="Select reporting senior"
-                            searchPlaceholder="Search by name, email, or role..."
-                            emptyMessage={loadingUsers ? "Loading users..." : "No users found in this department"}
-                            disabled={creatingProfile || loadingUsers || departmentUsers.length === 0}
-                            allowClear
-                            onClear={() => setProfileForm({...profileForm, reportingSeniorId: ""})}
-                          />
-                          {profileForm.departmentId && loadingUsers && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                              Loading department users...
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+              <TabsContent value="permissions">
+                <PermissionsSelector
+                  permissions={profileForm.extraAccessControls}
+                  onChange={(perms) => setProfileForm({...profileForm, extraAccessControls: perms})}
+                  disabled={creatingProfile}
+                  title="Extra Access Controls"
+                  description="Grant additional permissions beyond the user's role"
+                />
+              </TabsContent>
+            </div>
+          </Tabs>
+        </div>
 
-            <TabsContent value="address">
-              <AddressForm
-                value={profileForm.address}
-                onChange={(address) => setProfileForm({...profileForm, address})}
-                disabled={creatingProfile}
-              />
-            </TabsContent>
-
-            <TabsContent value="bank">
-              <BankDetailsForm
-                value={profileForm.bankDetails}
-                onChange={(bankDetails) => setProfileForm({...profileForm, bankDetails})}
-                disabled={creatingProfile}
-              />
-            </TabsContent>
-
-            <TabsContent value="education">
-              <EducationalDetailsForm
-                value={profileForm.educationalDetails}
-                onChange={(educationalDetails) => setProfileForm({...profileForm, educationalDetails})}
-                disabled={creatingProfile}
-              />
-            </TabsContent>
-
-            <TabsContent value="documents">
-              <DocumentsUpload
-                value={profileForm.documents}
-                onChange={(documents) => setProfileForm({...profileForm, documents})}
-                disabled={creatingProfile}
-              />
-            </TabsContent>
-
-            <TabsContent value="permissions">
-              <PermissionsSelector
-                permissions={profileForm.extraAccessControls}
-                onChange={(perms) => setProfileForm({...profileForm, extraAccessControls: perms})}
-                disabled={creatingProfile}
-                title="Extra Access Controls"
-                description="Grant additional permissions beyond the user's role"
-              />
-            </TabsContent>
+        <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-white">
+          <div className="flex gap-3 w-full sm:w-auto">
+            <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={creatingProfile} className="rounded-lg border-slate-200">
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} disabled={creatingProfile || !isFormValid} className="rounded-lg bg-orange-500 hover:bg-orange-600 text-white">
+              {creatingProfile ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Profile'
+              )}
+            </Button>
           </div>
-        </Tabs>
-        
-        <DialogFooter className="gap-2 mt-4">
-          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={creatingProfile}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={creatingProfile || !isFormValid}>
-            {creatingProfile ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              'Create Profile'
-            )}
-          </Button>
         </DialogFooter>
       </DialogContent>
+
+      <style>{`
+        .custom-scrollbar {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </Dialog>
   );
 }

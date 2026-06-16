@@ -17,7 +17,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Table,
@@ -157,24 +156,25 @@ export function LoanPartnersTab({
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', {
       day: '2-digit',
-      month: '2-digit',
+      month: 'short',
       year: 'numeric',
     });
   };
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Banknote className="w-5 h-5" />
+      <Card className="rounded-xl border-slate-200 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-slate-100 px-6 py-4">
+          <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
+            <Banknote className="w-4 h-4 text-orange-500" />
             Loan Partners
           </CardTitle>
           <div className="flex items-center gap-2">
             {fetchingData && (
-              <div className="flex items-center text-sm text-muted-foreground">
+              <div className="flex items-center text-xs text-slate-400">
                 <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                 Refreshing...
               </div>
@@ -184,136 +184,88 @@ export function LoanPartnersTab({
               size="sm"
               onClick={onRefresh}
               disabled={fetchingData}
+              className="rounded-lg border-slate-200"
             >
-              <RefreshCw className={cn("w-4 h-4 mr-2", fetchingData && "animate-spin")} />
+              <RefreshCw className={cn("w-3.5 h-3.5 mr-1", fetchingData && "animate-spin")} />
               Refresh
             </Button>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Loan Partner
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <form onSubmit={handleAddSubmit}>
-                  <DialogHeader>
-                    <DialogTitle>Add New Loan Partner</DialogTitle>
-                    <DialogDescription>
-                      Create a new loan partner with their details
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Partner Name *</Label>
-                      <Input
-                        id="name"
-                        placeholder="Enter partner name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="type">Partner Type *</Label>
-                      <Select
-                        value={formData.type}
-                        onValueChange={(value) => setFormData({ ...formData, type: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select partner type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="NBFC">NBFC</SelectItem>
-                          <SelectItem value="BANK">BANK</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="submissionCharge">Submission Charge (%) *</Label>
-                      <Input
-                        id="submissionCharge"
-                        type="number"
-                        placeholder="Enter submission charge"
-                        value={formData.submissionCharge}
-                        onChange={(e) => setFormData({ ...formData, submissionCharge: parseInt(e.target.value) || 0 })}
-                        min="0"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setIsAddDialogOpen(false);
-                        resetForm();
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={submitting}>
-                      {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                      Create Partner
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button
+              size="sm"
+              onClick={() => setIsAddDialogOpen(true)}
+              className="rounded-lg bg-orange-500 hover:bg-orange-600 text-white"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              Add Loan Partner
+            </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
             </div>
           ) : loanPartners.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No loan partners found. Click "Add Loan Partner" to create one.
+            <div className="text-center py-12">
+              <Banknote className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+              <h3 className="text-base font-semibold text-slate-800 mb-1">No loan partners found</h3>
+              <p className="text-sm text-slate-500 mb-4">Click "Add Loan Partner" to create one.</p>
+              <Button onClick={() => setIsAddDialogOpen(true)} className="rounded-lg bg-orange-500 hover:bg-orange-600 text-white">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Loan Partner
+              </Button>
             </div>
           ) : (
-            <div className="rounded-md border">
-              <Table>
+            <div className="overflow-x-auto">
+              <Table className="text-sm">
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Submission Charge</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created At</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                  <TableRow className="bg-slate-50 border-b border-slate-200">
+                    <TableHead className="text-xs font-medium text-slate-500">Name</TableHead>
+                    <TableHead className="text-xs font-medium text-slate-500">Type</TableHead>
+                    <TableHead className="text-xs font-medium text-slate-500">Submission Charge</TableHead>
+                    <TableHead className="text-xs font-medium text-slate-500">Status</TableHead>
+                    <TableHead className="text-xs font-medium text-slate-500">Created At</TableHead>
+                    <TableHead className="text-xs font-medium text-slate-500 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loanPartners.map((partner) => (
-                    <TableRow key={partner._id}>
-                      <TableCell className="font-medium">{partner.name}</TableCell>
+                    <TableRow key={partner._id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                      <TableCell className="font-medium text-slate-800">{partner.name}</TableCell>
                       <TableCell>
-                        <Badge variant={partner.type === 'BANK' ? 'default' : 'secondary'}>
+                        <span className={cn(
+                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                          partner.type === 'BANK' 
+                            ? "bg-blue-100 text-blue-700" 
+                            : "bg-purple-100 text-purple-700"
+                        )}>
                           {partner.type}
-                        </Badge>
+                        </span>
                       </TableCell>
-                      <TableCell>{partner.submissionCharge}%</TableCell>
+                      <TableCell className="text-slate-700">{partner.submissionCharge}%</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Switch
                             checked={partner.isActive}
                             onCheckedChange={() => handleToggleStatus(partner)}
+                            className="data-[state=checked]:bg-orange-500"
                           />
-                          <Badge variant={partner.isActive ? 'success' : 'destructive'}>
-                            {partner.isActive ? 'Active' : 'Inactive'}
-                          </Badge>
+                          <span className={cn(
+                            "text-xs font-medium",
+                            partner.isActive ? "text-emerald-600" : "text-slate-400"
+                          )}>
+                            {partner.isActive ? "Active" : "Inactive"}
+                          </span>
                         </div>
                       </TableCell>
-                      <TableCell>{formatDate(partner.createdAt)}</TableCell>
+                      <TableCell className="text-slate-500">{formatDate(partner.createdAt)}</TableCell>
                       <TableCell className="text-right">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => openEditDialog(partner)}
+                          className="h-7 w-7 rounded-lg text-slate-500 hover:text-orange-600"
                         >
-                          <Pencil className="w-4 h-4" />
+                          <Pencil className="w-3.5 h-3.5" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -325,75 +277,163 @@ export function LoanPartnersTab({
         </CardContent>
       </Card>
 
-      {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-          <form onSubmit={handleEditSubmit}>
-            <DialogHeader>
-              <DialogTitle>Edit Loan Partner</DialogTitle>
-              <DialogDescription>
-                Update the loan partner details
+      {/* Add Partner Modal */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="sm:max-w-[500px] rounded-2xl border-slate-200 p-0 overflow-hidden">
+          <form onSubmit={handleAddSubmit}>
+            <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
+              <DialogTitle className="text-xl font-bold text-slate-800">Add New Loan Partner</DialogTitle>
+              <DialogDescription className="text-sm text-slate-500">
+                Create a new loan partner with their details.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-name">Partner Name *</Label>
+            <div className="px-6 py-4 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">Partner Name *</Label>
                 <Input
-                  id="edit-name"
-                  placeholder="Enter partner name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Enter partner name"
+                  disabled={submitting}
+                  className="h-10 rounded-xl border-slate-200 focus:ring-orange-500"
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-type">Partner Type *</Label>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">Partner Type *</Label>
                 <Select
                   value={formData.type}
                   onValueChange={(value) => setFormData({ ...formData, type: value })}
+                  disabled={submitting}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10 rounded-xl border-slate-200">
                     <SelectValue placeholder="Select partner type" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="rounded-xl">
                     <SelectItem value="NBFC">NBFC</SelectItem>
                     <SelectItem value="BANK">BANK</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-submissionCharge">Submission Charge (%) *</Label>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">Submission Charge (%) *</Label>
                 <Input
-                  id="edit-submissionCharge"
                   type="number"
-                  placeholder="Enter submission charge"
-                  value={formData.submissionCharge}
-                  onChange={(e) => setFormData({ ...formData, submissionCharge: parseInt(e.target.value) || 0 })}
                   min="0"
+                  step="0.01"
+                  value={formData.submissionCharge}
+                  onChange={(e) => setFormData({ ...formData, submissionCharge: parseFloat(e.target.value) || 0 })}
+                  placeholder="Enter submission charge"
+                  disabled={submitting}
+                  className="h-10 rounded-xl border-slate-200 focus:ring-orange-500"
                   required
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsEditDialogOpen(false);
-                  setSelectedPartner(null);
-                  resetForm();
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Update Partner
-              </Button>
+            <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-white">
+              <div className="flex gap-3 w-full sm:w-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => { setIsAddDialogOpen(false); resetForm(); }}
+                  disabled={submitting}
+                  className="rounded-xl border-slate-200"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={submitting} className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white">
+                  {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Create Partner
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Partner Modal */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px] rounded-2xl border-slate-200 p-0 overflow-hidden">
+          <form onSubmit={handleEditSubmit}>
+            <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
+              <DialogTitle className="text-xl font-bold text-slate-800">Edit Loan Partner</DialogTitle>
+              <DialogDescription className="text-sm text-slate-500">
+                Update the loan partner details.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="px-6 py-4 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">Partner Name *</Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Enter partner name"
+                  disabled={submitting}
+                  className="h-10 rounded-xl border-slate-200 focus:ring-orange-500"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">Partner Type *</Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value) => setFormData({ ...formData, type: value })}
+                  disabled={submitting}
+                >
+                  <SelectTrigger className="h-10 rounded-xl border-slate-200">
+                    <SelectValue placeholder="Select partner type" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="NBFC">NBFC</SelectItem>
+                    <SelectItem value="BANK">BANK</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">Submission Charge (%) *</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.submissionCharge}
+                  onChange={(e) => setFormData({ ...formData, submissionCharge: parseFloat(e.target.value) || 0 })}
+                  placeholder="Enter submission charge"
+                  disabled={submitting}
+                  className="h-10 rounded-xl border-slate-200 focus:ring-orange-500"
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-white">
+              <div className="flex gap-3 w-full sm:w-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => { setIsEditDialogOpen(false); setSelectedPartner(null); resetForm(); }}
+                  disabled={submitting}
+                  className="rounded-xl border-slate-200"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={submitting} className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white">
+                  {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Update Partner
+                </Button>
+              </div>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <style>{`
+        .custom-scrollbar {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </div>
   );
 }

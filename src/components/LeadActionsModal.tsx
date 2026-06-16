@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -8,40 +7,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Eye,
-  Edit,
-  CheckCircle,
-  XCircle,
-  TrendingUp,
-  Users,
-  ArrowRight,
-  MoreHorizontal,
-  Loader2,
-  Phone,
-  Mail,
-  FileText,
-  CalendarDays
-} from 'lucide-react';
+import { Eye, Edit, TrendingUp, AlertTriangle, Users, Loader2, CheckCircle, XCircle, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { LeadType } from '@/types/lead';
-import { Badge } from '@/components/ui/badge';
-import ApiConfig from '@/config/apiConfig';
-import { toast } from 'sonner';
-import { postDataHandlerWithToken } from '@/config/services';
 
 interface LeadActionsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  selectedLead: LeadType | null;
+  selectedLead: any;
   loading: boolean;
   actions: {
-    onView: (lead: LeadType) => void;
-    onEdit: (lead: LeadType) => void;
-    onChangeStatus: (lead: LeadType) => void;
-    onChangeStage: (lead: LeadType) => void;
-    onAssign: (lead: LeadType) => void;
-    onConvert?: (lead: LeadType) => void;
+    onView: (lead: any) => void;
+    onEdit: (lead: any) => void;
+    onChangeStatus: (lead: any) => void;
+    onChangeStage: (lead: any) => void;
+    onAssign: (lead: any) => void;
+    onConvert: (lead: any) => void;
   };
 }
 
@@ -52,297 +32,232 @@ export function LeadActionsModal({
   loading,
   actions
 }: LeadActionsModalProps) {
-  const [ongoingExam, setOngoingExam] = useState<{ _id: string; title?: string; description?: string } | null>(null);
-  const [loadingExam, setLoadingExam] = useState(false);
-  const [registeringPcat, setRegisteringPcat] = useState(false);
-
-  useEffect(() => {
-    if (!open || !selectedLead) {
-      setOngoingExam(null);
-      return;
-    }
-
-    const fetchOngoingExam = async () => {
-      try {
-        setLoadingExam(true);
-        const response = await fetch(ApiConfig.getOngoingPcatExam);
-        if (!response.ok) {
-          throw new Error(`Failed to load ongoing exam (${response.status})`);
-        }
-
-        const data = await response.json();
-        setOngoingExam(data?._id ? data : null);
-      } catch (error) {
-        console.error('Failed to load ongoing PCAT exam:', error);
-        setOngoingExam(null);
-      } finally {
-        setLoadingExam(false);
-      }
-    };
-
-    fetchOngoingExam();
-  }, [open, selectedLead?._id]);
-
   if (!selectedLead) return null;
 
   const handleAction = (action: keyof typeof actions) => {
-    if (actions[action]) {
-      actions[action](selectedLead);
-      onOpenChange(false);
+    actions[action](selectedLead);
+    onOpenChange(false);
+  };
+
+  // Get status color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'text-emerald-600 bg-emerald-50 border-emerald-200';
+      case 'lost':
+        return 'text-red-600 bg-red-50 border-red-200';
+      case 'converted':
+        return 'text-blue-600 bg-blue-50 border-blue-200';
+      default:
+        return 'text-slate-600 bg-slate-50 border-slate-200';
     }
   };
 
-  const handlePcatRegister = async () => {
-    if (!ongoingExam?._id) {
-      toast.error('There is no running PCAT exam right now.');
-      return;
-    }
-
-    if (!selectedLead.name || !selectedLead.email || !selectedLead.phone) {
-      toast.error('Lead name, email, and phone are required for PCAT registration.');
-      return;
-    }
-
-    try {
-      setRegisteringPcat(true);
-      const response = await postDataHandlerWithToken(ApiConfig.registerPcatBackend(selectedLead.leadId),{},true)
-      toast.success(`${selectedLead.name} ${response.message}`);
-      handleAction('onChangeStage')
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to register lead for PCAT');
-    } finally {
-      setRegisteringPcat(false);
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <CheckCircle className="w-3.5 h-3.5" />;
+      case 'lost':
+        return <XCircle className="w-3.5 h-3.5" />;
+      case 'converted':
+        return <TrendingUp className="w-3.5 h-3.5" />;
+      default:
+        return null;
     }
   };
+
+  // Format date
+const formatDate = (dateString?: string | null) => {
+
+  if (!dateString) {
+
+    return 'No Calls Yet';
+
+  }
+
+
+  const date = new Date(dateString);
+
+
+  if (isNaN(date.getTime())) {
+
+    return 'Invalid Date';
+
+  }
+
+
+  const day = String(date.getDate()).padStart(2, '0');
+
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+
+  const year = String(date.getFullYear()).slice(-2);
+
+
+  return `${day}-${month}-${year}`;
+
+};
+
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px] max-w-[calc(100vw-2rem)] max-h-[90vh] h-auto overflow-hidden flex flex-col">
-        {/* Fixed Header */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
-          <DialogTitle className="text-lg sm:text-xl">Lead Actions</DialogTitle>
-          <DialogDescription className="text-sm sm:text-base">
-            Available actions for <strong>{selectedLead.name}</strong>
+      <DialogContent className="sm:max-w-[500px] rounded-2xl border-slate-200 p-0 overflow-hidden">
+        {/* Header */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
+          <DialogTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            Lead Actions
+          </DialogTitle>
+          <DialogDescription className="text-sm text-slate-500">
+            Manage lead: {selectedLead.name}
           </DialogDescription>
         </DialogHeader>
-        
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          
-          <div className="space-y-4 sm:space-y-5">
-            {/* Lead Info Summary */}
-            <div className="p-4 bg-muted/50 rounded-lg border">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
-                <div className="font-medium text-sm sm:text-base truncate">{selectedLead.name}</div>
-                <Badge variant="outline" className="text-xs sm:text-sm w-fit">
-                  ID: {selectedLead.leadId}
-                </Badge>
+
+        {/* Body - with thin scrollbar if needed */}
+        <div className="px-6 py-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+          <div className="space-y-5">
+            {/* Lead Summary Card */}
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
+                    <span className="text-sm font-medium text-orange-700">
+                      {selectedLead.name?.charAt(0)?.toUpperCase() || 'L'}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-800">{selectedLead.name}</p>
+                    <p className="text-xs text-slate-500">ID: {selectedLead.leadId}</p>
+                  </div>
+                </div>
+                <div className={cn(
+                  "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border",
+                  getStatusColor(selectedLead.status)
+                )}>
+                  {getStatusIcon(selectedLead.status)}
+                  {selectedLead.status?.charAt(0).toUpperCase() + selectedLead.status?.slice(1)}
+                </div>
               </div>
-              <div className="text-xs sm:text-sm space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <Phone className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                      <span>Phone:</span>
-                    </div>
-                    <div className="font-medium truncate">{selectedLead.phone}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <Mail className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                      <span>Email:</span>
-                    </div>
-                    <div className="font-medium truncate">{selectedLead.email}</div>
-                  </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs text-slate-400">Phone</p>
+                  <p className="font-medium text-slate-700">{selectedLead.phone}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <div className="text-muted-foreground">Status:</div>
-                    <div className="font-medium capitalize">
-                      <Badge className={cn(
-                        "text-xs sm:text-sm",
-                        selectedLead.status === 'active' && "bg-green-100 text-green-800",
-                        selectedLead.status === 'lost' && "bg-red-100 text-red-800",
-                        selectedLead.status === 'converted' && "bg-blue-100 text-blue-800"
-                      )}>
-                        {selectedLead.status}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-muted-foreground">Stage:</div>
-                    <div className="font-medium">
-                      <Badge variant="outline" className="text-xs sm:text-sm">
-                        {selectedLead.stageId.name}
-                      </Badge>
-                    </div>
-                  </div>
+                <div>
+                  <p className="text-xs text-slate-400">Email</p>
+                  <p className="font-medium text-slate-700 truncate">{selectedLead.email}</p>
                 </div>
-                <div className="space-y-1">
-                  <div className="text-muted-foreground">Assigned To:</div>
-                  <div className="font-medium truncate">
-                    {selectedLead.assignedTo?.name || 'Not assigned'}
-                  </div>
+                <div>
+                  <p className="text-xs text-slate-400">Stage</p>
+                  <p className="font-medium text-slate-700">{selectedLead.stageId?.name}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Created</p>
+                  <p className="font-medium text-slate-700">{formatDate(selectedLead.createdAt)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Assigned To</p>
+                  <p className="font-medium text-slate-700">{selectedLead.assignedTo?.name || 'Not assigned'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Last Call At</p>
+                  <p className="font-medium text-slate-700">{formatDate(selectedLead.lastCallDate)}</p>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border bg-gradient-to-br from-indigo-50 via-background to-background p-4 shadow-sm">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <CalendarDays className="h-4 w-4 text-indigo-600" />
-                    <h4 className="font-semibold text-sm sm:text-base">PCAT Registration</h4>
-                  </div>
-                  
-                  <p className="text-[11px] sm:text-xs text-muted-foreground">
-                    {loadingExam
-                      ? 'Checking for an ongoing exam...'
-                      : ongoingExam
-                        ? `${ongoingExam.title || 'Ongoing exam'}`
-                        : 'No ongoing exam found right now.'}
-                  </p>
-                </div>
-                <Button
-                  onClick={handlePcatRegister}
-                  disabled={loading || loadingExam || registeringPcat || !ongoingExam?._id}
-                  className="gap-2 shrink-0"
-                >
-                  {registeringPcat ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  PCAT register here
-                </Button>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-              {/* View Details */}
-              <Button
-                variant="outline"
-                className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px] hover:bg-accent"
-                onClick={() => handleAction('onView')}
-                disabled={loading}
-              >
-                <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
-                <div className="text-xs sm:text-sm text-center">View Details</div>
-              </Button>
-
-              {/* Edit Lead */}
-              <Button
-                variant="outline"
-                className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px] hover:bg-accent"
-                onClick={() => handleAction('onEdit')}
-                disabled={loading}
-              >
-                <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
-                <div className="text-xs sm:text-sm text-center">Edit Lead</div>
-              </Button>
-
-              {/* Change Status */}
-              <Button
-                variant="outline"
-                className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px] hover:bg-accent"
-                onClick={() => handleAction('onChangeStatus')}
-                disabled={loading}
-              >
-                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
-                <div className="text-xs sm:text-sm text-center">Change Status</div>
-              </Button>
-
-              {/* Change Stage */}
-              <Button
-                variant="outline"
-                className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px] hover:bg-accent"
-                onClick={() => handleAction('onChangeStage')}
-                disabled={loading}
-              >
-                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                <div className="text-xs sm:text-sm text-center">Change Stage</div>
-              </Button>
-
-              {/* Assign Lead */}
-              <Button
-                variant="outline"
-                className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px] hover:bg-accent"
-                onClick={() => handleAction('onAssign')}
-                disabled={loading}
-              >
-                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
-                <div className="text-xs sm:text-sm text-center">Assign Lead</div>
-              </Button>
-
-              {/* Convert Lead (only for active leads) */}
-              {selectedLead.status === 'active' && actions.onConvert && (
+            {/* Action Buttons Grid */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Quick Actions</p>
+              <div className="grid grid-cols-2 gap-2">
                 <Button
                   variant="outline"
-                  className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px] bg-green-50 border-green-200 hover:bg-green-100 text-green-700"
-                  onClick={() => handleAction('onConvert')}
-                  disabled={loading}
+                  onClick={() => handleAction('onView')}
+                  className="justify-start gap-2 rounded-xl border-slate-200 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 transition-colors"
                 >
-                  <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
-                  <div className="text-xs sm:text-sm text-center">Convert Lead</div>
+                  <Eye className="w-4 h-4" />
+                  View Details
                 </Button>
-              )}
-
-              {/* Mark as Lost (only for active leads) */}
-              {selectedLead.status === 'active' && !actions.onConvert && (
                 <Button
                   variant="outline"
-                  className="h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[90px] hover:bg-accent"
+                  onClick={() => handleAction('onEdit')}
+                  className="justify-start gap-2 rounded-xl border-slate-200 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 transition-colors"
+                >
+                  <Edit className="w-4 h-4" />
+                  Edit Lead
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => handleAction('onChangeStage')}
+                  className="justify-start gap-2 rounded-xl border-slate-200 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 transition-colors"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  Change Stage
+                </Button>
+                <Button
+                  variant="outline"
                   onClick={() => handleAction('onChangeStatus')}
-                  disabled={loading}
+                  className="justify-start gap-2 rounded-xl border-slate-200 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 transition-colors"
                 >
-                  <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
-                  <div className="text-xs sm:text-sm text-center">Mark as Lost</div>
+                  <AlertTriangle className="w-4 h-4" />
+                  Change Status
                 </Button>
-              )}
-
-              {/* Empty space filler if needed */}
-              {selectedLead.status !== 'active' && !actions.onConvert && (
-                <div className="min-h-[80px] sm:min-h-[90px]"></div>
-              )}
-            </div>
-
-            {/* Additional Info */}
-            <div className="pt-4 border-t">
-              <h4 className="text-xs sm:text-sm font-medium mb-2">Additional Information</h4>
-              <div className="text-xs sm:text-sm space-y-1 text-muted-foreground">
-                <p>• Source: <span className="font-medium text-foreground">{selectedLead.source}</span></p>
-                <p>• Created: <span className="font-medium text-foreground">
-                  {new Date(selectedLead.createdAt).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric'
-                  })}
-                </span></p>
-                {selectedLead.source_campaign && (
-                  <p>• Campaign: <span className="font-medium text-foreground">{selectedLead.source_campaign}</span></p>
+                <Button
+                  variant="outline"
+                  onClick={() => handleAction('onAssign')}
+                  className="justify-start gap-2 rounded-xl border-slate-200 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 transition-colors"
+                >
+                  <Users className="w-4 h-4" />
+                  Assign Lead
+                </Button>
+                {selectedLead.status !== 'converted' && (
+                  <Button
+                    variant="outline"
+                    onClick={() => handleAction('onConvert')}
+                    className="justify-start gap-2 rounded-xl border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 transition-colors"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Convert
+                  </Button>
                 )}
               </div>
             </div>
           </div>
         </div>
-        
-        {/* Fixed Footer */}
-        <DialogFooter className="px-6 py-4 border-t shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex flex-col relative justify-around sm:flex-row gap-2 w-full">
-            <Button 
-              variant="outline" 
-              onClick={() => onOpenChange(false)}
-              className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base px-4 sm:px-6 order-2 sm:order-1"
-            >
-              Close
-            </Button>
-            <Button 
-              variant="default" 
-              onClick={() => handleAction('onView')}
-              className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base px-4 sm:px-6 order-1 sm:order-2"
-            >
-              View Full Details
-            </Button>
-          </div>
+
+        {/* Footer */}
+        <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-white">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            className="w-full rounded-xl border-slate-200 hover:bg-slate-50"
+          >
+            Close
+          </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Global style for thin scrollbar */}
+      <style>{`
+        .custom-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: #cbd5e1 #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #f1f5f9;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8;
+        }
+      `}</style>
     </Dialog>
   );
 }

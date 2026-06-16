@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Activity, CalendarDays, Phone } from 'lucide-react';
+import { Activity, CalendarDays, Phone,Copy } from 'lucide-react';
 import { AssignIVRModal } from './AssignIVRModal';
 import {
   Dialog,
@@ -153,17 +153,13 @@ export function UsersTab({
     return singlePoolId ? [singlePoolId] : [];
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
-  };
-
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return {
-      date: date.toLocaleDateString(),
-      time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-  };
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear()).slice(-2);
+  return `${day}-${month}-${year}`;
+};
 
   const resetFilters = () => {
     setFilters({
@@ -213,7 +209,13 @@ export function UsersTab({
       setCreatingProfile(false);
     }
   };
+// Format date to DD-MM-YY
 
+
+// For joined date (only date, no time)
+const formatJoinedDate = (dateString: string) => {
+  return formatDate(dateString);
+};
   const handleEditClick = (user: UserType) => {
     setSelectedUser(user);
     setEditUserOpen(true);
@@ -329,225 +331,196 @@ export function UsersTab({
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">
-              All Users ({filteredUsers.length})
-              {loading && (
-                <span className="ml-2 text-sm text-muted-foreground">
-                  <Loader2 className="w-3 h-3 inline animate-spin mr-1" />
-                  Loading...
-                </span>
-              )}
-            </CardTitle>
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Quick search..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-64"
-                />
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-8">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
-              <p className="mt-2 text-muted-foreground">Loading users...</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Pool</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Login</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.map((user) => {
-                  const created = formatDateTime(user.createdAt);
-                  return (
-                    <TableRow key={user._id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-12 h-8 rounded-2xl bg-primary/10 flex items-center justify-center cursor-pointer hover:bg-primary/20 transition-colors"
-                            onClick={() => {
-                              navigator.clipboard.writeText(user.employeeId.toString());
-                              toast.success("Employee ID copied");
-                            }}
-                            title="Click to copy Employee ID"
-                          >
-                            <span className="text-xs font-medium text-primary">
-                              {user.employeeId}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="font-medium">{user.name}</div>
-                            <div className="text-xs text-muted-foreground flex items-center gap-1">
-                              <span>Joined {created.date}</span>
-                              <span className="text-[10px]">at {created.time}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="text-sm">{user.email}</div>
-                          <div className="text-xs text-muted-foreground">{user.number}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className={cn(
-                          user.role.isSuperAdmin && "bg-purple-100 text-purple-800 hover:bg-purple-100"
-                        )}>
-                          {user.role.name}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {user.profile?.poolIds && user.profile.poolIds.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {getPoolIdsToDisplay(user.profile.poolIds).map((poolId, index) => {
-                              const poolName = getPoolName(poolId);
-                              const poolActive = isPoolActive(poolId);
-                              return (
-                                <Badge
-                                  key={index}
-                                  variant="outline"
-                                  className={cn(
-                                    "flex items-center gap-1 text-xs",
-                                    poolActive
-                                      ? "border-blue-200 bg-blue-50 text-blue-700"
-                                      : "border-gray-200 bg-gray-50 text-gray-500"
-                                  )}
-                                >
-                                  <Database className="w-3 h-3" />
-                                  {poolName}
-                                </Badge>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
+      <Card className="rounded-xl border-slate-200 shadow-sm overflow-hidden">
+  <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-slate-100 px-6 py-4">
+    <CardTitle className="text-base font-semibold text-slate-800">
+      All Users ({filteredUsers.length})
+      {loading && <Loader2 className="w-3 h-3 inline animate-spin ml-2 text-slate-400" />}
+    </CardTitle>
+    <div className="relative">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+      <Input
+        placeholder="Quick search..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="pl-8 h-9 w-64 text-sm rounded-lg border-slate-200 focus:ring-orange-500"
+      />
+    </div>
+  </CardHeader>
+  <CardContent className="p-0">
+    {loading ? (
+      <div className="text-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin mx-auto text-orange-500" />
+        <p className="mt-2 text-sm text-slate-500">Loading users...</p>
+      </div>
+    ) : (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Emp Id.</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">User</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Contact</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Role</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Pool</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Status</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Last Login</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredUsers.map((user) => (
+              <tr key={user._id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                {/* User column */}
+                <td className="px-3 py-2">
+  <button
+    onClick={() => {
+      navigator.clipboard.writeText(user.employeeId.toString());
+      toast.success("Employee ID copied");
+    }}
+    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-orange-100 text-slate-700 hover:text-orange-700 transition-all text-xs font-medium"
+    title="Click to copy Employee ID"
+  >
+    <Copy className="w-3 h-3" />
+    {user.employeeId}
+  </button>
+</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-3">  
+                    <div>
+                      <div className="font-medium text-slate-800">{user.name}</div>
+                      <div className="text-xs text-slate-400">
+                        Joined {formatJoinedDate(user.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                {/* Contact column */}
+                <td className="px-3 py-2">
+                  <div className="text-sm text-slate-700">{user.email}</div>
+                  <div className="text-xs text-slate-400">{user.number}</div>
+                </td>
+                {/* Role column – plain text with orange for super admin */}
+                <td className="px-3 py-2">
+                  <span className={cn(
+                    "text-sm",
+                    user.role.isSuperAdmin && "text-orange-600 font-medium"
+                  )}>
+                    {user.role.name}
+                  </span>
+                </td>
+                {/* Pool column – show shortName if available */}
+                <td className="px-3 py-2">
+                  {user.profile?.poolIds && user.profile.poolIds.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {getPoolIdsToDisplay(user.profile.poolIds).map((poolId, index) => {
+                        const pool = pools.find(p => p._id === poolId);
+                        const poolName = pool?.shortName || pool?.name || 'Unknown';
+                        const poolActive = pool?.isActive || false;
+                        return (
                           <Badge
+                            key={index}
                             variant="outline"
                             className={cn(
-                              user.status === 'active'
-                                ? 'border-green-500 text-green-700 bg-green-50'
-                                : user.status === 'inactive'
-                                  ? 'border-gray-500 text-gray-700 bg-gray-50'
-                                  : user.status === 'probation'
-                                    ? 'border-yellow-500 text-yellow-700 bg-yellow-50'
-                                    : 'border-red-500 text-red-700 bg-red-50'
+                              "flex items-center gap-1 text-xs rounded-full",
+                              poolActive
+                                ? "bg-blue-50 text-blue-700 border-blue-200"
+                                : "bg-slate-100 text-slate-500 border-slate-200"
                             )}
                           >
-                            {user.status}
+                            <Database className="w-3 h-3" />
+                            {poolName}
                           </Badge>
-                          {user.isBlocked && (
-                            <Badge variant="destructive" className="text-xs ml-1">
-                              Blocked
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm text-muted-foreground">
-                          {user.lastLoginAt ? formatDate(user.lastLoginAt) : 'Never'}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" disabled={togglingBlock === user._id}>
-                              {togglingBlock === user._id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <MoreHorizontal className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => handleViewProfileClick(user)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Profile
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditClick(user)}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit User
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => navigate(`/admin/user-activity/${user._id}`)}>
-                              <Activity className="mr-2 h-4 w-4" />
-                              View Activity Log
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => navigate(`/admin/attendance/${user._id}`)}>
-                              <CalendarDays className="mr-2 h-4 w-4" />
-                              View Attendance
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setSelectedStatus(user.status);
-                                setStatusModalOpen(true);
-                              }}
-                            >
-                              {user.status === 'active' ? (
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                              ) : user.status === 'probation' ? (
-                                <Clock className="mr-2 h-4 w-4" />
-                              ) : user.status === 'resigned' ? (
-                                <LogOut className="mr-2 h-4 w-4" />
-                              ) : (
-                                <Clock className="mr-2 h-4 w-4" />
-                              )}
-                              Change Status
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleAssignIVR(user)}
-                              disabled={user.IVREnabled === true}
-                              className={cn(user.IVREnabled === true && "opacity-50 cursor-not-allowed")}
-                            >
-                              <Phone className="mr-2 h-4 w-4" />
-                              {user.IVREnabled ? "IVR Enabled" : "Assign IVR Access"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleToggleBlock(user._id)}>
-                              {user.isBlocked ? (
-                                <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
-                              ) : (
-                                <Ban className="mr-2 h-4 w-4 text-destructive" />
-                              )}
-                              <span className={user.isBlocked ? "text-green-600" : "text-destructive"}>
-                                {user.isBlocked ? 'Unblock User' : 'Block User'}
-                              </span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => toast.info("Password reset feature coming soon")}>
-                              <Key className="mr-2 h-4 w-4" />
-                              Reset Password
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-400">—</span>
+                  )}
+                </td>
+                {/* Status column – coloured dot + text, no badge */}
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      "w-2 h-2 rounded-full",
+                      user.status === 'active' && "bg-emerald-500",
+                      user.status === 'inactive' && "bg-slate-400",
+                      user.status === 'probation' && "bg-amber-500",
+                      user.status === 'resigned' && "bg-red-500"
+                    )} />
+                    <span className="text-sm text-slate-700 capitalize">{user.status}</span>
+                    {user.isBlocked && (
+                      <span className="text-xs text-red-600 ml-1">(Blocked)</span>
+                    )}
+                  </div>
+                </td>
+                {/* Last Login column */}
+                <td className="px-3 py-2">
+                  <span className="text-sm text-slate-700">
+                    {user.lastLoginAt ? formatDate(user.lastLoginAt) : 'Never'}
+                  </span>
+                </td>
+                {/* Actions dropdown */}
+                <td className="px-3 py-2 text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" disabled={togglingBlock === user._id} className="h-7 w-7 rounded-lg">
+                        {togglingBlock === user._id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <MoreHorizontal className="h-3.5 w-3.5 text-slate-500" />
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48 rounded-lg border-slate-200">
+                      <DropdownMenuItem onClick={() => handleViewProfileClick(user)} className="text-sm">
+                        <Eye className="mr-2 h-3.5 w-3.5" /> View Profile
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEditClick(user)} className="text-sm">
+                        <Edit className="mr-2 h-3.5 w-3.5" /> Edit User
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate(`/admin/user-activity/${user._id}`)} className="text-sm">
+                        <Activity className="mr-2 h-3.5 w-3.5" /> View Activity
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate(`/admin/attendance/${user._id}`)} className="text-sm">
+                        <CalendarDays className="mr-2 h-3.5 w-3.5" /> View Attendance
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setSelectedUser(user); setSelectedStatus(user.status); setStatusModalOpen(true); }} className="text-sm">
+                        {user.status === 'active' ? <CheckCircle className="mr-2 h-3.5 w-3.5" /> : <Clock className="mr-2 h-3.5 w-3.5" />}
+                        Change Status
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleAssignIVR(user)}
+                        disabled={user.IVREnabled === true}
+                        className={cn(user.IVREnabled === true && "opacity-50 cursor-not-allowed", "text-sm")}
+                      >
+                        <Phone className="mr-2 h-3.5 w-3.5" />
+                        {user.IVREnabled ? "IVR Enabled" : "Assign IVR"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleToggleBlock(user._id)} className="text-sm">
+                        {user.isBlocked ? (
+                          <CheckCircle className="mr-2 h-3.5 w-3.5 text-emerald-600" />
+                        ) : (
+                          <Ban className="mr-2 h-3.5 w-3.5 text-red-600" />
+                        )}
+                        <span className={user.isBlocked ? "text-emerald-600" : "text-red-600"}>
+                          {user.isBlocked ? 'Unblock User' : 'Block User'}
+                        </span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => toast.info("Password reset feature coming soon")} className="text-sm">
+                        <Key className="mr-2 h-3.5 w-3.5" /> Reset Password
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </CardContent>
+</Card>
 
       {/* View Profile Modal */}
       <ViewUserProfileModal
@@ -581,49 +554,70 @@ export function UsersTab({
       />
 
       {/* Status Update Modal */}
-      <Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
-        <DialogContent className="sm:max-w-[400px]">
-          {selectedUser && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Update Status</DialogTitle>
-                <DialogDescription>Update status for {selectedUser.name}</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label>Select Status</Label>
-                  <Select value={selectedStatus} onValueChange={(value: any) => setSelectedStatus(value)} disabled={updatingStatus}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                      <SelectItem value="probation">Probation</SelectItem>
-                      <SelectItem value="resigned">Resigned</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setStatusModalOpen(false)} disabled={updatingStatus}>
-                  Cancel
-                </Button>
-                <Button onClick={handleUpdateStatus} disabled={updatingStatus}>
-                  {updatingStatus ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Updating...
-                    </>
-                  ) : (
-                    'Update Status'
-                  )}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+     <Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
+  <DialogContent className="sm:max-w-[400px] rounded-2xl border-slate-200 p-0 overflow-hidden">
+    {selectedUser && (
+      <>
+        {/* Header */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
+          <DialogTitle className="text-xl font-bold text-slate-800">Update Status</DialogTitle>
+          <DialogDescription className="text-sm text-slate-500">
+            Update status for {selectedUser.name}
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Body */}
+        <div className="px-6 py-4">
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-slate-700">Select Status</Label>
+              <Select
+                value={selectedStatus}
+                onValueChange={(value: any) => setSelectedStatus(value)}
+                disabled={updatingStatus}
+              >
+                <SelectTrigger className="h-10 rounded-xl border-slate-200">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="probation">Probation</SelectItem>
+                  <SelectItem value="resigned">Resigned</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-white">
+          <div className="flex gap-3 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={() => setStatusModalOpen(false)}
+              disabled={updatingStatus}
+              className="rounded-xl border-slate-200"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateStatus}
+              disabled={updatingStatus}
+              className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white"
+            >
+              {updatingStatus ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating...</>
+              ) : (
+                'Update Status'
+              )}
+            </Button>
+          </div>
+        </DialogFooter>
+      </>
+    )}
+  </DialogContent>
+</Dialog>
 
       {/* Create Profile Modal */}
       <CreateProfileModal

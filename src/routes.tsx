@@ -49,6 +49,7 @@ import { AttendanceLeavePage } from "@/pages/bd/AttendanceLeavePage";
 import { LeaveRequestsPage } from "@/pages/bd/LeaveRequestsPage";
 import { LeadEntryPage } from "@/pages/public/LeadEntryPage";
 import { TargetsPage } from "@/pages/targets/TargetsPage";
+import { FollowUpPage } from "./pages/FollowUpPage";
 // Placeholder
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-[60vh]">
@@ -91,6 +92,7 @@ const AppRoutes = () => {
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="leads" element={<LeadsPage />} />
+          <Route path="followup" element ={<FollowUpPage/>}/>
           <Route path="source-campaigns" element={<SourceCampaignsPage />} />
           <Route path="calls" element={<AdminCallLogsPage />} />
           <Route path="meetings" element={<AdminMeetingLogsPage />} />
@@ -133,6 +135,7 @@ const AppRoutes = () => {
           <Route path="users" element={<BDUsersPage />} />
           <Route path="source-campaigns" element={<SourceCampaignsPage />} />
           <Route path="leads" element={<BDLeadsPage />} />
+          <Route path="followup" element ={<FollowUpPage/>}/>
           <Route path="calls" element={<CallLogsPage/>} />
           <Route path="meetings" element={<MeetingLogsPage />} />
           <Route path="orders" element={<OrderManagementPage />} />

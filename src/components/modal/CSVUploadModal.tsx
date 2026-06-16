@@ -47,6 +47,7 @@ export function CSVUploadModal({
   const [bulkReason, setBulkReason] = useState<string>('');
   const [selectedPoolId, setSelectedPoolId] = useState<string>('');
   const [currentError, setCurrentError] = useState<string>('');
+
   const downloadCSVTemplate = () => {
     const headers = ['name', 'phone', 'email', 'city', 'state', 'source', 'source_campaign'];
     const example = ['John Doe', '1234567890', 'john@example.com', 'Lucknow', 'Uttar Pradesh', 'manual', 'Summer Campaign'];
@@ -99,7 +100,6 @@ export function CSVUploadModal({
           return;
         }
 
-        // Validate required headers
         const requiredHeaders = ['name', 'phone', 'email'];
         const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
         
@@ -112,7 +112,6 @@ export function CSVUploadModal({
           return;
         }
 
-        // Parse data rows
         const leads: CSVLead[] = [];
         const getCellValue = (values: string[], headerName: string, fallback = '') => {
           const index = headers.indexOf(headerName);
@@ -135,12 +134,10 @@ export function CSVUploadModal({
             errors: []
           };
 
-          // Validate lead
           const errors: string[] = [];
           if (!lead.name) errors.push('Name is required');
           if (!lead.phone) errors.push('Phone is required');
           if (!lead.email) errors.push('Email is required');
-          // Validate email format
           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
           if (lead.email && !emailRegex.test(lead.email)) {
             errors.push('Invalid email format');
@@ -208,7 +205,6 @@ export function CSVUploadModal({
       return;
     }
 
-    // Validate bulk assignment
     if (selectedUserId && selectedUserId.trim() !== "" && !bulkReason.trim()) {
       toast({
         title: 'Reason Required',
@@ -221,10 +217,8 @@ export function CSVUploadModal({
     setUploading(true);
 
     try {
-      // Process leads one by one
       let successCount = 0;
       let errorCount = 0;
-      let error = '';
 
       for (const lead of validLeads) {
         try {
@@ -242,7 +236,6 @@ export function CSVUploadModal({
             reason: selectedUserId ? bulkReason : (lead.reason || undefined)
           };
 
-          // Remove undefined values
           Object.keys(dataToSend).forEach(key => {
             if (dataToSend[key] === undefined || dataToSend[key] === '') {
               delete dataToSend[key];
@@ -251,7 +244,7 @@ export function CSVUploadModal({
 
           await postDataHandlerWithToken('createNewLead', dataToSend);
           successCount++;
-        } catch (error) {
+        } catch (error: any) {
           errorCount++;
           console.error('Failed to upload lead:', error.message);
           setCurrentError(error.message);
@@ -263,7 +256,6 @@ export function CSVUploadModal({
         description: `Successfully uploaded ${successCount} leads. ${errorCount} failed`,
       });
 
-      // Reset and close
       setFile(null);
       setParsedLeads([]);
       setSelectedUserId('');
@@ -281,267 +273,278 @@ export function CSVUploadModal({
     }
   };
 
-  const getUserName = (id: string) => {
-    return users.find(u => u._id === id)?.name || id;
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Upload CSV File</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="sm:max-w-[800px] rounded-2xl border-slate-200 p-0 overflow-hidden">
+        {/* Header */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
+          <DialogTitle className="text-xl font-bold text-slate-800">Upload CSV File</DialogTitle>
+          <DialogDescription className="text-sm text-slate-500">
             Upload a CSV file containing lead data. Make sure your CSV follows the required format.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          {/* File Upload Section */}
-              <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-medium">1. Download Template</h3>
-                <p className="text-sm text-muted-foreground">
-                  Download our CSV template to ensure proper formatting
-                </p>
+        {/* Scrollable Body */}
+        <div className="px-6 py-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+          <div className="space-y-6">
+            {/* File Upload Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-slate-800">1. Download Template</h3>
+                  <p className="text-sm text-slate-500">Download our CSV template to ensure proper formatting</p>
+                </div>
+                <Button variant="outline" onClick={downloadCSVTemplate} className="rounded-xl border-slate-200 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200">
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Template
+                </Button>
               </div>
-              <Button variant="outline" onClick={downloadCSVTemplate}>
-                <Download className="w-4 h-4 mr-2" />
-                Download Template
-              </Button>
-            </div>
 
-            <div className="space-y-2">
-              <h3 className="font-medium">2. Upload CSV File</h3>
-              <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-                {file ? (
-                  <div className="space-y-2">
-                    <FileSpreadsheet className="w-12 h-12 mx-auto text-primary" />
-                    <p className="font-medium">{file.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {parsedLeads.length} leads found
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setFile(null);
-                        setParsedLeads([]);
-                      }}
-                      disabled={parsing || uploading}
-                    >
-                      Change File
-                    </Button>
+              <div className="space-y-2">
+                <h3 className="font-semibold text-slate-800">2. Upload CSV File</h3>
+                <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center bg-slate-50/30">
+                  {file ? (
+                    <div className="space-y-2">
+                      <FileSpreadsheet className="w-12 h-12 mx-auto text-orange-500" />
+                      <p className="font-medium text-slate-800">{file.name}</p>
+                      <p className="text-sm text-slate-500">{parsedLeads.length} leads found</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setFile(null);
+                          setParsedLeads([]);
+                        }}
+                        disabled={parsing || uploading}
+                        className="rounded-lg"
+                      >
+                        Change File
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                      <Label htmlFor="csv-upload" className="cursor-pointer">
+                        <div className="text-center">
+                          <p className="text-sm font-medium text-slate-700 mb-1">Click to upload CSV file</p>
+                          <p className="text-xs text-slate-400">Supports .csv files with required columns</p>
+                        </div>
+                        <Input
+                          id="csv-upload"
+                          type="file"
+                          accept=".csv"
+                          className="hidden"
+                          onChange={handleFileUpload}
+                          disabled={parsing}
+                        />
+                      </Label>
+                    </>
+                  )}
+                </div>
+                {parsing && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Parsing CSV file...
                   </div>
-                ) : (
-                  <>
-                    <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                    <Label htmlFor="csv-upload" className="cursor-pointer">
-                      <div className="text-center">
-                        <p className="text-sm font-medium mb-1">Click to upload CSV file</p>
-                        <p className="text-xs text-muted-foreground">
-                          Supports .csv files with required columns
-                        </p>
-                      </div>
-                      <Input
-                        id="csv-upload"
-                        type="file"
-                        accept=".csv"
-                        className="hidden"
-                        onChange={handleFileUpload}
-                        disabled={parsing}
-                      />
-                    </Label>
-                  </>
                 )}
               </div>
-              {parsing && (
-                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Parsing CSV file...
-                </div>
-              )}
-            </div>
 
-            {/* Bulk Assignment (Optional) */}
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <h3 className="font-medium">3. Select Pool and Optional Assignment</h3>
-                <div className="space-y-2">
-                  <Label>Assign To (Optional)</Label>
-                  <SearchableDropdown
-                    options={[
-                      { value: "", label: "Not assigned" },
-                      ...users.map(user => ({
-                        value: user._id,
-                        label: user.name,
-                        role: user.role?.name || user.role,
-                        empId: user.employeeId,
-                        email: user.email
-                      }))
-                    ]}
-                    value={selectedUserId}
-                    onValueChange={setSelectedUserId}
-                    placeholder="Select user to assign all leads"
-                    searchPlaceholder="Search by name, email, or role..."
-                    emptyMessage="No users found"
-                    disabled={uploading}
-                    allowClear
-                    onClear={() => {
-                      setSelectedUserId("");
-                      setBulkReason("");
-                    }}
-                    triggerClassName="h-10 text-sm"
-                    contentClassName="w-full max-w-[var(--radix-popover-trigger-width)]"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Assign To Pool *</Label>
-                  <SearchableDropdown
-                    options={[
-                      { value: "", label: "Not assigned" },
-                      ...pools.map(pool => ({
-                        value: pool._id,
-                        label: pool.name,
-                      }))
-                    ]}
-                    value={selectedPoolId}
-                    onValueChange={setSelectedPoolId}
-                    placeholder="Select pool for all leads"
-                    searchPlaceholder="Search by name..."
-                    emptyMessage="No pools found"
-                    disabled={uploading}
-                    allowClear
-                    onClear={() => {
-                      setSelectedPoolId("");
-                      setBulkReason("");
-                    }}
-                    triggerClassName="h-10 text-sm"
-                    contentClassName="w-full max-w-[var(--radix-popover-trigger-width)]"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Pool selection is required for upload. User assignment remains optional.
-                </p>
-              </div>
-              
-
-              {/* Bulk Reason Field - Only shown when user is selected */}
-              {selectedUserId && selectedUserId.trim() !== "" && (
-                <div className="space-y-2">
-                  <Label htmlFor="bulk-reason">
-                    Reason for Bulk Assignment *
-                    <span className="text-xs text-muted-foreground ml-1">
-                      (Required when assigning all leads)
-                    </span>
-                  </Label>
-                  <textarea
-                    id="bulk-reason"
-                    value={bulkReason}
-                    onChange={(e) => setBulkReason(e.target.value)}
-                    placeholder="Enter reason for assigning all leads..."
-                    className="w-full min-h-[60px] p-2 border rounded-md text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={uploading}
-                    rows={3}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    This reason will be recorded in the lead history for all assigned leads.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Preview Section */}
-            {parsedLeads.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-medium">4. Preview & Validate</h3>
-                  <Badge variant={parsedLeads.every(l => l.isValid) ? "default" : "destructive"}>
-                    {parsedLeads.filter(l => l.isValid).length} / {parsedLeads.length} Valid
-                  </Badge>
-                </div>
-                <div className="border rounded-lg overflow-hidden">
-                  <div className="max-h-64 overflow-y-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Phone</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>City</TableHead>
-                          <TableHead>State</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {parsedLeads.slice(0, 10).map((lead, index) => (
-                          <TableRow key={index} className={!lead.isValid ? "bg-red-50" : ""}>
-                            <TableCell>
-                              {lead.isValid ? (
-                                <Check className="w-4 h-4 text-green-600" />
-                              ) : (
-                                <AlertCircle className="w-4 h-4 text-red-600" />
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">{lead.name}</div>
-                                {lead.errors.length > 0 && (
-                                  <div className="text-xs text-red-600">
-                                    {lead.errors[0]}
-                                  </div>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>{lead.phone}</TableCell>
-                            <TableCell>{lead.email}</TableCell>
-                            <TableCell>{lead.city || 'N/A'}</TableCell>
-                            <TableCell>{lead.state || 'N/A'}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+              {/* Pool & Assignment Section */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-slate-800">3. Select Pool and Optional Assignment</h3>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium text-slate-700">Assign To Pool *</Label>
+                    <SearchableDropdown
+                      options={[
+                        ...pools.map(pool => ({
+                          value: pool._id,
+                          label: pool.name,
+                        }))
+                      ]}
+                      value={selectedPoolId}
+                      onValueChange={setSelectedPoolId}
+                      placeholder="Select pool for all leads"
+                      searchPlaceholder="Search pool by name..."
+                      emptyMessage="No pools found"
+                      disabled={uploading}
+                      allowClear
+                      triggerClassName="rounded-xl border-slate-200"
+                    />
+                    <p className="text-xs text-slate-400">Pool selection is required for upload.</p>
                   </div>
-                  {parsedLeads.length > 10 && (
-                    <div className="p-2 text-center text-sm text-muted-foreground border-t">
-                      Showing 10 of {parsedLeads.length} leads
+
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium text-slate-700">Assign To User (Optional)</Label>
+                    <SearchableDropdown
+                      options={[
+                        { value: "", label: "Not assigned" },
+                        ...users.map(user => ({
+                          value: user._id,
+                          label: user.name,
+                          role: user.role?.name,
+                          empId: user.employeeId,
+                          email: user.email
+                        }))
+                      ]}
+                      value={selectedUserId}
+                      onValueChange={setSelectedUserId}
+                      placeholder="Select user to assign all leads"
+                      searchPlaceholder="Search by name, email, or role..."
+                      emptyMessage="No users found"
+                      disabled={uploading}
+                      allowClear
+                      onClear={() => {
+                        setSelectedUserId("");
+                        setBulkReason("");
+                      }}
+                      triggerClassName="rounded-xl border-slate-200"
+                    />
+                  </div>
+
+                  {/* Bulk Reason */}
+                  {selectedUserId && selectedUserId.trim() !== "" && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="bulk-reason" className="text-sm font-medium text-slate-700">
+                        Reason for Bulk Assignment *
+                      </Label>
+                      <textarea
+                        id="bulk-reason"
+                        value={bulkReason}
+                        onChange={(e) => setBulkReason(e.target.value)}
+                        placeholder="Enter reason for assigning all leads..."
+                        className="w-full min-h-[80px] p-3 border border-slate-200 rounded-xl text-sm resize-y focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
+                        disabled={uploading}
+                        rows={3}
+                      />
+                      <p className="text-xs text-slate-400">
+                        This reason will be recorded in the lead history for all assigned leads.
+                      </p>
                     </div>
                   )}
                 </div>
               </div>
-            )}
+
+              {/* Preview Section */}
+              {parsedLeads.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-slate-800">4. Preview & Validate</h3>
+                    <Badge className={parsedLeads.every(l => l.isValid) ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200" : "bg-red-100 text-red-700 hover:bg-red-100 border-red-200"}>
+                      {parsedLeads.filter(l => l.isValid).length} / {parsedLeads.length} Valid
+                    </Badge>
+                  </div>
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="max-h-64 overflow-y-auto custom-scrollbar">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-slate-50">
+                            <TableHead className="text-xs font-semibold text-slate-500">Status</TableHead>
+                            <TableHead className="text-xs font-semibold text-slate-500">Name</TableHead>
+                            <TableHead className="text-xs font-semibold text-slate-500">Phone</TableHead>
+                            <TableHead className="text-xs font-semibold text-slate-500">Email</TableHead>
+                            <TableHead className="text-xs font-semibold text-slate-500">City</TableHead>
+                            <TableHead className="text-xs font-semibold text-slate-500">State</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {parsedLeads.slice(0, 10).map((lead, index) => (
+                            <TableRow key={index} className={!lead.isValid ? "bg-red-50/50" : "hover:bg-slate-50"}>
+                              <TableCell>
+                                {lead.isValid ? (
+                                  <Check className="w-4 h-4 text-emerald-600" />
+                                ) : (
+                                  <AlertCircle className="w-4 h-4 text-red-600" />
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium text-sm text-slate-800">{lead.name}</div>
+                                  {lead.errors.length > 0 && (
+                                    <div className="text-xs text-red-600 mt-0.5">
+                                      {lead.errors[0]}
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-sm text-slate-600">{lead.phone}</TableCell>
+                              <TableCell className="text-sm text-slate-600">{lead.email}</TableCell>
+                              <TableCell className="text-sm text-slate-600">{lead.city || 'N/A'}</TableCell>
+                              <TableCell className="text-sm text-slate-600">{lead.state || 'N/A'}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {parsedLeads.length > 10 && (
+                      <div className="p-2 text-center text-sm text-slate-500 border-t border-slate-200 bg-slate-50">
+                        Showing 10 of {parsedLeads.length} leads
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <DialogFooter>
-          <Button 
-            variant="outline" 
-            onClick={() => {
-              onOpenChange(false);
-              setFile(null);
-              setParsedLeads([]);
-              setSelectedUserId('');
-              setBulkReason('');
-            }} 
-            disabled={uploading}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleUpload}
-            disabled={!file || parsedLeads.length === 0 || uploading || parsing}
-          >
-            {uploading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              'Upload Now'
-            )}
-          </Button>
+        {/* Footer */}
+        <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-white">
+          <div className="flex gap-3 w-full sm:w-auto">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                onOpenChange(false);
+                setFile(null);
+                setParsedLeads([]);
+                setSelectedUserId('');
+                setBulkReason('');
+              }} 
+              disabled={uploading}
+              className="flex-1 sm:flex-none rounded-xl border-slate-200 hover:bg-slate-50"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpload}
+              disabled={!file || parsedLeads.length === 0 || uploading || parsing}
+              className="flex-1 sm:flex-none rounded-xl bg-orange-500 hover:bg-orange-600 text-white"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                'Upload Now'
+              )}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
+
+      {/* Global style for thin scrollbar */}
+      <style>{`
+        .custom-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: #cbd5e1 #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #f1f5f9;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8;
+        }
+      `}</style>
     </Dialog>
   );
 }

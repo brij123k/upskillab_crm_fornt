@@ -918,16 +918,16 @@ export function BDUsersPage() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+   <div className="space-y-6 animate-fade-in">
+      {/* Header - modern white/orange design */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Users Management</h1>
-          <p className="text-muted-foreground">Manage users, roles, departments, pools, and stages</p>
+          <h1 className="text-2xl font-bold text-slate-800">Users Management</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Manage users, roles, departments, pools, and stages</p>
         </div>
         <div className="flex items-center gap-2">
           {fetchingData && (
-            <div className="flex items-center text-sm text-muted-foreground">
+            <div className="flex items-center text-xs text-slate-400">
               <Loader2 className="w-3 h-3 mr-1 animate-spin" />
               Refreshing...
             </div>
@@ -937,8 +937,9 @@ export function BDUsersPage() {
             size="sm"
             onClick={fetchAllData}
             disabled={fetchingData}
+            className="rounded-lg border-slate-200"
           >
-            <RefreshCw className={cn("w-4 h-4 mr-2", fetchingData && "animate-spin")} />
+            <RefreshCw className={cn("w-3.5 h-3.5 mr-1", fetchingData && "animate-spin")} />
             Refresh
           </Button>
 
@@ -952,55 +953,103 @@ export function BDUsersPage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(value) => permittedTabs[value as keyof typeof permittedTabs] && setActiveTab(value as any)}>
-        <TabsList className="flex flex-wrap">
+      {/* Tabs – custom buttons with orange active state, only show permitted tabs */}
+      <div className="border-b border-slate-200">
+        <div className="flex flex-wrap gap-2 pb-2">
           {permittedTabs.users && (
-            <TabsTrigger value="users" className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('users')}
+              className={cn(
+                "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all",
+                activeTab === 'users'
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              )}
+            >
               <User className="w-4 h-4" />
               Users
-            </TabsTrigger>
+            </button>
           )}
           {permittedTabs.roles && (
-            <TabsTrigger value="roles" className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('roles')}
+              className={cn(
+                "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all",
+                activeTab === 'roles'
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              )}
+            >
               <Shield className="w-4 h-4" />
               Roles
-            </TabsTrigger>
+            </button>
           )}
           {permittedTabs.departments && (
-            <TabsTrigger value="departments" className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('departments')}
+              className={cn(
+                "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all",
+                activeTab === 'departments'
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              )}
+            >
               <Building className="w-4 h-4" />
               Departments
-            </TabsTrigger>
+            </button>
           )}
           {permittedTabs.pools && (
-            <TabsTrigger value="pools" className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('pools')}
+              className={cn(
+                "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all",
+                activeTab === 'pools'
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              )}
+            >
               <Database className="w-4 h-4" />
               Pools
-            </TabsTrigger>
+            </button>
           )}
           {permittedTabs.stages && (
-            <TabsTrigger value="stages" className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('stages')}
+              className={cn(
+                "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all",
+                activeTab === 'stages'
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              )}
+            >
               <GitBranch className="w-4 h-4" />
               Stages
-            </TabsTrigger>
+            </button>
           )}
           {permittedTabs.loanpartners && (
-            <TabsTrigger value="loanpartners" className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('loanpartners')}
+              className={cn(
+                "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all",
+                activeTab === 'loanpartners'
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              )}
+            >
               <HandCoins className="w-4 h-4" />
               Loan Partners
-            </TabsTrigger>
+            </button>
           )}
-        </TabsList>
-      </Tabs>
+        </div>
+      </div>
 
       {Object.values(permittedTabs).every(v => !v) && (
         <div className="text-center py-8">
-          <p className="text-muted-foreground">You do not have permission to access this page.</p>
+          <p className="text-slate-500">You do not have permission to access this page.</p>
         </div>
       )}
 
-      {/* Users Tab */}
+      {/* Content area – unchanged */}
       {activeTab === 'users' && permittedTabs.users && (
         <UsersTab
           users={users}
@@ -1018,7 +1067,6 @@ export function BDUsersPage() {
         />
       )}
 
-      {/* Roles Tab */}
       {activeTab === 'roles' && permittedTabs.roles && (
         <RolesTab
           roles={roles}
@@ -1028,7 +1076,6 @@ export function BDUsersPage() {
         />
       )}
 
-      {/* Departments Tab */}
       {activeTab === 'departments' && permittedTabs.departments && (
         <DepartmentsTab
           departments={departments}
@@ -1038,7 +1085,6 @@ export function BDUsersPage() {
         />
       )}
 
-      {/* Pools Tab */}
       {activeTab === 'pools' && permittedTabs.pools && (
         <PoolsTab
           pools={pools}
@@ -1053,7 +1099,6 @@ export function BDUsersPage() {
         />
       )}
 
-      {/* Stages Tab */}
       {activeTab === 'stages' && permittedTabs.stages && (
         <StagesTab
           stages={stages}
@@ -1076,7 +1121,6 @@ export function BDUsersPage() {
           onRefresh={fetchLoanPartners}
         />
       )}
-
     </div>
   );
 }

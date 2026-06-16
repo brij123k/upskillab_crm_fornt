@@ -18,14 +18,11 @@ import {
   Building, 
   Plus, 
   Edit, 
-  Trash2, 
-  Users, 
-  Network, 
   Loader2,
   Eye,
   MoreHorizontal,
   Search,
-  Filter
+  Network
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -35,8 +32,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { DepartmentType } from '@/types/user';
-import ApiConfig from '@/config/apiConfig';
-import { getDataHandlerWithToken } from '@/config/services';
 
 interface DepartmentsTabProps {
   departments: DepartmentType[];
@@ -56,50 +51,27 @@ export function DepartmentsTab({
   const [viewDepartmentOpen, setViewDepartmentOpen] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<DepartmentType | null>(null);
   
-  // Loading states
   const [addingDepartment, setAddingDepartment] = useState(false);
   const [updatingDepartment, setUpdatingDepartment] = useState(false);
-  const [deletingDepartment, setDeletingDepartment] = useState<string | null>(null);
   
-  // Form states
   const [departmentForm, setDepartmentForm] = useState({
     name: '',
     parentDepartmentId: ''
   });
 
-  // Search and filter
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'main' | 'sub'>('all');
 
-  // Filter departments
   const filteredDepartments = departments.filter(dept => {
     const searchMatch = 
       dept.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      dept.parentDepartmentId?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+      (dept.parentDepartmentId?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
     
-    if (filter === 'main') return dept.parentDepartmentId === null;
-    if (filter === 'sub') return dept.parentDepartmentId !== null;
+    if (filter === 'main') return !dept.parentDepartmentId;
+    if (filter === 'sub') return !!dept.parentDepartmentId;
     return searchMatch;
   });
 
-  // Get user count for department (you'll need to implement this based on your data)
-//   const getUserCountForDepartment = async (departmentId: string) => {
-//     try{
-//         const endpoint = ApiConfig.getUserByDepartmentId(departmentId)
-//         const response = await getDataHandlerWithToken(endpoint,null,null,true)
-//         console.log(response)
-//         if(response.length>0){
-//             return response.length;
-//         }else{
-//             return 0
-//         }
-//     }catch(error){
-//         return 0
-//     }
-
-//   };
-
-  // Helper functions
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -109,10 +81,7 @@ export function DepartmentsTab({
   };
 
   const resetForm = () => {
-    setDepartmentForm({
-      name: '',
-      parentDepartmentId: ''
-    });
+    setDepartmentForm({ name: '', parentDepartmentId: '' });
   };
 
   const handleAddDepartment = async () => {
@@ -139,7 +108,6 @@ export function DepartmentsTab({
     }
   };
 
-
   const handleEditOpen = (dept: DepartmentType) => {
     setSelectedDepartment(dept);
     setDepartmentForm({
@@ -156,35 +124,35 @@ export function DepartmentsTab({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      {/* Header with search and filter */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-lg font-semibold">All Departments ({departments.length})</h3>
-          <p className="text-sm text-muted-foreground">Manage organizational departments</p>
+          <h3 className="text-base font-semibold text-slate-800">All Departments ({departments.length})</h3>
+          <p className="text-sm text-slate-500">Manage organizational departments</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
             <Input
               placeholder="Search departments..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-64"
+              className="pl-8 h-9 w-64 text-sm rounded-lg border-slate-200 focus:ring-orange-500"
             />
           </div>
           
           <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
+            <SelectTrigger className="w-40 h-9 text-sm rounded-lg border-slate-200">
+              <SelectValue placeholder="Filter" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-lg">
               <SelectItem value="all">All Departments</SelectItem>
               <SelectItem value="main">Main Departments</SelectItem>
               <SelectItem value="sub">Sub-departments</SelectItem>
             </SelectContent>
           </Select>
           
-          <Button onClick={() => setNewDepartmentOpen(true)}>
+          <Button onClick={() => setNewDepartmentOpen(true)} className="rounded-lg bg-orange-500 hover:bg-orange-600 text-white h-9">
             <Plus className="w-4 h-4 mr-2" />
             New Department
           </Button>
@@ -194,21 +162,21 @@ export function DepartmentsTab({
       {/* Departments Grid */}
       {loading ? (
         <div className="text-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
-          <p className="mt-2 text-muted-foreground">Loading departments...</p>
+          <Loader2 className="w-8 h-8 animate-spin mx-auto text-orange-500" />
+          <p className="mt-2 text-sm text-slate-500">Loading departments...</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredDepartments.map((dept) => (
-            <Card key={dept._id} className="relative group hover:shadow-md transition-shadow">
-              <CardHeader className="pb-2">
+            <Card key={dept._id} className="rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+              <CardHeader className="pb-2 px-5 pt-5">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       "w-10 h-10 rounded-lg flex items-center justify-center",
                       dept.parentDepartmentId 
                         ? "bg-blue-100 text-blue-700" 
-                        : "bg-primary/10 text-primary"
+                        : "bg-orange-100 text-orange-700"
                     )}>
                       {dept.parentDepartmentId ? (
                         <Network className="w-5 h-5" />
@@ -217,8 +185,8 @@ export function DepartmentsTab({
                       )}
                     </div>
                     <div>
-                      <CardTitle className="text-base">{dept.name}</CardTitle>
-                      <p className="text-xs text-muted-foreground">
+                      <CardTitle className="text-base font-semibold text-slate-800">{dept.name}</CardTitle>
+                      <p className="text-xs text-slate-400 mt-0.5">
                         Created {formatDate(dept.createdAt)}
                       </p>
                     </div>
@@ -226,74 +194,58 @@ export function DepartmentsTab({
                   
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" disabled={deletingDepartment === dept._id}>
-                        {deletingDepartment === dept._id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <MoreHorizontal className="h-4 w-4" />
-                        )}
+                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg text-slate-500 hover:text-orange-600">
+                        <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem onClick={() => handleViewOpen(dept)}>
-                        <Eye className="mr-2 h-4 w-4" />
+                    <DropdownMenuContent align="end" className="rounded-lg border-slate-200">
+                      <DropdownMenuItem onClick={() => handleViewOpen(dept)} className="text-sm">
+                        <Eye className="mr-2 h-3.5 w-3.5" />
                         View Details
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleEditOpen(dept)}>
-                        <Edit className="mr-2 h-4 w-4" />
+                      <DropdownMenuItem onClick={() => handleEditOpen(dept)} className="text-sm">
+                        <Edit className="mr-2 h-3.5 w-3.5" />
                         Edit Department
                       </DropdownMenuItem>
-                      
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
               </CardHeader>
               
-              <CardContent>
-                <div className="space-y-3">
-                  {/* Department Type Badge */}
-                  <div>
-                    {dept.parentDepartmentId ? (
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                        <Network className="w-3 h-3 mr-1" />
-                        Sub-department
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                        <Building className="w-3 h-3 mr-1" />
-                        Main Department
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  {/* Parent Department */}
-                  {dept.parentDepartmentId && (
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground mb-1">
-                        Parent Department:
-                      </div>
-                      <Badge variant="secondary" className="text-xs">
-                        {dept.parentDepartmentId.name}
-                      </Badge>
-                    </div>
+              <CardContent className="px-5 pb-5 pt-0 space-y-3">
+                {/* Type Badge */}
+                <div>
+                  {dept.parentDepartmentId ? (
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 rounded-full text-xs">
+                      <Network className="w-3 h-3 mr-1" />
+                      Sub-department
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 rounded-full text-xs">
+                      <Building className="w-3 h-3 mr-1" />
+                      Main Department
+                    </Badge>
                   )}
-                  
-                  {/* Stats */}
-                  <div className="flex items-center gap-4 pt-2">
-                    {/* <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm">
-                        {getUserCountForDepartment(dept._id)} users
-                      </span>
-                    </div> */}
-                    
-                    {/* Sub-departments count */}
-                    <div className="flex items-center gap-2">
-                      <Network className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm">
-                        {departments.filter(d => d.parentDepartmentId?._id === dept._id).length} sub-depts
-                      </span>
+                </div>
+                
+                {/* Parent Department */}
+                {dept.parentDepartmentId && (
+                  <div>
+                    <div className="text-xs font-medium text-slate-500 mb-1">Parent Department:</div>
+                    <div className="inline-flex items-center gap-1.5 text-sm text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg">
+                      <Building className="w-3 h-3 text-slate-400" />
+                      {dept.parentDepartmentId.name}
                     </div>
+                  </div>
+                )}
+                
+                {/* Stats */}
+                <div className="flex items-center gap-4 pt-2">
+                  <div className="flex items-center gap-1.5">
+                    <Network className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-sm text-slate-600">
+                      {departments.filter(d => d.parentDepartmentId?._id === dept._id).length} sub-depts
+                    </span>
                   </div>
                 </div>
               </CardContent>
@@ -304,16 +256,16 @@ export function DepartmentsTab({
 
       {/* Empty State */}
       {!loading && filteredDepartments.length === 0 && (
-        <Card className="border-dashed">
+        <Card className="border-dashed border-slate-200 rounded-xl">
           <CardContent className="py-12 text-center">
-            <Building className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No departments found</h3>
-            <p className="text-muted-foreground mb-6">
+            <Building className="w-12 h-12 mx-auto text-slate-300 mb-4" />
+            <h3 className="text-base font-semibold text-slate-800 mb-1">No departments found</h3>
+            <p className="text-sm text-slate-500 mb-6">
               {searchQuery || filter !== 'all' 
                 ? 'Try adjusting your search or filters'
                 : 'Get started by creating your first department'}
             </p>
-            <Button onClick={() => setNewDepartmentOpen(true)}>
+            <Button onClick={() => setNewDepartmentOpen(true)} className="rounded-lg bg-orange-500 hover:bg-orange-600 text-white">
               <Plus className="w-4 h-4 mr-2" />
               Create Department
             </Button>
@@ -323,37 +275,37 @@ export function DepartmentsTab({
 
       {/* New Department Modal */}
       <Dialog open={newDepartmentOpen} onOpenChange={setNewDepartmentOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Create New Department</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="sm:max-w-[500px] rounded-2xl border-slate-200 p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
+            <DialogTitle className="text-xl font-bold text-slate-800">Create New Department</DialogTitle>
+            <DialogDescription className="text-sm text-slate-500">
               Add a new department to your organization structure.
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Department Name *</Label>
+          <div className="px-6 py-4 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-slate-700">Department Name *</Label>
               <Input
-                id="name"
                 value={departmentForm.name}
                 onChange={(e) => setDepartmentForm({...departmentForm, name: e.target.value})}
                 placeholder="e.g., Human Resources"
                 disabled={addingDepartment}
+                className="h-10 rounded-xl border-slate-200 focus:ring-orange-500"
               />
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="parent">Parent Department (Optional)</Label>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-slate-700">Parent Department (Optional)</Label>
               <Select
                 value={departmentForm.parentDepartmentId}
                 onValueChange={(value) => setDepartmentForm({...departmentForm, parentDepartmentId: value})}
                 disabled={addingDepartment}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-10 rounded-xl border-slate-200">
                   <SelectValue placeholder="Select parent department (optional)" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl">
                   <SelectItem value=" ">None (Create as main department)</SelectItem>
                   {departments
                     .filter(dept => !dept.parentDepartmentId)
@@ -364,75 +316,70 @@ export function DepartmentsTab({
                     ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-slate-500">
                 Leave empty to create a main department. Sub-departments can be created later.
               </p>
             </div>
           </div>
           
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setNewDepartmentOpen(false);
-                resetForm();
-              }} 
-              disabled={addingDepartment}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleAddDepartment} 
-              disabled={addingDepartment || !departmentForm.name}
-            >
-              {addingDepartment ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                'Create Department'
-              )}
-            </Button>
+          <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-white">
+            <div className="flex gap-3 w-full sm:w-auto">
+              <Button 
+                variant="outline" 
+                onClick={() => { setNewDepartmentOpen(false); resetForm(); }} 
+                disabled={addingDepartment}
+                className="rounded-xl border-slate-200"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleAddDepartment} 
+                disabled={addingDepartment || !departmentForm.name}
+                className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white"
+              >
+                {addingDepartment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Create Department
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Edit Department Modal */}
       <Dialog open={editDepartmentOpen} onOpenChange={setEditDepartmentOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] rounded-2xl border-slate-200 p-0 overflow-hidden">
           {selectedDepartment && (
             <>
-              <DialogHeader>
-                <DialogTitle>Edit Department</DialogTitle>
-                <DialogDescription>
+              <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
+                <DialogTitle className="text-xl font-bold text-slate-800">Edit Department</DialogTitle>
+                <DialogDescription className="text-sm text-slate-500">
                   Update department: {selectedDepartment.name}
                 </DialogDescription>
               </DialogHeader>
               
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-name">Department Name *</Label>
+              <div className="px-6 py-4 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-slate-700">Department Name *</Label>
                   <Input
-                    id="edit-name"
                     value={departmentForm.name}
                     onChange={(e) => setDepartmentForm({...departmentForm, name: e.target.value})}
-                    placeholder="e.g., Human Resources"
+                    placeholder="Department name"
                     disabled={updatingDepartment}
+                    className="h-10 rounded-xl border-slate-200 focus:ring-orange-500"
                   />
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="edit-parent">Parent Department</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-slate-700">Parent Department</Label>
                   <Select
                     value={departmentForm.parentDepartmentId}
                     onValueChange={(value) => setDepartmentForm({...departmentForm, parentDepartmentId: value})}
                     disabled={updatingDepartment}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10 rounded-xl border-slate-200">
                       <SelectValue placeholder="Select parent department" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="rounded-xl">
                       <SelectItem value=" ">None (Make it a main department)</SelectItem>
                       {departments
                         .filter(dept => dept._id !== selectedDepartment._id && !dept.parentDepartmentId)
@@ -445,38 +392,32 @@ export function DepartmentsTab({
                   </Select>
                 </div>
                 
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm text-yellow-800">
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  <p className="text-sm text-amber-800">
                     <strong>Note:</strong> Changing parent department will affect all users and sub-departments in this department.
                   </p>
                 </div>
               </div>
               
-              <DialogFooter>
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setEditDepartmentOpen(false);
-                    setSelectedDepartment(null);
-                    resetForm();
-                  }} 
-                  disabled={updatingDepartment}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleUpdateDepartment} 
-                  disabled={updatingDepartment || !departmentForm.name}
-                >
-                  {updatingDepartment ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Updating...
-                    </>
-                  ) : (
-                    'Update Department'
-                  )}
-                </Button>
+              <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-white">
+                <div className="flex gap-3 w-full sm:w-auto">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => { setEditDepartmentOpen(false); setSelectedDepartment(null); resetForm(); }} 
+                    disabled={updatingDepartment}
+                    className="rounded-xl border-slate-200"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleUpdateDepartment} 
+                    disabled={updatingDepartment || !departmentForm.name}
+                    className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white"
+                  >
+                    {updatingDepartment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Update Department
+                  </Button>
+                </div>
               </DialogFooter>
             </>
           )}
@@ -485,23 +426,23 @@ export function DepartmentsTab({
 
       {/* View Department Modal */}
       <Dialog open={viewDepartmentOpen} onOpenChange={setViewDepartmentOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] rounded-2xl border-slate-200 p-0 overflow-hidden">
           {selectedDepartment && (
             <>
-              <DialogHeader>
-                <DialogTitle>Department Details</DialogTitle>
-                <DialogDescription>
+              <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
+                <DialogTitle className="text-xl font-bold text-slate-800">Department Details</DialogTitle>
+                <DialogDescription className="text-sm text-slate-500">
                   Complete information for {selectedDepartment.name}
                 </DialogDescription>
               </DialogHeader>
               
-              <div className="space-y-4">
+              <div className="px-6 py-4 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-4">
                 <div className="flex items-center gap-4">
                   <div className={cn(
-                    "w-16 h-16 rounded-lg flex items-center justify-center",
+                    "w-16 h-16 rounded-xl flex items-center justify-center",
                     selectedDepartment.parentDepartmentId 
                       ? "bg-blue-100 text-blue-700" 
-                      : "bg-primary/10 text-primary"
+                      : "bg-orange-100 text-orange-700"
                   )}>
                     {selectedDepartment.parentDepartmentId ? (
                       <Network className="w-8 h-8" />
@@ -510,71 +451,60 @@ export function DepartmentsTab({
                     )}
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold">{selectedDepartment.name}</h3>
-                    <p className="text-muted-foreground">
+                    <h3 className="text-lg font-semibold text-slate-800">{selectedDepartment.name}</h3>
+                    <p className="text-sm text-slate-500">
                       {selectedDepartment.parentDepartmentId ? 'Sub-department' : 'Main Department'}
                     </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 pt-2">
                   <div>
-                    <Label>Created</Label>
-                    <p className="text-sm">{formatDate(selectedDepartment.createdAt)}</p>
+                    <div className="text-xs font-medium text-slate-500 mb-1">Created</div>
+                    <p className="text-sm text-slate-700">{formatDate(selectedDepartment.createdAt)}</p>
                   </div>
                   <div>
-                    <Label>Last Updated</Label>
-                    <p className="text-sm">{formatDate(selectedDepartment.updatedAt)}</p>
+                    <div className="text-xs font-medium text-slate-500 mb-1">Last Updated</div>
+                    <p className="text-sm text-slate-700">{formatDate(selectedDepartment.updatedAt)}</p>
                   </div>
-                  {/* <div>
-                    <Label>Total Users</Label>
-                    <p className="text-sm">{getUserCountForDepartment(selectedDepartment._id)}</p>
-                  </div> */}
                   <div>
-                    <Label>Sub-departments</Label>
-                    <p className="text-sm">
+                    <div className="text-xs font-medium text-slate-500 mb-1">Sub-departments</div>
+                    <p className="text-sm text-slate-700">
                       {departments.filter(d => d.parentDepartmentId?._id === selectedDepartment._id).length}
                     </p>
                   </div>
                 </div>
 
                 {selectedDepartment.parentDepartmentId && (
-                  <div className="border-t pt-4">
-                    <Label>Parent Department</Label>
-                    <div className="mt-2 p-3 bg-muted rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                          <Building className="h-5 w-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{selectedDepartment.parentDepartmentId.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            Main Department
-                          </div>
-                        </div>
+                  <div className="border-t border-slate-100 pt-4">
+                    <div className="text-xs font-medium text-slate-500 mb-2">Parent Department</div>
+                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                      <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                        <Building className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium text-slate-800">{selectedDepartment.parentDepartmentId.name}</div>
+                        <div className="text-xs text-slate-500">Main Department</div>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Sub-departments List */}
                 {departments.filter(d => d.parentDepartmentId?._id === selectedDepartment._id).length > 0 && (
-                  <div className="border-t pt-4">
-                    <Label>Sub-departments</Label>
-                    <div className="mt-2 space-y-2">
+                  <div className="border-t border-slate-100 pt-4">
+                    <div className="text-xs font-medium text-slate-500 mb-2">Sub-departments</div>
+                    <div className="space-y-2">
                       {departments
                         .filter(d => d.parentDepartmentId?._id === selectedDepartment._id)
                         .map(subDept => (
-                          <div key={subDept._id} className="p-3 bg-muted rounded-lg">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
-                                <Network className="h-4 w-4 text-gray-600" />
-                              </div>
-                              <div>
-                                <div className="font-medium">{subDept.name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  Created: {formatDate(subDept.createdAt)}
-                                </div>
+                          <div key={subDept._id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center">
+                              <Network className="h-4 w-4 text-slate-500" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-slate-700">{subDept.name}</div>
+                              <div className="text-xs text-slate-400">
+                                Created: {formatDate(subDept.createdAt)}
                               </div>
                             </div>
                           </div>
@@ -584,8 +514,8 @@ export function DepartmentsTab({
                 )}
               </div>
               
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setViewDepartmentOpen(false)}>
+              <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-white">
+                <Button variant="outline" onClick={() => setViewDepartmentOpen(false)} className="rounded-xl border-slate-200">
                   Close
                 </Button>
               </DialogFooter>
@@ -593,6 +523,17 @@ export function DepartmentsTab({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Global style for hidden scrollbar */}
+      <style>{`
+        .custom-scrollbar {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </div>
   );
 }
