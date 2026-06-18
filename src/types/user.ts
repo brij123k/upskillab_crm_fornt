@@ -95,7 +95,10 @@ export interface StageType {
 export interface RoleType {
   _id: string;
   name: string;
-  level: number;
+  levelId:{
+    _id:string;
+    name:string;
+  };
   isSuperAdmin: boolean;
   reportingRole?: string;
   permissions: Array<{

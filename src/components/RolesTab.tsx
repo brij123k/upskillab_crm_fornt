@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,19 +13,37 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { 
   ShieldPlus, 
   Edit, 
   Loader2, 
   Shield,
   ShieldCheck,
-  ShieldOff
+  Plus,
+  Pencil,
+  Layers
 } from 'lucide-react';
 import { PermissionsSelector } from './PermissionsSelector';
 import { RoleType } from '@/types/user';
 import { modulesConfig } from '@/config/modulesConfig';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { getDataHandlerWithToken, postDataHandlerWithToken, patchTokenDataHandler } from '@/config/services';
+import ApiConfig from '@/config/apiConfig';
+import { toast } from '@/hooks/use-toast';
+
+interface LevelType {
+  _id: string;
+  name: string;
+}
 
 interface RolesTabProps {
   roles: RoleType[];
@@ -49,44 +67,99 @@ export function RolesTab({
 
   const [roleForm, setRoleForm] = useState({
     name: '',
-    level: 1,
+    levelId: '',
     reportingRole: '',
     isSuperAdmin: false,
     permissions: [] as Array<{ module: string; actions: string[] }>
   });
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  // Levels state
+  const [levels, setLevels] = useState<LevelType[]>([]);
+  const [loadingLevels, setLoadingLevels] = useState(false);
+
+  // Available Levels modal state
+  const [levelsModalOpen, setLevelsModalOpen] = useState(false);
+  const [editingLevelId, setEditingLevelId] = useState<string | null>(null);
+  const [newLevelName, setNewLevelName] = useState('');
+  const [savingLevel, setSavingLevel] = useState(false);
+
+  // Fetch levels on mount
+  useEffect(() => {
+    fetchLevels();
+  }, []);
+
+  const fetchLevels = async () => {
+    try {
+      setLoadingLevels(true);
+      const response = await getDataHandlerWithToken('getAllLevels', null, null);
+      if (response) setLevels(response);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch levels",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingLevels(false);
+    }
   };
 
-  const getModuleLabel = (moduleId: string) => {
-    const module = Object.values(modulesConfig).find(m => m.id === moduleId);
-    return module ? module.label : moduleId;
+  // ---------- Helpers to handle both populated objects and plain IDs ----------
+  const getLevelId = (level: any): string => {
+    if (!level) return '';
+    if (typeof level === 'object') return level._id || '';
+    return level;
   };
 
+  const getLevelName = (level: any): string => {
+    if (!level) return 'Unknown Level';
+    if (typeof level === 'object') return level.name || 'Unknown Level';
+    const found = levels.find(l => l._id === level);
+    return found ? found.name : 'Unknown Level';
+  };
+
+  const getLevelOrder = (level: any): number => {
+    const id = getLevelId(level);
+    const lvl = levels.find(l => l._id === id);
+    if (!lvl) return 0;
+    const match = lvl.name.match(/\d+/);
+    return match ? parseInt(match[0], 10) : 0;
+  };
+
+  const getReportingRoleName = (reportingRole: any): string => {
+    if (!reportingRole) return '';
+    if (typeof reportingRole === 'object') return reportingRole.name || '';
+    const found = roles.find(r => r._id === reportingRole);
+    return found ? found.name : reportingRole;
+  };
+
+  // ---------- Role sorting and reporting options ----------
   const getSortedRoles = () => {
     return [...roles].sort((a, b) => {
-      const levelDiff = (b.level ?? 0) - (a.level ?? 0);
-      if (levelDiff !== 0) return levelDiff;
+      const orderA = getLevelOrder(a.levelId);
+      const orderB = getLevelOrder(b.levelId);
+      if (orderB !== orderA) return orderB - orderA; // higher order first
       return a.name.localeCompare(b.name);
     });
   };
 
-  const getReportingRoleOptions = (currentLevel: number, currentRoleId?: string) => {
+  const getReportingRoleOptions = (currentLevelId: string, currentRoleId?: string) => {
+    const currentOrder = getLevelOrder(currentLevelId);
     return getSortedRoles().filter((role) => {
       if (role.isSuperAdmin) return false;
       if (currentRoleId && role._id === currentRoleId) return false;
-      return (role.level ?? 0) > currentLevel;
+      return getLevelOrder(role.levelId) > currentOrder;
     });
   };
 
+  // ---------- Handlers ----------
   const handleAddRole = async () => {
     setAddingRole(true);
     try {
       await onAddRole(roleForm);
       setRoleForm({ 
         name: '', 
-        level: 1,
+        levelId: '',
         reportingRole: '', 
         isSuperAdmin: false,
         permissions: [] 
@@ -106,7 +179,7 @@ export function RolesTab({
       setSelectedRole(null);
       setRoleForm({ 
         name: '', 
-        level: 1,
+        levelId: '',
         reportingRole: '', 
         isSuperAdmin: false,
         permissions: [] 
@@ -120,8 +193,8 @@ export function RolesTab({
     setSelectedRole(role);
     setRoleForm({
       name: role.name,
-      level: role.level ?? 1,
-      reportingRole: role.reportingRole || '',
+      levelId: getLevelId(role.levelId),            // extract the ID string
+      reportingRole: getLevelId(role.reportingRole), // may be object or string
       isSuperAdmin: role.isSuperAdmin || false,
       permissions: role.permissions.map(perm => ({
         module: perm.module,
@@ -136,8 +209,50 @@ export function RolesTab({
       ...prev,
       isSuperAdmin: checked,
       permissions: checked ? [] : prev.permissions,
-      reportingRole: checked ? '' : prev.reportingRole
+      reportingRole: checked ? '' : prev.reportingRole,
+      levelId: checked ? '' : prev.levelId, // super admin doesn't need level
     }));
+  };
+
+  // Level CRUD handlers
+  const handleAddLevel = async () => {
+    if (!newLevelName.trim()) return;
+    setSavingLevel(true);
+    try {
+      await postDataHandlerWithToken('addNewLevel', { name: newLevelName.trim() });
+      toast({ title: "Success", description: "Level created" });
+      setNewLevelName('');
+      fetchLevels();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.response?.data?.message || "Failed to create level", variant: "destructive" });
+    } finally {
+      setSavingLevel(false);
+    }
+  };
+
+  const handleUpdateLevel = async (levelId: string, newName: string) => {
+    if (!newName.trim()) return;
+    setSavingLevel(true);
+    try {
+      const endpoint = ApiConfig.levelUpdate(levelId);
+      await patchTokenDataHandler(endpoint, { name: newName.trim() }, true);
+      toast({ title: "Success", description: "Level updated" });
+      setEditingLevelId(null);
+      fetchLevels();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.response?.data?.message || "Failed to update level", variant: "destructive" });
+    } finally {
+      setSavingLevel(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
+  const getModuleLabel = (moduleId: string) => {
+    const module = Object.values(modulesConfig).find(m => m.id === moduleId);
+    return module ? module.label : moduleId;
   };
 
   return (
@@ -148,10 +263,20 @@ export function RolesTab({
           <h3 className="text-base font-semibold text-slate-800">All Roles ({roles.length})</h3>
           <p className="text-sm text-slate-500">Manage user roles and permissions</p>
         </div>
-        <Button onClick={() => setNewRoleOpen(true)} className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white">
-          <ShieldPlus className="w-4 h-4 mr-2" />
-          New Role
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setLevelsModalOpen(true)}
+            className="rounded-xl border-slate-200"
+          >
+            <Layers className="w-4 h-4 mr-2" />
+            Available Levels
+          </Button>
+          <Button onClick={() => setNewRoleOpen(true)} className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white">
+            <ShieldPlus className="w-4 h-4 mr-2" />
+            New Role
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -182,7 +307,7 @@ export function RolesTab({
                       </Badge>
                     )}
                     <Badge variant="outline" className="border-slate-200 text-slate-600 rounded-full text-xs px-2 py-0.5">
-                      Level {role.level ?? 1}
+                      {getLevelName(role.levelId)}
                     </Badge>
                   </div>
                 </div>
@@ -191,18 +316,15 @@ export function RolesTab({
                 </p>
               </CardHeader>
               <CardContent className="px-5 pb-5 pt-2 space-y-3">
-                {/* Reporting Role */}
                 {!role.isSuperAdmin && role.reportingRole && (
                   <div>
                     <div className="text-xs font-medium text-slate-500 mb-1">Reports To:</div>
                     <div className="inline-flex items-center gap-1.5 text-sm text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg">
                       <Shield className="w-3 h-3 text-slate-400" />
-                      {roles.find(r => r._id === role.reportingRole)?.name || role.reportingRole}
+                      {getReportingRoleName(role.reportingRole)}
                     </div>
                   </div>
                 )}
-
-                {/* Permissions - only for non-super admin */}
                 {!role.isSuperAdmin && (
                   <div>
                     <div className="text-xs font-medium text-slate-500 mb-1.5">Permissions:</div>
@@ -219,8 +341,6 @@ export function RolesTab({
                     </div>
                   </div>
                 )}
-                
-                {/* Super Admin Note */}
                 {role.isSuperAdmin && (
                   <div className="mt-2 p-3 bg-orange-50 rounded-lg border border-orange-100">
                     <div className="flex items-center gap-2">
@@ -230,8 +350,6 @@ export function RolesTab({
                     <p className="text-xs text-orange-600 mt-1">Has access to all modules and actions</p>
                   </div>
                 )}
-                
-                {/* Actions - Edit button for non-super admin roles */}
                 {!role.isSuperAdmin && (
                   <div className="pt-3 flex justify-end">
                     <Button 
@@ -272,19 +390,28 @@ export function RolesTab({
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium text-slate-700">Role Level *</Label>
-              <Input
-                type="number"
-                min={1}
-                value={roleForm.level}
-                onChange={(e) => setRoleForm({...roleForm, level: Number(e.target.value) || 1})}
-                placeholder="1"
-                disabled={addingRole}
-                className="h-10 rounded-xl border-slate-200 focus:ring-orange-500"
-              />
-              <p className="text-xs text-slate-500">Higher number = more senior. Multiple roles can share the same level.</p>
-            </div>
+            {/* Level Selection */}
+            {!roleForm.isSuperAdmin && (
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">Level *</Label>
+                <Select
+                  value={roleForm.levelId}
+                  onValueChange={(value) => setRoleForm({...roleForm, levelId: value})}
+                  disabled={addingRole}
+                >
+                  <SelectTrigger className="h-10 rounded-xl border-slate-200">
+                    <SelectValue placeholder="Select a level" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {levels.map((level) => (
+                      <SelectItem key={level._id} value={level._id}>
+                        {level.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             
             {/* Super Admin Toggle */}
             <div className="flex items-center justify-between p-4 border border-slate-200 rounded-xl bg-slate-50">
@@ -303,7 +430,6 @@ export function RolesTab({
               />
             </div>
             
-            {/* Conditional fields */}
             {!roleForm.isSuperAdmin && (
               <>
                 <div className="space-y-1.5">
@@ -318,10 +444,10 @@ export function RolesTab({
                     </SelectTrigger>
                     <SelectContent className="rounded-xl">
                       <SelectItem value=" ">No reporting role</SelectItem>
-                      {getReportingRoleOptions(roleForm.level)
+                      {getReportingRoleOptions(roleForm.levelId)
                         .map((role) => (
                           <SelectItem key={role._id} value={role._id}>
-                            {role.name} (Level {role.level ?? 1})
+                            {role.name} ({getLevelName(role.levelId)})
                           </SelectItem>
                         ))}
                     </SelectContent>
@@ -338,7 +464,6 @@ export function RolesTab({
               </>
             )}
             
-            {/* Super Admin Warning */}
             {roleForm.isSuperAdmin && (
               <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl">
                 <div className="flex items-center gap-3">
@@ -356,7 +481,7 @@ export function RolesTab({
               <Button variant="outline" onClick={() => setNewRoleOpen(false)} disabled={addingRole} className="rounded-xl border-slate-200">
                 Cancel
               </Button>
-              <Button onClick={handleAddRole} disabled={addingRole || !roleForm.name} className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white">
+              <Button onClick={handleAddRole} disabled={addingRole || !roleForm.name || (!roleForm.isSuperAdmin && !roleForm.levelId)} className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white">
                 {addingRole ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Create Role
               </Button>
@@ -388,21 +513,28 @@ export function RolesTab({
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium text-slate-700">Role Level *</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={roleForm.level}
-                    onChange={(e) => setRoleForm({...roleForm, level: Number(e.target.value) || 1})}
-                    placeholder="1"
-                    disabled={updatingRole}
-                    className="h-10 rounded-xl border-slate-200 focus:ring-orange-500"
-                  />
-                  <p className="text-xs text-slate-500">Higher number = more senior. Multiple roles can share the same level.</p>
-                </div>
+                {!roleForm.isSuperAdmin && !selectedRole.isSuperAdmin && (
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium text-slate-700">Level *</Label>
+                    <Select
+                      value={roleForm.levelId}
+                      onValueChange={(value) => setRoleForm({...roleForm, levelId: value})}
+                      disabled={updatingRole}
+                    >
+                      <SelectTrigger className="h-10 rounded-xl border-slate-200">
+                        <SelectValue placeholder="Select a level" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        {levels.map((level) => (
+                          <SelectItem key={level._id} value={level._id}>
+                            {level.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 
-                {/* Super Admin Toggle for Edit */}
                 {!selectedRole.isSuperAdmin && (
                   <div className="flex items-center justify-between p-4 border border-slate-200 rounded-xl bg-slate-50">
                     <div className="space-y-0.5">
@@ -421,7 +553,6 @@ export function RolesTab({
                   </div>
                 )}
                 
-                {/* Existing Super Admin warning */}
                 {selectedRole.isSuperAdmin && (
                   <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl">
                     <div className="flex items-center gap-3">
@@ -448,10 +579,10 @@ export function RolesTab({
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
                           <SelectItem value=" ">No reporting role</SelectItem>
-                          {getReportingRoleOptions(roleForm.level, selectedRole._id)
+                          {getReportingRoleOptions(roleForm.levelId, selectedRole._id)
                             .map((role) => (
                               <SelectItem key={role._id} value={role._id}>
-                                {role.name} (Level {role.level ?? 1})
+                                {role.name} ({getLevelName(role.levelId)})
                               </SelectItem>
                             ))}
                         </SelectContent>
@@ -473,7 +604,7 @@ export function RolesTab({
                   <Button variant="outline" onClick={() => { setEditingRole(false); setSelectedRole(null); }} disabled={updatingRole} className="rounded-xl border-slate-200">
                     Cancel
                   </Button>
-                  <Button onClick={handleUpdateRole} disabled={updatingRole || !roleForm.name} className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white">
+                  <Button onClick={handleUpdateRole} disabled={updatingRole || !roleForm.name || (!roleForm.isSuperAdmin && !roleForm.levelId)} className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white">
                     {updatingRole ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Update Role
                   </Button>
@@ -484,7 +615,108 @@ export function RolesTab({
         </DialogContent>
       </Dialog>
 
-      {/* Global style for hidden scrollbar */}
+      {/* Available Levels Modal */}
+      <Dialog open={levelsModalOpen} onOpenChange={setLevelsModalOpen}>
+        <DialogContent className="sm:max-w-[500px] rounded-2xl border-slate-200 p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
+            <DialogTitle className="text-xl font-bold text-slate-800">Manage Levels</DialogTitle>
+            <DialogDescription className="text-sm text-slate-500">
+              Add, edit, and view organisational levels (e.g., L1, L2).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-6 py-4 space-y-4">
+            {/* Add new level */}
+            <div className="flex gap-2">
+              <Input
+                placeholder="Level name (e.g., L3)"
+                value={newLevelName}
+                onChange={(e) => setNewLevelName(e.target.value)}
+                disabled={savingLevel}
+                className="h-10 rounded-xl border-slate-200"
+                onKeyDown={(e) => e.key === 'Enter' && handleAddLevel()}
+              />
+              <Button 
+                onClick={handleAddLevel} 
+                disabled={savingLevel || !newLevelName.trim()}
+                className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add
+              </Button>
+            </div>
+
+            {/* Levels list */}
+            <div className="max-h-60 overflow-y-auto custom-scrollbar border border-slate-200 rounded-xl">
+              {levels.length === 0 ? (
+                <div className="p-4 text-center text-sm text-slate-500">No levels defined yet.</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-full">Name</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {levels.map(level => (
+                      <TableRow key={level._id}>
+                        <TableCell>
+                          {editingLevelId === level._id ? (
+                            <Input
+                              defaultValue={level.name}
+                              id={`edit-level-${level._id}`}
+                              className="h-8"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const input = e.currentTarget;
+                                  handleUpdateLevel(level._id, input.value);
+                                }
+                              }}
+                            />
+                          ) : (
+                            <span className="font-medium">{level.name}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {editingLevelId === level._id ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                const input = document.getElementById(`edit-level-${level._id}`) as HTMLInputElement;
+                                handleUpdateLevel(level._id, input?.value || '');
+                              }}
+                              disabled={savingLevel}
+                            >
+                              Save
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setEditingLevelId(level._id)}
+                              disabled={savingLevel}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-white">
+            <Button variant="outline" onClick={() => setLevelsModalOpen(false)} className="rounded-xl border-slate-200">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden scrollbar style */}
       <style>{`
         .custom-scrollbar {
           scrollbar-width: none;

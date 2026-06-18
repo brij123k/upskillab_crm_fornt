@@ -762,91 +762,89 @@ export function UsersPage() {
     }
   };
 
-  // Role Handlers
-  const handleAddRole = async (roleData: any) => {
-    try {
-      const dataToSend: any = {
-        name: roleData.name,
-        level: Number(roleData.level) || 1,
-        isSuperAdmin: roleData.isSuperAdmin || false
-      };
+// Role Handlers
+const handleAddRole = async (roleData: any) => {
+  try {
+    const dataToSend: any = {
+      name: roleData.name,
+      levelId: roleData.levelId || null,
+      isSuperAdmin: roleData.isSuperAdmin || false
+    };
 
-      // Only add permissions and reportingRole if not Super Admin
-      if (!roleData.isSuperAdmin) {
-        dataToSend.permissions = roleData.permissions
-          .filter((perm: any) => perm.actions.length > 0)
-          .map((perm: any) => ({
-            module: perm.module,
-            actions: perm.actions
-          }));
+    if (!roleData.isSuperAdmin) {
+      dataToSend.permissions = roleData.permissions
+        .filter((perm: any) => perm.actions.length > 0)
+        .map((perm: any) => ({
+          module: perm.module,
+          actions: perm.actions
+        }));
 
-        if (roleData.reportingRole && roleData.reportingRole !== "") {
-          dataToSend.reportingRole = roleData.reportingRole;
-        }
+      if (roleData.reportingRole && roleData.reportingRole !== "") {
+        dataToSend.reportingRole = roleData.reportingRole;
       }
-
-      const response = await postDataHandlerWithToken("addNewRole", dataToSend);
-      toast({
-        title: "Success",
-        description: response?.message || "Role created successfully",
-      });
-      fetchRoles();
-      return response;
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to create role",
-        variant: "destructive",
-      });
-      throw error;
     }
-  };
 
-  const handleUpdateRole = async (roleId: string, roleData: any) => {
-    try {
-      const dataToSend: any = {
-        name: roleData.name,
-        level: Number(roleData.level) || 1,
-        isSuperAdmin: roleData.isSuperAdmin || false
-      };
+    const response = await postDataHandlerWithToken("addNewRole", dataToSend);
+    toast({
+      title: "Success",
+      description: response?.message || "Role created successfully",
+    });
+    fetchRoles();
+    return response;
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.response?.data?.message || "Failed to create role",
+      variant: "destructive",
+    });
+    throw error;
+  }
+};
 
-      // Only add permissions and reportingRole if not Super Admin
-      if (!roleData.isSuperAdmin) {
-        dataToSend.permissions = roleData.permissions
-          .filter((perm: any) => perm.actions.length > 0)
-          .map((perm: any) => ({
-            module: perm.module,
-            actions: perm.actions
-          }));
+const handleUpdateRole = async (roleId: string, roleData: any) => {
+  try {
+    const dataToSend: any = {
+      name: roleData.name,
+      levelId: roleData.levelId || null,
+      isSuperAdmin: roleData.isSuperAdmin || false
+    };
 
-        if (roleData.reportingRole && roleData.reportingRole !== "") {
-          dataToSend.reportingRole = roleData.reportingRole;
-        } else {
-          dataToSend.reportingRole = null;
-        }
+    if (!roleData.isSuperAdmin) {
+      dataToSend.permissions = roleData.permissions
+        .filter((perm: any) => perm.actions.length > 0)
+        .map((perm: any) => ({
+          module: perm.module,
+          actions: perm.actions
+        }));
+
+      if (roleData.reportingRole && roleData.reportingRole !== "") {
+        dataToSend.reportingRole = roleData.reportingRole;
       } else {
-        // Clear permissions and reporting role for Super Admin
-        dataToSend.permissions = [];
         dataToSend.reportingRole = null;
       }
-
-      const endpoint = ApiConfig.updateRole(roleId);
-      const response = await patchTokenDataHandler(endpoint, dataToSend, true);
-      toast({
-        title: "Success",
-        description: response?.message || "Role updated successfully",
-      });
-      fetchRoles();
-      return response;
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to update role",
-        variant: "destructive",
-      });
-      throw error;
+    } else {
+      dataToSend.permissions = [];
+      dataToSend.reportingRole = null;
+      dataToSend.levelId = null;
     }
-  };
+
+    const endpoint = ApiConfig.updateRole(roleId);
+    const response = await patchTokenDataHandler(endpoint, dataToSend, true);
+    toast({
+      title: "Success",
+      description: response?.message || "Role updated successfully",
+    });
+    fetchRoles();
+    return response;
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.response?.data?.message || "Failed to update role",
+      variant: "destructive",
+    });
+    throw error;
+  }
+};
 
 return (
     <div className="space-y-6 animate-fade-in">

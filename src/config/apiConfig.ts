@@ -46,6 +46,9 @@ const ApiConfig = {
   leaddoublicateFinder:`${url}/leads/leaddoublicate/duplicates`,
   leadmerge:`${url}/leads/leaddoublicate/merge`,
 
+  getAllLevels: `${url}/level`,       // GET all levels
+addNewLevel: `${url}/level`,  
+  levelUpdate:(levelId:string)=>`${url}/level/${levelId}`,
   CallLog:`${url}/call-logs/users`,
   LeadInteractionLog:`${url}/interaction-logs/users`,
   createInteractionLog:`${url}/interaction-logs`,
