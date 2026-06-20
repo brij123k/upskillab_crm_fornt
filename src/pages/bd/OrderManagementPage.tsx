@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import {
     Search,
+    Clock,
     Plus,
     RefreshCw,
     Loader2,
@@ -1096,2072 +1097,2026 @@ export function OrderManagementPage() {
     return (
         <div className="space-y-4 md:space-y-6 p-2 md:p-0">
             {/* Header */}
-            <div className="flex items-center space-x-2 bg-muted/30 p-3 rounded-lg border">
-                {hasPermission(permissions, 'user', 'read') && (
-                    <>
-                        <Checkbox
-                            id="group-filter"
-                            checked={filters.groupFilter}
-                            onCheckedChange={(checked) => handleFilterChange('groupFilter', checked)}
-                        />
-                        <Label htmlFor="group-filter" className="text-sm font-medium cursor-pointer">
-                            Group
-                        </Label>
-                        {filters.groupFilter && (
-                            <Badge variant="secondary" className="ml-2">
-                                Grouped View
-                            </Badge>
-                        )}
-                    </>
-                )}
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-foreground">Order Management</h1>
-                    <p className="text-sm md:text-base text-muted-foreground">Manage and track all orders</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    {hasPermission(permissions, 'orders', 'create') && (
-                        <Button onClick={() => {
-                            resetForm();
-                            setCreateModalOpen(true);
-                        }}>
-                            <Plus className="w-4 h-4 mr-2" />
-                            Create Order
-                        </Button>
-                    )}
-                    {hasPermission(permissions, 'orders', 'read_payment_history') && (
-                        <Button
-                            variant="outline"
-                            onClick={() => navigate('/bd/payments')}
-                        >
-                            <History className="w-4 h-4 mr-2" />
-                            Payment History
-                        </Button>
-                    )}
-                    {hasPermission(permissions, 'orders', 'read_loans') && (
-                        <Button
-                            variant="outline"
-                            onClick={() => navigate('/bd/loan-management')}
-                        >
-                            <Users className="w-4 h-4 mr-2" />
-                            Loan Management
-                        </Button>
-                    )}
-                </div>
-            </div>
+           {/* Header */}
+<div className="flex justify-between items-center">
+    <div>
+        <h1 className="text-3xl font-bold text-slate-800 tracking-tight">
+            Order Management
+        </h1>
+        <p className="text-slate-500 mt-1">
+            Manage and track all orders
+        </p>
+    </div>
+    <div className="flex items-center gap-2">
+        {/* Additional action buttons – styled as outline */}
+        {hasPermission(permissions, 'orders', 'read_payment_history') && (
+            <Button
+                variant="outline"
+                onClick={() => navigate('/bd/payments')}
+                className="border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl"
+            >
+                <History className="w-4 h-4 mr-2" />
+                Payment History
+            </Button>
+        )}
+        {hasPermission(permissions, 'orders', 'read_loans') && (
+            <Button
+                variant="outline"
+                onClick={() => navigate('/bd/loan-management')}
+                className="border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl"
+            >
+                <Users className="w-4 h-4 mr-2" />
+                Loan Management
+            </Button>
+        )}
+        {/* Primary action button */}
+        {hasPermission(permissions, 'orders', 'create') && (
+            <Button
+                onClick={() => {
+                    resetForm();
+                    setCreateModalOpen(true);
+                }}
+                className="bg-orange-600 hover:bg-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 rounded-xl px-5 py-2"
+            >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Order
+            </Button>
+        )}
+    </div>
+</div>
+            {/* Group Toggle */}
+<div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm border border-slate-100">
+    <div
+        className="flex items-center gap-2 cursor-pointer"
+        onClick={() => handleFilterChange('groupFilter', !filters.groupFilter)}
+    >
+        <div
+            className={`w-4 h-4 rounded border ${
+                filters.groupFilter ? 'bg-orange-600 border-orange-600' : 'border-slate-300'
+            } flex items-center justify-center transition-all`}
+        >
+            {filters.groupFilter && <div className="w-2 h-2 bg-white rounded-sm" />}
+        </div>
+        <span className="text-sm font-medium text-slate-700">Group by User</span>
+    </div>
+</div>
 
-            {/* Filters Toggle */}
-            <div className="flex items-center justify-between">
-                <Button
-                    variant="outline"
+            {/* Filters Header */}
+<div className="flex justify-between items-center">
+  <Button
+    variant="outline"
+    onClick={() => setShowFilters(!showFilters)}
+    className="border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl"
+  >
+    <Filter className="w-4 h-4 mr-2" />
+    {showFilters ? 'Hide Filters' : 'Show Filters'}
+    {showFilters ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
+  </Button>
+  <Button variant="ghost" onClick={resetFilters} className="text-slate-500 hover:text-slate-700 rounded-xl">
+    <RefreshCw className="w-4 h-4 mr-2" />
+    Reset
+  </Button>
+</div>
+
+{/* Filters Panel */}
+{showFilters && (
+  <Card className="p-5 bg-white border-0 shadow-sm">
+    {/* First row – 4 columns */}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Search */}
+      <div>
+        <Label className="text-xs font-semibold text-slate-500 uppercase">Search</Label>
+        <div className="relative mt-1.5">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input
+            placeholder="Search by name, email, phone..."
+            value={filters.search}
+            onChange={(e) => handleFilterChange('search', e.target.value)}
+            className="pl-9 rounded-xl border-slate-200"
+          />
+        </div>
+      </div>
+
+      {/* Payment Mode */}
+      <div>
+        <Label className="text-xs font-semibold text-slate-500 uppercase">Payment Mode</Label>
+        <Select
+          value={filters.paymentMode}
+          onValueChange={(value) => handleFilterChange('paymentMode', value)}
+        >
+          <SelectTrigger className="mt-1.5 rounded-xl">
+            <SelectValue placeholder="All Modes" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="Lumpsum">Lumpsum</SelectItem>
+            <SelectItem value="Loan">Loan</SelectItem>
+            <SelectItem value="Subscription">Subscription</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Status */}
+      <div>
+        <Label className="text-xs font-semibold text-slate-500 uppercase">Status</Label>
+        <Select
+          value={filters.status}
+          onValueChange={(value) => handleFilterChange('status', value)}
+        >
+          <SelectTrigger className="mt-1.5 rounded-xl">
+            <SelectValue placeholder="All Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="Fully Paid">Fully Paid</SelectItem>
+            <SelectItem value="Partially Paid">Partially Paid</SelectItem>
+            <SelectItem value="Pending">Pending</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Date Filter */}
+      <div>
+        <Label className="text-xs font-semibold text-slate-500 uppercase">Date</Label>
+        <Select
+          value={filters.dateFilter}
+          onValueChange={(value) => handleFilterChange('dateFilter', value)}
+        >
+          <SelectTrigger className="mt-1.5 rounded-xl">
+            <SelectValue placeholder="Select" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Time</SelectItem>
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="week">This Week</SelectItem>
+            <SelectItem value="month">This Month</SelectItem>
+            <SelectItem value="year">This Year</SelectItem>
+            <SelectItem value="custom">Custom Range</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+
+    {/* Custom Date Range (only when "custom" is selected) */}
+    {filters.dateFilter === 'custom' && (
+      <div className="grid grid-cols-2 gap-4 mt-4">
+        <Input
+          type="date"
+          placeholder="From"
+          value={filters.fromDate}
+          onChange={(e) => handleFilterChange('fromDate', e.target.value)}
+          className="rounded-xl"
+        />
+        <Input
+          type="date"
+          placeholder="To"
+          value={filters.toDate}
+          onChange={(e) => handleFilterChange('toDate', e.target.value)}
+          className="rounded-xl"
+        />
+      </div>
+    )}
+
+    {/* Counsellor Filter (only when grouped view is active) */}
+    {filters.groupFilter && (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div>
+          <Label className="text-xs font-semibold text-slate-500 uppercase">Counsellor</Label>
+          <SearchableDropdown
+            options={[
+              { value: 'all', label: 'All Counsellors' },
+              ...counsellors.map(counsellor => ({
+                value: counsellor._id,
+                label: counsellor.name,
+                empId: counsellor.employeeId
+              }))
+            ]}
+            value={filters.counsellorId}
+            onValueChange={(value) => handleFilterChange('counsellorId', value)}
+            placeholder="Select counsellor"
+            searchPlaceholder="Search by name, email or ID..."
+            emptyMessage="No counsellors found"
+            disabled={loadingCounsellors}
+            className="mt-1.5"
+          />
+        </div>
+      </div>
+    )}
+  </Card>
+)}
+
+          {/* Orders Table */}
+<Card className="bg-white border-0 shadow-sm overflow-hidden">
+  {/* Table Header with Title & Pagination */}
+  <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
+    <h2 className="font-semibold text-slate-800">Order Records</h2>
+    <div className="flex items-center gap-3 text-sm text-slate-500">
+      <span>Page {page} of {totalPages}</span>
+      <div className="flex gap-1">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage(p => Math.max(1, p - 1))}
+          disabled={page === 1 || loading}
+          className="h-8 w-8 p-0 rounded-lg"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+          disabled={page === totalPages || loading}
+          className="h-8 w-8 p-0 rounded-lg"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+      </div>
+      <Select
+        value={limit.toString()}
+        onValueChange={v => { setLimit(parseInt(v)); setPage(1); }}
+      >
+        <SelectTrigger className="w-20 h-8 text-sm rounded-lg">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="10">10</SelectItem>
+          <SelectItem value="25">25</SelectItem>
+          <SelectItem value="50">50</SelectItem>
+          <SelectItem value="100">100</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  </div>
+
+  {/* Table Content */}
+  {loading ? (
+    <div className="py-16 text-center">
+      <Loader2 className="w-8 h-8 animate-spin mx-auto text-orange-400" />
+      <p className="mt-3 text-slate-500">Loading orders...</p>
+    </div>
+  ) : orders.length === 0 ? (
+    <div className="py-16 text-center">
+      <DollarSign className="w-12 h-12 mx-auto text-slate-300" />
+      <h3 className="mt-3 text-base font-medium text-slate-700">No orders found</h3>
+      <p className="text-sm text-slate-400">Adjust filters or create a new order</p>
+    </div>
+  ) : (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-slate-50 border-b border-slate-100">
+            <TableHead className="text-xs font-semibold text-slate-500 uppercase">Order ID</TableHead>
+            <TableHead className="text-xs font-semibold text-slate-500 uppercase">Student</TableHead>
+            <TableHead className="text-xs font-semibold text-slate-500 uppercase">Course</TableHead>
+            <TableHead className="text-xs font-semibold text-slate-500 uppercase">Amount</TableHead>
+            <TableHead className="text-xs font-semibold text-slate-500 uppercase">Payment Mode</TableHead>
+            <TableHead className="text-xs font-semibold text-slate-500 uppercase">Status</TableHead>
+            <TableHead className="text-xs font-semibold text-slate-500 uppercase">Approval</TableHead>
+            <TableHead className="text-xs font-semibold text-slate-500 uppercase">Order Date</TableHead>
+            <TableHead className="text-xs font-semibold text-slate-500 uppercase">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {orders.map((order) => (
+            <TableRow
+              key={order._id}
+              className="border-b border-slate-50 hover:bg-slate-50/50 cursor-pointer transition-colors"
+            >
+              <TableCell className="py-3">
+                <span className="font-mono text-sm text-slate-600">{order._id.slice(-8)}</span>
+              </TableCell>
+              <TableCell>
+                <div className="font-medium text-slate-800 text-sm">{order.studentName}</div>
+                <div className="text-xs text-slate-400">{order.mobile}</div>
+              </TableCell>
+              <TableCell>
+                <div className="text-sm text-slate-700">{order.courseName}</div>
+                <div className="text-xs text-slate-400">{order.courseDuration} days</div>
+              </TableCell>
+              <TableCell>
+                <div className="font-medium text-slate-800 text-sm">{formatCurrency(order.finalFee)}</div>
+                {order.discount > 0 && (
+                  <div className="text-xs text-slate-400 line-through">{formatCurrency(order.totalFee)}</div>
+                )}
+                {order.GSTEnabled && order.GSTAmount && (
+                  <div className="text-xs text-slate-400">+GST: {formatCurrency(order.GSTAmount)}</div>
+                )}
+              </TableCell>
+              <TableCell>
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700">
+                  {order.paymentMode}
+                </span>
+              </TableCell>
+              <TableCell>
+                {getStatusBadge(order.status, order.Approved)}
+              </TableCell>
+              <TableCell>
+                {order.Approved ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Approved
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs text-yellow-600">
+                    <XCircle className="w-3 h-3" />
+                    Pending
+                  </span>
+                )}
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-sm text-slate-600">
+                {formatDate(order.orderDate)}
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
                     size="sm"
-                    onClick={() => setShowFilters(!showFilters)}
-                    className="flex items-center gap-2"
-                >
-                    <Filter className="w-4 h-4" />
-                    {showFilters ? 'Hide Filters' : 'Show Filters'}
-                    {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </Button>
-
-                {showFilters && (
-                    <Button variant="outline" size="sm" onClick={resetFilters}>
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Reset Filters
+                    onClick={() => handleViewOrder(order)}
+                    className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100"
+                    title="View Details"
+                  >
+                    <Eye className="w-4 h-4 text-slate-400" />
+                  </Button>
+                  {hasPermission(permissions, 'orders', 'read_loans') && !order.Approved && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEditOrder(order)}
+                      className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100"
+                      title="Edit Order"
+                    >
+                      <Edit className="w-4 h-4 text-slate-400" />
                     </Button>
-                )}
+                  )}
+                  {hasPermission(permissions, 'orders', 'approve') && !order.Approved && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleApproveOrder(order._id, order.Approved)}
+                      className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100"
+                      title="Approve Order"
+                      disabled={approvingOrder}
+                    >
+                      <ShieldCheck className="w-4 h-4 text-green-500" />
+                    </Button>
+                  )}
+                  {order.Approved && order.paymentMode === 'Subscription' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSubscriptionAction(order)}
+                      className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100"
+                      title={order.subscriptionDetails?.cashfreeSubscriptionId?.trim() ? "Get Auth Link" : "Create Subscription"}
+                      disabled={subscriptionLoading}
+                    >
+                      {order.subscriptionDetails?.cashfreeSubscriptionId?.trim() ? (
+                        <ExternalLink className="w-4 h-4 text-blue-500" />
+                      ) : (
+                        <Receipt className="w-4 h-4 text-blue-500" />
+                      )}
+                    </Button>
+                  )}
+                  {hasPermission(permissions, 'orders', 'payment_link_generator') &&
+                    order.paymentMode === 'Lumpsum' && order.Approved && order.status !== 'Fully Paid' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handlePaymentModal(order)}
+                        className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100"
+                        title="Generate Payment Link"
+                      >
+                        <CreditCard className="w-4 h-4 text-slate-400" />
+                      </Button>
+                  )}
+                  {hasPermission(permissions, 'orders', 'read_payment_history') &&
+                    order.paymentMode === 'Lumpsum' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handlePaymentHistory(order)}
+                        className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100"
+                        title="View Payment History"
+                      >
+                        <Receipt className="w-4 h-4 text-slate-400" />
+                      </Button>
+                  )}
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  )}
+
+  {/* Footer Pagination */}
+  <div className="px-5 py-3 border-t border-slate-100 flex justify-between items-center text-sm text-slate-500">
+    <span>Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, totalOrders)} of {totalOrders}</span>
+    <div className="flex gap-2">
+      <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1 || loading} className="rounded-lg">Previous</Button>
+      <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || loading} className="rounded-lg">Next</Button>
+    </div>
+  </div>
+</Card>
+
+           {/* Create Order Modal */}
+<Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
+  <DialogContent className="rounded-2xl max-w-4xl max-h-[90vh] overflow-y-auto 
+    [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+    
+    <DialogHeader>
+      <DialogTitle className="text-xl">Create New Order</DialogTitle>
+      <DialogDescription>Fill in the details to create a new order</DialogDescription>
+    </DialogHeader>
+
+    <div className="space-y-6 py-2">
+      {/* Student Information */}
+      <div className="bg-white border-0 shadow-sm rounded-xl p-5">
+        <h3 className="text-base font-semibold text-slate-800 mb-4">Student Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Student Name *</Label>
+            <div className="relative mt-1.5">
+              <Input
+                value={orderForm.studentName}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setOrderForm({ ...orderForm, studentName: value });
+                  if (value.length > 0) {
+                    const filteredLeads = leads.filter(lead =>
+                      lead.name.toLowerCase().includes(value.toLowerCase()) ||
+                      lead.phone.includes(value) ||
+                      lead.leadId.toString().includes(value)
+                    );
+                    setFilteredLeads(filteredLeads.slice(0, 5));
+                    setShowLeadSuggestions(true);
+                  } else {
+                    setShowLeadSuggestions(false);
+                  }
+                }}
+                onFocus={() => {
+                  if (orderForm.studentName.length > 0) {
+                    const filteredLeads = leads.filter(lead =>
+                      lead.name.toLowerCase().includes(orderForm.studentName.toLowerCase()) ||
+                      lead.phone.includes(orderForm.studentName) ||
+                      lead.leadId.toString().includes(orderForm.studentName)
+                    );
+                    setFilteredLeads(filteredLeads.slice(0, 5));
+                    setShowLeadSuggestions(true);
+                  }
+                }}
+                placeholder="Type student name to search leads..."
+                className="rounded-xl border-slate-200"
+              />
+              {showLeadSuggestions && filteredLeads.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                  {filteredLeads.map((lead) => (
+                    <div
+                      key={lead._id}
+                      className="px-4 py-3 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors"
+                      onClick={() => {
+                        handleLeadSelectFromSearch(lead);
+                        setShowLeadSuggestions(false);
+                        setFilteredLeads([]);
+                      }}
+                    >
+                      <div className="font-medium text-sm">{lead.name}</div>
+                      <div className="text-xs text-slate-400">{lead.phone} | ID: {lead.leadId}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
+          </div>
 
-            {/* Filters Panel */}
-            {showFilters && (
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Search</Label>
-                                    <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                        <Input
-                                            placeholder="Search by name, email, phone..."
-                                            value={filters.search}
-                                            onChange={(e) => handleFilterChange('search', e.target.value)}
-                                            className="pl-10"
-                                        />
-                                    </div>
-                                </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Father's Name</Label>
+            <Input
+              value={orderForm.fatherName}
+              onChange={(e) => setOrderForm({ ...orderForm, fatherName: e.target.value })}
+              placeholder="Enter father's name"
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Mobile Number *</Label>
+            <Input
+              value={orderForm.mobile}
+              onChange={(e) => setOrderForm({ ...orderForm, mobile: e.target.value })}
+              placeholder="Enter mobile number"
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Email *</Label>
+            <Input
+              type="email"
+              value={orderForm.email}
+              onChange={(e) => setOrderForm({ ...orderForm, email: e.target.value })}
+              placeholder="Enter email address"
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Date of Birth</Label>
+            <Input
+              type="date"
+              value={orderForm.dob}
+              onChange={(e) => setOrderForm({ ...orderForm, dob: e.target.value })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Education</Label>
+            <Input
+              value={orderForm.education}
+              onChange={(e) => setOrderForm({ ...orderForm, education: e.target.value })}
+              placeholder="Enter education qualification"
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Address</Label>
+            <Input
+              value={orderForm.address}
+              onChange={(e) => setOrderForm({ ...orderForm, address: e.target.value })}
+              placeholder="Enter address"
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">City</Label>
+            <Input
+              value={orderForm.city}
+              onChange={(e) => setOrderForm({ ...orderForm, city: e.target.value })}
+              placeholder="Enter city"
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">State</Label>
+            <Input
+              value={orderForm.state}
+              onChange={(e) => setOrderForm({ ...orderForm, state: e.target.value })}
+              placeholder="Enter state"
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+        </div>
+      </div>
 
-                                <div className="space-y-2">
-                                    <Label>Payment Mode</Label>
-                                    <Select
-                                        value={filters.paymentMode}
-                                        onValueChange={(value) => handleFilterChange('paymentMode', value)}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="All Modes" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">All</SelectItem>
-                                            <SelectItem value="Lumpsum">Lumpsum</SelectItem>
-                                            <SelectItem value="Loan">Loan</SelectItem>
-                                            <SelectItem value="Subscription">Subscription</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Status</Label>
-                                    <Select
-                                        value={filters.status}
-                                        onValueChange={(value) => handleFilterChange('status', value)}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="All Status" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">All</SelectItem>
-                                            <SelectItem value="Fully Paid">Fully Paid</SelectItem>
-                                            <SelectItem value="Partially Paid">Partially Paid</SelectItem>
-                                            <SelectItem value="Pending">Pending</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Date Filter</Label>
-                                    <Select
-                                        value={filters.dateFilter}
-                                        onValueChange={(value) => handleFilterChange('dateFilter', value)}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">All Time</SelectItem>
-                                            <SelectItem value="today">Today</SelectItem>
-                                            <SelectItem value="week">This Week</SelectItem>
-                                            <SelectItem value="month">This Month</SelectItem>
-                                            <SelectItem value="year">This Year</SelectItem>
-                                            <SelectItem value="custom">Custom Range</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                {filters.dateFilter === 'custom' && (
-                                    <>
-                                        <div className="space-y-2">
-                                            <Label>From Date</Label>
-                                            <Input
-                                                type="date"
-                                                value={filters.fromDate}
-                                                onChange={(e) => handleFilterChange('fromDate', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>To Date</Label>
-                                            <Input
-                                                type="date"
-                                                value={filters.toDate}
-                                                onChange={(e) => handleFilterChange('toDate', e.target.value)}
-                                            />
-                                        </div>
-                                    </>
-                                )}
-
-                                {filters.groupFilter && (
-                                    <div className="space-y-2">
-                                        <Label>Counsellor</Label>
-                                        <SearchableDropdown
-                                            options={[
-                                                { value: 'all', label: 'All Counsellors' },
-                                                ...counsellors.map(counsellor => ({
-                                                    value: counsellor._id,
-                                                    label: counsellor.name,
-                                                    empId: counsellor.employeeId
-                                                }))
-                                            ]}
-                                            value={filters.counsellorId}
-                                            onValueChange={(value) => handleFilterChange('counsellorId', value)}
-                                            placeholder="Select counsellor"
-                                            searchPlaceholder="Search by name, email or ID..."
-                                            emptyMessage="No counsellors found"
-                                            disabled={loadingCounsellors}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Active Filters Display */}
-                            <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
-                                <span className="text-xs text-muted-foreground">Active filters:</span>
-                                {filters.paymentMode !== 'all' && (
-                                    <Badge variant="secondary" className="text-xs">
-                                        Payment: {filters.paymentMode}
-                                    </Badge>
-                                )}
-                                {filters.status !== 'all' && (
-                                    <Badge variant="secondary" className="text-xs">
-                                        Status: {filters.status}
-                                    </Badge>
-                                )}
-                                {filters.dateFilter !== 'all' && filters.dateFilter !== 'custom' && (
-                                    <Badge variant="secondary" className="text-xs">
-                                        Date: {filters.dateFilter}
-                                    </Badge>
-                                )}
-
-                                {filters.groupFilter && (
-                                    <Badge variant="secondary" className="text-xs">
-                                        Group View: {filters.counsellorId !== 'all' ?
-                                            `Counsellor: ${counsellors.find(c => c._id === filters.counsellorId)?.name || filters.counsellorId}` :
-                                            'All Counsellors'}
-                                    </Badge>
-                                )}
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Orders Table */}
-            <Card>
-                <CardHeader className="py-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            Orders
-                            <Badge variant="outline" className="ml-2">
-                                {totalOrders} total
-                            </Badge>
-                            {loading && <Loader2 className="w-3 h-3 animate-spin ml-2" />}
-                        </CardTitle>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                            <div className="text-sm text-muted-foreground">
-                                Page {filters.page} of {totalPages}
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={() => handleFilterChange('page', Math.max(1, filters.page - 1))}
-                                    disabled={filters.page === 1 || loading}
-                                    className="h-8 w-8"
-                                >
-                                    <ChevronLeft className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={() => handleFilterChange('page', Math.min(totalPages, filters.page + 1))}
-                                    disabled={filters.page === totalPages || loading}
-                                    className="h-8 w-8"
-                                >
-                                    <ChevronRight className="h-4 w-4" />
-                                </Button>
-                            </div>
-                            <Select
-                                value={filters.limit.toString()}
-                                onValueChange={(value) => {
-                                    handleFilterChange('limit', parseInt(value));
-                                    handleFilterChange('page', 1);
-                                }}
-                            >
-                                <SelectTrigger className="w-20 h-8">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="10">10</SelectItem>
-                                    <SelectItem value="25">25</SelectItem>
-                                    <SelectItem value="50">50</SelectItem>
-                                    <SelectItem value="100">100</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+      {/* Course Information */}
+      <div className="bg-white border-0 shadow-sm rounded-xl p-5">
+        <h3 className="text-base font-semibold text-slate-800 mb-4">Course Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Pool (Course Vertical)</Label>
+            <Select
+              value={orderForm.courseVertical}
+              onValueChange={(value) => setOrderForm({ ...orderForm, courseVertical: value })}
+            >
+              <SelectTrigger className="mt-1.5 rounded-xl">
+                <SelectValue placeholder="Select pool" />
+              </SelectTrigger>
+              <SelectContent>
+                {pools.map((pool) => (
+                  <SelectItem key={pool._id} value={pool._id}>{pool.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Select Course *</Label>
+            <div className="relative mt-1.5">
+              <Input
+                value={orderForm.courseName}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setOrderForm({ ...orderForm, courseName: value });
+                  if (value.length > 0) {
+                    const filteredCourses = courses.filter(course =>
+                      course.courseName.toLowerCase().includes(value.toLowerCase())
+                    );
+                    setFilteredCourses(filteredCourses.slice(0, 5));
+                    setShowCourseSuggestions(true);
+                  } else {
+                    setShowCourseSuggestions(false);
+                  }
+                }}
+                onFocus={() => {
+                  if (orderForm.courseName.length > 0) {
+                    const filteredCourses = courses.filter(course =>
+                      course.courseName.toLowerCase().includes(orderForm.courseName.toLowerCase())
+                    );
+                    setFilteredCourses(filteredCourses.slice(0, 5));
+                    setShowCourseSuggestions(true);
+                  }
+                }}
+                placeholder="Type course name to search..."
+                className="rounded-xl border-slate-200"
+              />
+              {showCourseSuggestions && filteredCourses.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                  {filteredCourses.map((course) => (
+                    <div
+                      key={course._id}
+                      className="px-4 py-3 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors"
+                      onClick={() => {
+                        handleCourseSelectFromSearch(course);
+                        setShowCourseSuggestions(false);
+                        setFilteredCourses([]);
+                      }}
+                    >
+                      <div className="font-medium text-sm">{course.courseName}</div>
+                      <div className="text-xs text-slate-400">
+                        Duration: {course.courseDuration} days | Fee: {formatCurrency(course.totalFee)}
+                      </div>
                     </div>
-                </CardHeader>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Course Name</Label>
+            <Input
+              value={orderForm.courseName}
+              onChange={(e) => setOrderForm({ ...orderForm, courseName: e.target.value })}
+              placeholder="Course name"
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Course Duration (days)</Label>
+            <Input
+              value={orderForm.courseDuration}
+              onChange={(e) => setOrderForm({ ...orderForm, courseDuration: e.target.value })}
+              placeholder="Duration in days"
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Total Fee *</Label>
+            <Input
+              type="number"
+              value={orderForm.totalFee}
+              onChange={(e) => setOrderForm({ ...orderForm, totalFee: parseInt(e.target.value) || 0 })}
+              placeholder="Total fee amount"
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Discount</Label>
+            <Input
+              type="number"
+              value={orderForm.discount}
+              onChange={(e) => setOrderForm({ ...orderForm, discount: parseInt(e.target.value) || 0 })}
+              placeholder="Discount amount"
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+        </div>
 
-                <CardContent className="p-0">
-                    {loading ? (
-                        <div className="text-center py-12">
-                            <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
-                            <p className="mt-2 text-muted-foreground">Loading orders...</p>
-                        </div>
-                    ) : orders.length === 0 ? (
-                        <div className="text-center py-12">
-                            <DollarSign className="w-12 h-12 mx-auto text-muted-foreground" />
-                            <h3 className="mt-4 text-lg font-semibold">No orders found</h3>
-                            <p className="text-muted-foreground">Try adjusting your filters or create a new order</p>
-                        </div>
+        {/* GST Section */}
+        <div className="border-t border-slate-100 mt-4 pt-4">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={() => setOrderForm({ ...orderForm, GSTEnabled: !orderForm.GSTEnabled })}
+            >
+              <div className={`w-4 h-4 rounded border ${orderForm.GSTEnabled ? 'bg-orange-600 border-orange-600' : 'border-slate-300'} flex items-center justify-center transition-all`}>
+                {orderForm.GSTEnabled && <div className="w-2 h-2 bg-white rounded-sm" />}
+              </div>
+              <span className="text-sm font-medium text-slate-700">Enable GST</span>
+            </div>
+          </div>
+          {orderForm.GSTEnabled && (
+            <div className="mt-3">
+              <Label className="text-xs font-semibold text-slate-500 uppercase">GST Amount</Label>
+              <Input
+                type="number"
+                value={orderForm.GSTAmount}
+                onChange={(e) => setOrderForm({ ...orderForm, GSTAmount: parseInt(e.target.value) || 0 })}
+                placeholder="Enter GST amount"
+                className="mt-1.5 rounded-xl border-slate-200"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                This amount will be added to the final fee
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-slate-50 rounded-xl p-4 mt-4">
+          <p className="text-xs font-semibold text-slate-500 uppercase">Final Fee</p>
+          <p className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(calculateFinalFee())}</p>
+          {orderForm.GSTEnabled && orderForm.GSTAmount && (
+            <p className="text-xs text-slate-400 mt-1">Including GST: {formatCurrency(orderForm.GSTAmount)}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Payment Information */}
+      <div className="bg-white border-0 shadow-sm rounded-xl p-5">
+        <h3 className="text-base font-semibold text-slate-800 mb-4">Payment Information</h3>
+        <div>
+          <Label className="text-xs font-semibold text-slate-500 uppercase">Payment Mode *</Label>
+          <Select
+            value={orderForm.paymentMode}
+            onValueChange={(value) => setOrderForm({ ...orderForm, paymentMode: value })}
+          >
+            <SelectTrigger className="mt-1.5 rounded-xl">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Lumpsum">Lumpsum</SelectItem>
+              <SelectItem value="Loan">Loan</SelectItem>
+              <SelectItem value="Subscription">Subscription</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {orderForm.paymentMode === 'Lumpsum' && orderForm.lumpsumDetails && (
+          <div className="border-t border-slate-100 mt-4 pt-4">
+            <h4 className="text-sm font-medium text-slate-700 mb-3">Lumpsum Details</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Registration Date</Label>
+                <Input
+                  type="datetime-local"
+                  value={orderForm.lumpsumDetails.registrationDate}
+                  onChange={(e) => setOrderForm({
+                    ...orderForm,
+                    lumpsumDetails: { ...orderForm.lumpsumDetails!, registrationDate: e.target.value }
+                  })}
+                  className="mt-1.5 rounded-xl border-slate-200"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Registration Amount</Label>
+                <Input
+                  type="number"
+                  value={orderForm.lumpsumDetails.registrationAmount}
+                  onChange={(e) => setOrderForm({
+                    ...orderForm,
+                    lumpsumDetails: { ...orderForm.lumpsumDetails!, registrationAmount: parseInt(e.target.value) || 0 }
+                  })}
+                  className="mt-1.5 rounded-xl border-slate-200"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Total Received</Label>
+                <Input
+                  type="number"
+                  value={orderForm.lumpsumDetails.totalReceived}
+                  onChange={(e) => setOrderForm({
+                    ...orderForm,
+                    lumpsumDetails: { ...orderForm.lumpsumDetails!, totalReceived: parseInt(e.target.value) || 0 }
+                  })}
+                  className="mt-1.5 rounded-xl border-slate-200"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Payment Type</Label>
+                <Select
+                  value={orderForm.lumpsumDetails.paymentType}
+                  onValueChange={(value) => setOrderForm({
+                    ...orderForm,
+                    lumpsumDetails: { ...orderForm.lumpsumDetails!, paymentType: value }
+                  })}
+                >
+                  <SelectTrigger className="mt-1.5 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UPI">UPI</SelectItem>
+                    <SelectItem value="Card">Card</SelectItem>
+                    <SelectItem value="Net Banking">Net Banking</SelectItem>
+                    <SelectItem value="Cash">Cash</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {orderForm.paymentMode === 'Loan' && orderForm.loanDetails && (
+          <div className="border-t border-slate-100 mt-4 pt-4">
+            <h4 className="text-sm font-medium text-slate-700 mb-3">Loan Details</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Loan Partner *</Label>
+                <Select
+                  value={orderForm.loanDetails.loanPartner}
+                  onValueChange={(value) => setOrderForm({
+                    ...orderForm,
+                    loanDetails: { ...orderForm.loanDetails!, loanPartner: value }
+                  })}
+                >
+                  <SelectTrigger className="mt-1.5 rounded-xl">
+                    <SelectValue placeholder="Select loan partner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingLoanPartners ? (
+                      <div className="flex items-center justify-center py-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      </div>
+                    ) : loanPartners.length === 0 ? (
+                      <div className="px-2 py-2 text-sm text-slate-400">No loan partners available</div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="bg-muted/50">
-                                        <TableHead className="whitespace-nowrap">Order ID</TableHead>
-                                        <TableHead className="whitespace-nowrap">Student</TableHead>
-                                        <TableHead className="whitespace-nowrap">Course</TableHead>
-                                        <TableHead className="whitespace-nowrap">Amount</TableHead>
-                                        <TableHead className="whitespace-nowrap">Payment Mode</TableHead>
-                                        <TableHead className="whitespace-nowrap">Status</TableHead>
-                                        <TableHead className="whitespace-nowrap">Approval</TableHead>
-                                        <TableHead className="whitespace-nowrap">Order Date</TableHead>
-                                        <TableHead className="whitespace-nowrap">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {orders.map((order) => (
-                                        <TableRow key={order._id} className="hover:bg-muted/50">
-                                            <TableCell className="whitespace-nowrap">
-                                                <span className="font-mono text-xs">{order._id.slice(-8)}</span>
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap">
-                                                <div className="font-medium">{order.studentName}</div>
-                                                <div className="text-xs text-muted-foreground">{order.mobile}</div>
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap">
-                                                <div className="text-sm">{order.courseName}</div>
-                                                <div className="text-xs text-muted-foreground">{order.courseDuration} days</div>
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap">
-                                                <div className="font-medium">{formatCurrency(order.finalFee)}</div>
-                                                <div className="text-xs text-muted-foreground line-through">
-                                                    {order.discount > 0 && formatCurrency(order.totalFee)}
-                                                </div>
-                                                {order.GSTEnabled && order.GSTAmount && (
-                                                    <div className="text-xs text-muted-foreground">
-                                                        +GST: {formatCurrency(order.GSTAmount)}
-                                                    </div>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap">
-                                                <Badge variant="outline">{order.paymentMode}</Badge>
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap">
-                                                {getStatusBadge(order.status, order.Approved)}
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap">
-                                                {order.Approved ? (
-                                                    <Badge className="bg-green-100 text-green-700 border-green-200 flex items-center gap-1">
-                                                        <CheckCircle2 className="w-3 h-3" />
-                                                        Approved
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 flex items-center gap-1">
-                                                        <XCircle className="w-3 h-3" />
-                                                        Pending
-                                                    </Badge>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap">
-                                                <div className="text-sm">{formatDate(order.orderDate)}</div>
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap">
-                                                <div className="flex items-center gap-2">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleViewOrder(order)}
-                                                        className="h-8 w-8 p-0"
-                                                        title="View Details"
-                                                    >
-                                                        <Eye className="w-4 h-4" />
-                                                    </Button>
-                                                    {hasPermission(permissions, 'orders', 'read_loans') &&
-                                                        (!order.Approved && (
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => handleEditOrder(order)}
-                                                                className="h-8 w-8 p-0"
-                                                                title="Edit Order"
-                                                            >
-                                                                <Edit className="w-4 h-4" />
-                                                            </Button>
-                                                        ))
-                                                    }
-                                                    {hasPermission(permissions, 'orders', 'approve') &&
-                                                    (!order.Approved && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleApproveOrder(order._id, order.Approved)}
-                                                            className="h-8 w-8 p-0"
-                                                            title={order.Approved ? "Unapprove Order" : "Approve Order"}
-                                                            disabled={approvingOrder}
-                                                        >
-
-                                                            <ShieldCheck className="w-4 h-4 text-green-500" />
-
-                                                        </Button>
-                                                    ))}
-                                                    {order.Approved && order.paymentMode === 'Subscription' && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleSubscriptionAction(order)}
-                                                            className="h-8 w-8 p-0"
-                                                            title={order.subscriptionDetails?.cashfreeSubscriptionId?.trim() ? "Get Auth Link" : "Create Subscription"}
-                                                            disabled={subscriptionLoading}
-                                                        >
-                                                            {order.subscriptionDetails?.cashfreeSubscriptionId?.trim() ? (
-                                                                <ExternalLink className="w-4 h-4 text-blue-500" />
-                                                            ) : (
-                                                                <Receipt className="w-4 h-4 text-blue-500" />
-                                                            )}
-                                                        </Button>
-                                                    )}
-                                                    {hasPermission(permissions, 'orders', 'payment_link_generator') &&
-                                                    (order.paymentMode === 'Lumpsum' && order.Approved && order.status !== 'Fully Paid' && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handlePaymentModal(order)}
-                                                            className="h-8 w-8 p-0"
-                                                            title="Generate Payment Link"
-                                                        >
-                                                            <CreditCard className="w-4 h-4" />
-                                                        </Button>
-                                                    ))}
-                                                    {hasPermission(permissions, 'orders', 'read_payment_history') &&
-                                                    (order.paymentMode === 'Lumpsum' && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handlePaymentHistory(order)}
-                                                            className="h-8 w-8 p-0"
-                                                            title="View Payment History"
-                                                        >
-                                                            <Receipt className="w-4 h-4" />
-                                                        </Button>
-                                                    ))}
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
+                      loanPartners.map((partner) => (
+                        <SelectItem key={partner._id} value={partner._id}>
+                          {partner.name}
+                          <span className="ml-2 text-xs text-slate-400">
+                            Type: {partner.type} | Charge: {partner.submissionCharge}%
+                          </span>
+                        </SelectItem>
+                      ))
                     )}
-                </CardContent>
-            </Card>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Loan Amount</Label>
+                <Input
+                  type="number"
+                  value={orderForm.loanDetails.loanAmount}
+                  onChange={(e) => setOrderForm({
+                    ...orderForm,
+                    loanDetails: { ...orderForm.loanDetails!, loanAmount: parseInt(e.target.value) || 0 }
+                  })}
+                  placeholder="Enter loan amount"
+                  className="mt-1.5 rounded-xl border-slate-200"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Disbursement Amount</Label>
+                <Input
+                  type="number"
+                  value={orderForm.loanDetails.disbursementAmount}
+                  onChange={(e) => setOrderForm({
+                    ...orderForm,
+                    loanDetails: { ...orderForm.loanDetails!, disbursementAmount: parseInt(e.target.value) || 0 }
+                  })}
+                  placeholder="Enter disbursement amount"
+                  className="mt-1.5 rounded-xl border-slate-200"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">First EMI Date</Label>
+                <Input
+                  type="datetime-local"
+                  value={orderForm.loanDetails.firstEmiDate}
+                  onChange={(e) => setOrderForm({
+                    ...orderForm,
+                    loanDetails: { ...orderForm.loanDetails!, firstEmiDate: e.target.value }
+                  })}
+                  className="mt-1.5 rounded-xl border-slate-200"
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
-            {/* Create Order Modal */}
-            <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-                <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-                    <DialogHeader>
-                        <DialogTitle>Create New Order</DialogTitle>
-                        <DialogDescription>Fill in the details to create a new order</DialogDescription>
-                    </DialogHeader>
+        {orderForm.paymentMode === 'Subscription' && orderForm.subscriptionDetails && (
+          <div className="border-t border-slate-100 mt-4 pt-4">
+            <h4 className="text-sm font-medium text-slate-700 mb-3">Subscription Details</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Gateway</Label>
+                <Select
+                  value={orderForm.subscriptionDetails.gateway}
+                  onValueChange={(value) => setOrderForm({
+                    ...orderForm,
+                    subscriptionDetails: { ...orderForm.subscriptionDetails!, gateway: value }
+                  })}
+                >
+                  <SelectTrigger className="mt-1.5 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Cashfree">Cashfree</SelectItem>
+                    <SelectItem value="Razorpay">Razorpay</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Installment Amount</Label>
+                <Input
+                  type="number"
+                  value={orderForm.subscriptionDetails.installmentAmount}
+                  onChange={(e) => setOrderForm({
+                    ...orderForm,
+                    subscriptionDetails: { ...orderForm.subscriptionDetails!, installmentAmount: parseInt(e.target.value) || 0 }
+                  })}
+                  className="mt-1.5 rounded-xl border-slate-200"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Number of Installments</Label>
+                <Input
+                  type="number"
+                  value={orderForm.subscriptionDetails.numberOfInstallments}
+                  onChange={(e) => setOrderForm({
+                    ...orderForm,
+                    subscriptionDetails: { ...orderForm.subscriptionDetails!, numberOfInstallments: parseInt(e.target.value) || 1 }
+                  })}
+                  className="mt-1.5 rounded-xl border-slate-200"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">First Installment Date</Label>
+                <Input
+                  type="datetime-local"
+                  value={orderForm.subscriptionDetails.firstInstallmentDate}
+                  onChange={(e) => setOrderForm({
+                    ...orderForm,
+                    subscriptionDetails: { ...orderForm.subscriptionDetails!, firstInstallmentDate: e.target.value }
+                  })}
+                  className="mt-1.5 rounded-xl border-slate-200"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Last Installment Date</Label>
+                <Input
+                  type="datetime-local"
+                  value={orderForm.subscriptionDetails.lastInstallmentDate}
+                  onChange={(e) => setOrderForm({
+                    ...orderForm,
+                    subscriptionDetails: { ...orderForm.subscriptionDetails!, lastInstallmentDate: e.target.value }
+                  })}
+                  className="mt-1.5 rounded-xl border-slate-200"
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
-                    <div className="overflow-y-auto flex-1 py-4">
-                        <div className="space-y-6">
-                            {/* Student Information */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">Student Information</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Student Name *</Label>
-                                            <div className="relative">
-                                                <Input
-                                                    value={orderForm.studentName}
-                                                    onChange={(e) => {
-                                                        const value = e.target.value;
-                                                        setOrderForm({ ...orderForm, studentName: value });
-                                                        if (value.length > 0) {
-                                                            const filteredLeads = leads.filter(lead =>
-                                                                lead.name.toLowerCase().includes(value.toLowerCase()) ||
-                                                                lead.phone.includes(value) ||
-                                                                lead.leadId.toString().includes(value)
-                                                            );
-                                                            setFilteredLeads(filteredLeads.slice(0, 5));
-                                                            setShowLeadSuggestions(true);
-                                                        } else {
-                                                            setShowLeadSuggestions(false);
-                                                        }
-                                                    }}
-                                                    onFocus={() => {
-                                                        if (orderForm.studentName.length > 0) {
-                                                            const filteredLeads = leads.filter(lead =>
-                                                                lead.name.toLowerCase().includes(orderForm.studentName.toLowerCase()) ||
-                                                                lead.phone.includes(orderForm.studentName) ||
-                                                                lead.leadId.toString().includes(orderForm.studentName)
-                                                            );
-                                                            setFilteredLeads(filteredLeads.slice(0, 5));
-                                                            setShowLeadSuggestions(true);
-                                                        }
-                                                    }}
-                                                    placeholder="Type student name to search leads..."
-                                                />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Order Date</Label>
+            <Input
+              type="datetime-local"
+              value={orderForm.orderDate}
+              onChange={(e) => setOrderForm({ ...orderForm, orderDate: e.target.value })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+        </div>
 
-                                                {showLeadSuggestions && filteredLeads.length > 0 && (
-                                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                                                        {filteredLeads.map((lead) => (
-                                                            <div
-                                                                key={lead._id}
-                                                                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                                                                onClick={() => {
-                                                                    handleLeadSelectFromSearch(lead);
-                                                                    setShowLeadSuggestions(false);
-                                                                    setFilteredLeads([]);
-                                                                }}
-                                                            >
-                                                                <div className="font-medium">{lead.name}</div>
-                                                                <div className="text-sm text-gray-500">
-                                                                    {lead.phone} | ID: {lead.leadId}
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Father's Name</Label>
-                                            <Input
-                                                value={orderForm.fatherName}
-                                                onChange={(e) => setOrderForm({ ...orderForm, fatherName: e.target.value })}
-                                                placeholder="Enter father's name"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Mobile Number *</Label>
-                                            <Input
-                                                value={orderForm.mobile}
-                                                onChange={(e) => setOrderForm({ ...orderForm, mobile: e.target.value })}
-                                                placeholder="Enter mobile number"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Email *</Label>
-                                            <Input
-                                                type="email"
-                                                value={orderForm.email}
-                                                onChange={(e) => setOrderForm({ ...orderForm, email: e.target.value })}
-                                                placeholder="Enter email address"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Date of Birth</Label>
-                                            <Input
-                                                type="date"
-                                                value={orderForm.dob}
-                                                onChange={(e) => setOrderForm({ ...orderForm, dob: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Education</Label>
-                                            <Input
-                                                value={orderForm.education}
-                                                onChange={(e) => setOrderForm({ ...orderForm, education: e.target.value })}
-                                                placeholder="Enter education qualification"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Address</Label>
-                                            <Input
-                                                value={orderForm.address}
-                                                onChange={(e) => setOrderForm({ ...orderForm, address: e.target.value })}
-                                                placeholder="Enter address"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>City</Label>
-                                            <Input
-                                                value={orderForm.city}
-                                                onChange={(e) => setOrderForm({ ...orderForm, city: e.target.value })}
-                                                placeholder="Enter city"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>State</Label>
-                                            <Input
-                                                value={orderForm.state}
-                                                onChange={(e) => setOrderForm({ ...orderForm, state: e.target.value })}
-                                                placeholder="Enter state"
-                                            />
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
+        <div className="mt-4">
+          <Label className="text-xs font-semibold text-slate-500 uppercase">Remarks</Label>
+          <Textarea
+            value={orderForm.remarks}
+            onChange={(e) => setOrderForm({ ...orderForm, remarks: e.target.value })}
+            placeholder="Add any remarks or notes..."
+            rows={3}
+            className="mt-1.5 rounded-xl border-slate-200"
+          />
+        </div>
+      </div>
+    </div>
 
-                            {/* Course Information */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">Course Information</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label>Pool (Course Vertical)</Label>
-                                        <Select
-                                            value={orderForm.courseVertical}
-                                            onValueChange={(value) => setOrderForm({ ...orderForm, courseVertical: value })}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select pool" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {pools.map((pool) => (
-                                                    <SelectItem key={pool._id} value={pool._id}>
-                                                        {pool.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Select Course *</Label>
-                                        <div className="relative">
-                                            <Input
-                                                value={orderForm.courseName}
-                                                onChange={(e) => {
-                                                    const value = e.target.value;
-                                                    setOrderForm({ ...orderForm, courseName: value });
-                                                    if (value.length > 0) {
-                                                        const filteredCourses = courses.filter(course =>
-                                                            course.courseName.toLowerCase().includes(value.toLowerCase())
-                                                        );
-                                                        setFilteredCourses(filteredCourses.slice(0, 5));
-                                                        setShowCourseSuggestions(true);
-                                                    } else {
-                                                        setShowCourseSuggestions(false);
-                                                    }
-                                                }}
-                                                onFocus={() => {
-                                                    if (orderForm.courseName.length > 0) {
-                                                        const filteredCourses = courses.filter(course =>
-                                                            course.courseName.toLowerCase().includes(orderForm.courseName.toLowerCase())
-                                                        );
-                                                        setFilteredCourses(filteredCourses.slice(0, 5));
-                                                        setShowCourseSuggestions(true);
-                                                    }
-                                                }}
-                                                placeholder="Type course name to search..."
-                                            />
-
-                                            {showCourseSuggestions && filteredCourses.length > 0 && (
-                                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                                                    {filteredCourses.map((course) => (
-                                                        <div
-                                                            key={course._id}
-                                                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                                                            onClick={() => {
-                                                                handleCourseSelectFromSearch(course);
-                                                                setShowCourseSuggestions(false);
-                                                                setFilteredCourses([]);
-                                                            }}
-                                                        >
-                                                            <div className="font-medium">{course.courseName}</div>
-                                                            <div className="text-sm text-gray-500">
-                                                                Duration: {course.courseDuration} days | Fee: {formatCurrency(course.totalFee)}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Course Name</Label>
-                                            <Input
-                                                value={orderForm.courseName}
-                                                onChange={(e) => setOrderForm({ ...orderForm, courseName: e.target.value })}
-                                                placeholder="Course name"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Course Duration (days)</Label>
-                                            <Input
-                                                value={orderForm.courseDuration}
-                                                onChange={(e) => setOrderForm({ ...orderForm, courseDuration: e.target.value })}
-                                                placeholder="Duration in days"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Total Fee *</Label>
-                                            <Input
-                                                type="number"
-                                                value={orderForm.totalFee}
-                                                onChange={(e) => setOrderForm({ ...orderForm, totalFee: parseInt(e.target.value) || 0 })}
-                                                placeholder="Total fee amount"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Discount</Label>
-                                            <Input
-                                                type="number"
-                                                value={orderForm.discount}
-                                                onChange={(e) => setOrderForm({ ...orderForm, discount: parseInt(e.target.value) || 0 })}
-                                                placeholder="Discount amount"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* GST Section */}
-                                    <div className="space-y-4 border-t pt-4">
-                                        <div className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id="gst-enabled"
-                                                checked={orderForm.GSTEnabled}
-                                                onCheckedChange={(checked) => setOrderForm({ ...orderForm, GSTEnabled: checked as boolean })}
-                                            />
-                                            <Label htmlFor="gst-enabled" className="text-sm font-medium cursor-pointer">
-                                                Enable GST
-                                            </Label>
-                                        </div>
-
-                                        {orderForm.GSTEnabled && (
-                                            <div className="space-y-2">
-                                                <Label>GST Amount</Label>
-                                                <Input
-                                                    type="number"
-                                                    value={orderForm.GSTAmount}
-                                                    onChange={(e) => setOrderForm({ ...orderForm, GSTAmount: parseInt(e.target.value) || 0 })}
-                                                    placeholder="Enter GST amount"
-                                                />
-                                                <p className="text-xs text-muted-foreground">
-                                                    This amount will be added to the final fee
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="bg-muted/30 p-3 rounded-lg">
-                                        <Label className="text-sm font-medium">Final Fee</Label>
-                                        <div className="text-2xl font-bold text-primary mt-1">
-                                            {formatCurrency(calculateFinalFee())}
-                                        </div>
-                                        {orderForm.GSTEnabled && orderForm.GSTAmount && (
-                                            <div className="text-xs text-muted-foreground mt-1">
-                                                Including GST: {formatCurrency(orderForm.GSTAmount)}
-                                            </div>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Payment Information */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">Payment Information</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label>Payment Mode *</Label>
-                                        <Select
-                                            value={orderForm.paymentMode}
-                                            onValueChange={(value) => setOrderForm({ ...orderForm, paymentMode: value })}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Lumpsum">Lumpsum</SelectItem>
-                                                <SelectItem value="Loan">Loan</SelectItem>
-                                                <SelectItem value="Subscription">Subscription</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    {orderForm.paymentMode === 'Lumpsum' && orderForm.lumpsumDetails && (
-                                        <div className="space-y-4 border-t pt-4">
-                                            <h3 className="font-medium">Lumpsum Details</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <Label>Registration Date</Label>
-                                                    <Input
-                                                        type="datetime-local"
-                                                        value={orderForm.lumpsumDetails.registrationDate}
-                                                        onChange={(e) => setOrderForm({
-                                                            ...orderForm,
-                                                            lumpsumDetails: { ...orderForm.lumpsumDetails!, registrationDate: e.target.value }
-                                                        })}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Registration Amount</Label>
-                                                    <Input
-                                                        type="number"
-                                                        value={orderForm.lumpsumDetails.registrationAmount}
-                                                        onChange={(e) => setOrderForm({
-                                                            ...orderForm,
-                                                            lumpsumDetails: { ...orderForm.lumpsumDetails!, registrationAmount: parseInt(e.target.value) || 0 }
-                                                        })}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Total Received</Label>
-                                                    <Input
-                                                        type="number"
-                                                        value={orderForm.lumpsumDetails.totalReceived}
-                                                        onChange={(e) => setOrderForm({
-                                                            ...orderForm,
-                                                            lumpsumDetails: { ...orderForm.lumpsumDetails!, totalReceived: parseInt(e.target.value) || 0 }
-                                                        })}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Payment Type</Label>
-                                                    <Select
-                                                        value={orderForm.lumpsumDetails.paymentType}
-                                                        onValueChange={(value) => setOrderForm({
-                                                            ...orderForm,
-                                                            lumpsumDetails: { ...orderForm.lumpsumDetails!, paymentType: value }
-                                                        })}
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="UPI">UPI</SelectItem>
-                                                            <SelectItem value="Card">Card</SelectItem>
-                                                            <SelectItem value="Net Banking">Net Banking</SelectItem>
-                                                            <SelectItem value="Cash">Cash</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {orderForm.paymentMode === 'Loan' && orderForm.loanDetails && (
-                                        <div className="space-y-4 border-t pt-4">
-                                            <h3 className="font-medium">Loan Details</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <Label>Loan Partner *</Label>
-                                                    <Select
-                                                        value={orderForm.loanDetails.loanPartner}
-                                                        onValueChange={(value) => setOrderForm({
-                                                            ...orderForm,
-                                                            loanDetails: { ...orderForm.loanDetails!, loanPartner: value }
-                                                        })}
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select loan partner" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {loadingLoanPartners ? (
-                                                                <div className="flex items-center justify-center py-2">
-                                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                                </div>
-                                                            ) : loanPartners.length === 0 ? (
-                                                                <div className="px-2 py-2 text-sm text-muted-foreground">
-                                                                    No loan partners available
-                                                                </div>
-                                                            ) : (
-                                                                loanPartners.map((partner) => (
-                                                                    <SelectItem key={partner._id} value={partner._id}>
-                                                                        <div className="flex flex-col">
-                                                                            <span>{partner.name}</span>
-                                                                            <span className="text-xs text-muted-foreground">
-                                                                                Type: {partner.type} | Charge: {partner.submissionCharge}%
-                                                                            </span>
-                                                                        </div>
-                                                                    </SelectItem>
-                                                                ))
-                                                            )}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Loan Amount</Label>
-                                                    <Input
-                                                        type="number"
-                                                        value={orderForm.loanDetails.loanAmount}
-                                                        onChange={(e) => setOrderForm({
-                                                            ...orderForm,
-                                                            loanDetails: { ...orderForm.loanDetails!, loanAmount: parseInt(e.target.value) || 0 }
-                                                        })}
-                                                        placeholder="Enter loan amount"
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Disbursement Amount</Label>
-                                                    <Input
-                                                        type="number"
-                                                        value={orderForm.loanDetails.disbursementAmount}
-                                                        onChange={(e) => setOrderForm({
-                                                            ...orderForm,
-                                                            loanDetails: { ...orderForm.loanDetails!, disbursementAmount: parseInt(e.target.value) || 0 }
-                                                        })}
-                                                        placeholder="Enter disbursement amount"
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>First EMI Date</Label>
-                                                    <Input
-                                                        type="datetime-local"
-                                                        value={orderForm.loanDetails.firstEmiDate}
-                                                        onChange={(e) => setOrderForm({
-                                                            ...orderForm,
-                                                            loanDetails: { ...orderForm.loanDetails!, firstEmiDate: e.target.value }
-                                                        })}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {orderForm.paymentMode === 'Subscription' && orderForm.subscriptionDetails && (
-                                        <div className="space-y-4 border-t pt-4">
-                                            <h3 className="font-medium">Subscription Details</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <Label>Gateway</Label>
-                                                    <Select
-                                                        value={orderForm.subscriptionDetails.gateway}
-                                                        onValueChange={(value) => setOrderForm({
-                                                            ...orderForm,
-                                                            subscriptionDetails: { ...orderForm.subscriptionDetails!, gateway: value }
-                                                        })}
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="Cashfree">Cashfree</SelectItem>
-                                                            <SelectItem value="Razorpay">Razorpay</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Installment Amount</Label>
-                                                    <Input
-                                                        type="number"
-                                                        value={orderForm.subscriptionDetails.installmentAmount}
-                                                        onChange={(e) => setOrderForm({
-                                                            ...orderForm,
-                                                            subscriptionDetails: { ...orderForm.subscriptionDetails!, installmentAmount: parseInt(e.target.value) || 0 }
-                                                        })}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Number of Installments</Label>
-                                                    <Input
-                                                        type="number"
-                                                        value={orderForm.subscriptionDetails.numberOfInstallments}
-                                                        onChange={(e) => setOrderForm({
-                                                            ...orderForm,
-                                                            subscriptionDetails: { ...orderForm.subscriptionDetails!, numberOfInstallments: parseInt(e.target.value) || 1 }
-                                                        })}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>First Installment Date</Label>
-                                                    <Input
-                                                        type="datetime-local"
-                                                        value={orderForm.subscriptionDetails.firstInstallmentDate}
-                                                        onChange={(e) => setOrderForm({
-                                                            ...orderForm,
-                                                            subscriptionDetails: { ...orderForm.subscriptionDetails!, firstInstallmentDate: e.target.value }
-                                                        })}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Last Installment Date</Label>
-                                                    <Input
-                                                        type="datetime-local"
-                                                        value={orderForm.subscriptionDetails.lastInstallmentDate}
-                                                        onChange={(e) => setOrderForm({
-                                                            ...orderForm,
-                                                            subscriptionDetails: { ...orderForm.subscriptionDetails!, lastInstallmentDate: e.target.value }
-                                                        })}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Order Date</Label>
-                                            <Input
-                                                type="datetime-local"
-                                                value={orderForm.orderDate}
-                                                onChange={(e) => setOrderForm({ ...orderForm, orderDate: e.target.value })}
-                                            />
-                                        </div>
-                                        {/* <div className="space-y-2">
-                                            <Label>Fee Deposit Date</Label>
-                                            <Input
-                                                type="datetime-local"
-                                                value={orderForm.feeDepositDate}
-                                                onChange={(e) => setOrderForm({ ...orderForm, feeDepositDate: e.target.value })}
-                                            />
-                                        </div> */}
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label>Remarks</Label>
-                                        <Textarea
-                                            value={orderForm.remarks}
-                                            onChange={(e) => setOrderForm({ ...orderForm, remarks: e.target.value })}
-                                            placeholder="Add any remarks or notes..."
-                                            rows={3}
-                                        />
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </div>
-
-                    <DialogFooter className="pt-4 border-t">
-                        <Button variant="outline" onClick={() => setCreateModalOpen(false)} disabled={addingOrder}>
-                            Cancel
-                        </Button>
-                        <Button onClick={handleCreateOrder} disabled={addingOrder}>
-                            {addingOrder ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Creating...
-                                </>
-                            ) : (
-                                'Create Order'
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+    <DialogFooter className="pt-4 border-t border-slate-100">
+      <Button variant="outline" onClick={() => setCreateModalOpen(false)} disabled={addingOrder} className="rounded-xl">
+        Cancel
+      </Button>
+      <Button onClick={handleCreateOrder} disabled={addingOrder} className="bg-orange-600 hover:bg-orange-700 rounded-xl">
+        {addingOrder ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Creating...
+          </>
+        ) : (
+          'Create Order'
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
             {/* View Order Modal */}
-            <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
-                <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-y-auto p-0">
-                    <DialogHeader className="sticky top-0 z-10 bg-background border-b px-6 py-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <DialogTitle className="text-2xl font-bold">Order Details</DialogTitle>
-                                <DialogDescription className="text-sm">
-                                    Complete information about the order
-                                </DialogDescription>
-                            </div>
-                            <Badge variant={selectedOrder?.Approved ? "default" : "secondary"}
-                                className={selectedOrder?.Approved ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}>
-                                {selectedOrder?.Approved ? "Approved" : "Pending Approval"}
-                            </Badge>
-                        </div>
-                    </DialogHeader>
+<Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
+  <DialogContent className="rounded-2xl max-w-4xl max-h-[80vh] overflow-y-auto 
+    [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+    
+    <DialogHeader>
+      <DialogTitle className="text-xl">Order Details</DialogTitle>
+      <DialogDescription>Complete information about the order</DialogDescription>
+    </DialogHeader>
 
-                    {selectedOrder && (
-                        <div className="px-6 py-4 space-y-6">
-                            {/* Order Summary Header */}
-                            <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg p-4 border">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div>
-                                        <p className="text-xs text-muted-foreground mb-1">Order ID</p>
-                                        <p className="font-mono text-sm font-semibold">{selectedOrder._id}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-muted-foreground mb-1">Order Date</p>
-                                        <p className="text-sm font-medium">{formatDate(selectedOrder.orderDate)}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-muted-foreground mb-1">Payment Status</p>
-                                        <Badge variant="outline" className="mt-1">
-                                            {selectedOrder.status}
-                                        </Badge>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-muted-foreground mb-1">Payment Mode</p>
-                                        <Badge variant="outline" className="mt-1">
-                                            {selectedOrder.paymentMode}
-                                        </Badge>
-                                    </div>
-                                </div>
-                            </div>
+    {selectedOrder && (
+      <div className="space-y-5">
+        {/* Order Summary Header (simple key-value rows) */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs text-slate-500 uppercase font-semibold">Order ID</p>
+            <p className="mt-1 font-mono text-sm text-slate-800">{selectedOrder._id}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 uppercase font-semibold">Order Date</p>
+            <p className="mt-1 text-slate-800">{formatDate(selectedOrder.orderDate)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 uppercase font-semibold">Payment Status</p>
+            <p className="mt-1">
+              {selectedOrder.status === 'Fully Paid' ? (
+                <span className="inline-flex items-center gap-1 text-xs text-emerald-600"><CheckCircle2 className="w-3 h-3" />Fully Paid</span>
+              ) : selectedOrder.status === 'Partially Paid' ? (
+                <span className="inline-flex items-center gap-1 text-xs text-amber-600"><Clock className="w-3 h-3" />Partially Paid</span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs text-red-600"><XCircle className="w-3 h-3" />Pending</span>
+              )}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 uppercase font-semibold">Payment Mode</p>
+            <p className="mt-1">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700">
+                {selectedOrder.paymentMode}
+              </span>
+            </p>
+          </div>
+        </div>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* Student Information */}
-                                <Card className="overflow-hidden border-2 hover:shadow-md transition-shadow">
-                                    <CardHeader className="bg-muted/30 border-b">
-                                        <CardTitle className="text-base flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                <Users className="w-4 h-4 text-primary" />
-                                            </div>
-                                            Student Information
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="pt-4">
-                                        <div className="space-y-3">
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Full Name</p>
-                                                    <p className="text-sm font-medium">{selectedOrder.studentName}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Father's Name</p>
-                                                    <p className="text-sm">{selectedOrder.fatherName || '-'}</p>
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Mobile Number</p>
-                                                    <p className="text-sm font-mono">{selectedOrder.mobile}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Email Address</p>
-                                                    <p className="text-sm truncate">{selectedOrder.email}</p>
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Date of Birth</p>
-                                                    <p className="text-sm">{formatDate(selectedOrder.dob) || '-'}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Education</p>
-                                                    <p className="text-sm">{selectedOrder.education || '-'}</p>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-muted-foreground mb-1">Address</p>
-                                                <p className="text-sm">{selectedOrder.address}, {selectedOrder.city}, {selectedOrder.state}</p>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
+        {/* Sections: Student, Course, Payment, Additional */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Student Information */}
+          <div className="bg-white rounded-xl border border-slate-100 p-5">
+            <h3 className="text-base font-semibold text-slate-800 mb-4">Student Information</h3>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">Full Name</p>
+                  <p className="text-sm text-slate-800 mt-1">{selectedOrder.studentName}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">Father's Name</p>
+                  <p className="text-sm text-slate-800 mt-1">{selectedOrder.fatherName || '—'}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">Mobile Number</p>
+                  <p className="text-sm font-mono text-slate-800 mt-1">{selectedOrder.mobile}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">Email Address</p>
+                  <p className="text-sm text-slate-800 truncate mt-1">{selectedOrder.email}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">Date of Birth</p>
+                  <p className="text-sm text-slate-800 mt-1">{formatDate(selectedOrder.dob) || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">Education</p>
+                  <p className="text-sm text-slate-800 mt-1">{selectedOrder.education || '—'}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 uppercase font-semibold">Address</p>
+                <p className="text-sm text-slate-800 mt-1">
+                  {selectedOrder.address}, {selectedOrder.city}, {selectedOrder.state}
+                </p>
+              </div>
+            </div>
+          </div>
 
-                                {/* Course Information */}
-                                <Card className="overflow-hidden border-2 hover:shadow-md transition-shadow">
-                                    <CardHeader className="bg-muted/30 border-b">
-                                        <CardTitle className="text-base flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                <BookOpen className="w-4 h-4 text-primary" />
-                                            </div>
-                                            Course Information
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="pt-4">
-                                        <div className="space-y-3">
-                                            <div>
-                                                <p className="text-xs text-muted-foreground mb-1">Course Name</p>
-                                                <p className="text-sm font-medium">{selectedOrder.courseName}</p>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Duration</p>
-                                                    <p className="text-sm">{selectedOrder.courseDuration} days</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Course Vertical</p>
-                                                    <p className="text-sm">{selectedOrder.courseVertical?.name || '-'}</p>
-                                                </div>
-                                            </div>
-                                            <div className="bg-muted/20 rounded-lg p-3 space-y-2">
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-sm text-muted-foreground">Total Fee</span>
-                                                    <span className="text-sm font-medium">{formatCurrency(selectedOrder.totalFee)}</span>
-                                                </div>
-                                                {selectedOrder.discount > 0 && (
-                                                    <div className="flex justify-between items-center text-green-600">
-                                                        <span className="text-sm">Discount</span>
-                                                        <span className="text-sm font-medium">-{formatCurrency(selectedOrder.discount)}</span>
-                                                    </div>
-                                                )}
-                                                {selectedOrder.GSTEnabled && selectedOrder.GSTAmount && (
-                                                    <div className="flex justify-between items-center text-blue-600">
-                                                        <span className="text-sm">GST</span>
-                                                        <span className="text-sm font-medium">+{formatCurrency(selectedOrder.GSTAmount)}</span>
-                                                    </div>
-                                                )}
-                                                <div className="border-t pt-2 mt-2">
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-base font-semibold">Final Fee</span>
-                                                        <span className="text-lg font-bold text-primary">{formatCurrency(selectedOrder.finalFee)}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
+          {/* Course Information */}
+          <div className="bg-white rounded-xl border border-slate-100 p-5">
+            <h3 className="text-base font-semibold text-slate-800 mb-4">Course Information</h3>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-slate-500 uppercase font-semibold">Course Name</p>
+                <p className="text-sm text-slate-800 mt-1">{selectedOrder.courseName}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">Duration</p>
+                  <p className="text-sm text-slate-800 mt-1">{selectedOrder.courseDuration} days</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">Course Vertical</p>
+                  <p className="text-sm text-slate-800 mt-1">{selectedOrder.courseVertical?.name || '—'}</p>
+                </div>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Total Fee</span>
+                  <span className="text-slate-800">{formatCurrency(selectedOrder.totalFee)}</span>
+                </div>
+                {selectedOrder.discount > 0 && (
+                  <div className="flex justify-between text-sm text-emerald-600 mt-2">
+                    <span>Discount</span>
+                    <span>-{formatCurrency(selectedOrder.discount)}</span>
+                  </div>
+                )}
+                {selectedOrder.GSTEnabled && selectedOrder.GSTAmount && (
+                  <div className="flex justify-between text-sm text-blue-600 mt-2">
+                    <span>GST</span>
+                    <span>+{formatCurrency(selectedOrder.GSTAmount)}</span>
+                  </div>
+                )}
+                <div className="border-t border-slate-200 mt-3 pt-3 flex justify-between font-semibold">
+                  <span className="text-slate-700">Final Fee</span>
+                  <span className="text-slate-800 text-lg">{formatCurrency(selectedOrder.finalFee)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
-                                {/* Payment Details */}
-                                <Card className="overflow-hidden border-2 hover:shadow-md transition-shadow">
-                                    <CardHeader className="bg-muted/30 border-b">
-                                        <CardTitle className="text-base flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                <CreditCard className="w-4 h-4 text-primary" />
-                                            </div>
-                                            Payment Details
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="pt-4">
-                                        <div className="space-y-3">
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Order Date</p>
-                                                    <p className="text-sm">{formatDate(selectedOrder.orderDate)}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Fee Deposit Date</p>
-                                                    <p className="text-sm">{formatDate(selectedOrder.feeDepositDate)}</p>
-                                                </div>
-                                            </div>
+          {/* Payment Details */}
+          <div className="bg-white rounded-xl border border-slate-100 p-5">
+            <h3 className="text-base font-semibold text-slate-800 mb-4">Payment Details</h3>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">Order Date</p>
+                  <p className="text-sm text-slate-800 mt-1">{formatDate(selectedOrder.orderDate)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">Fee Deposit Date</p>
+                  <p className="text-sm text-slate-800 mt-1">{formatDate(selectedOrder.feeDepositDate)}</p>
+                </div>
+              </div>
 
-                                            {selectedOrder.lumpsumDetails && (
-                                                <div className="bg-muted/20 rounded-lg p-3 space-y-2">
-                                                    <p className="text-xs font-semibold text-primary mb-2">Lumpsum Details</p>
-                                                    <div className="grid grid-cols-2 gap-2 text-sm">
-                                                        <div>
-                                                            <span className="text-muted-foreground">Registration Date:</span>
-                                                            <span className="ml-2 font-medium">{formatDate(selectedOrder.lumpsumDetails.registrationDate)}</span>
-                                                        </div>
-                                                        <div>
-                                                            <span className="text-muted-foreground">Registration Amount:</span>
-                                                            <span className="ml-2 font-medium">{formatCurrency(selectedOrder.lumpsumDetails.registrationAmount)}</span>
-                                                        </div>
-                                                        <div>
-                                                            <span className="text-muted-foreground">Total Received:</span>
-                                                            <span className="ml-2 font-medium">{formatCurrency(selectedOrder.lumpsumDetails.totalReceived)}</span>
-                                                        </div>
-                                                        <div>
-                                                            <span className="text-muted-foreground">Pending Amount:</span>
-                                                            <span className="ml-2 font-medium text-orange-600">{formatCurrency(selectedOrder.lumpsumDetails.pendingAmount)}</span>
-                                                        </div>
-                                                        <div className="col-span-2">
-                                                            <span className="text-muted-foreground">Payment Type:</span>
-                                                            <Badge variant="outline" className="ml-2">{selectedOrder.lumpsumDetails.paymentType}</Badge>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
+              {selectedOrder.lumpsumDetails && (
+                <div className="bg-slate-50 rounded-xl p-4">
+                  <p className="text-xs text-slate-500 uppercase font-semibold mb-2">Lumpsum Details</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-slate-500">Registration Date:</span>
+                      <span className="ml-1 text-slate-800">{formatDate(selectedOrder.lumpsumDetails.registrationDate)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Registration Amount:</span>
+                      <span className="ml-1 text-slate-800">{formatCurrency(selectedOrder.lumpsumDetails.registrationAmount)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Total Received:</span>
+                      <span className="ml-1 text-slate-800">{formatCurrency(selectedOrder.lumpsumDetails.totalReceived)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Pending Amount:</span>
+                      <span className="ml-1 text-orange-600">{formatCurrency(selectedOrder.lumpsumDetails.pendingAmount)}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-slate-500">Payment Type:</span>
+                      <span className="ml-1 text-slate-800">{selectedOrder.lumpsumDetails.paymentType}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-                                            {selectedOrder.loanDetails && (
-                                                <div className="bg-muted/20 rounded-lg p-3 space-y-2">
-                                                    <p className="text-xs font-semibold text-primary mb-2">Loan Details</p>
-                                                    <div className="space-y-2 text-sm">
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Loan Partner:</span>
-                                                            <span className="font-medium">{selectedOrder.loanDetails.loanPartner?.name}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Loan Amount:</span>
-                                                            <span className="font-medium">{formatCurrency(selectedOrder.loanDetails.loanAmount)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Disbursement Amount:</span>
-                                                            <span className="font-medium">{formatCurrency(selectedOrder.loanDetails.disbursementAmount)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">First EMI Date:</span>
-                                                            <span className="font-medium">{formatDate(selectedOrder.loanDetails.firstEmiDate)}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
+              {selectedOrder.loanDetails && (
+                <div className="bg-slate-50 rounded-xl p-4">
+                  <p className="text-xs text-slate-500 uppercase font-semibold mb-2">Loan Details</p>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Loan Partner:</span>
+                      <span className="text-slate-800">{selectedOrder.loanDetails.loanPartner?.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Loan Amount:</span>
+                      <span className="text-slate-800">{formatCurrency(selectedOrder.loanDetails.loanAmount)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Disbursement Amount:</span>
+                      <span className="text-slate-800">{formatCurrency(selectedOrder.loanDetails.disbursementAmount)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">First EMI Date:</span>
+                      <span className="text-slate-800">{formatDate(selectedOrder.loanDetails.firstEmiDate)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-                                            {selectedOrder.subscriptionDetails && (
-                                                <div className="bg-muted/20 rounded-lg p-3 space-y-2">
-                                                    <p className="text-xs font-semibold text-primary mb-2">Subscription Details</p>
-                                                    <div className="grid grid-cols-2 gap-2 text-sm">
-                                                        <div>
-                                                            <span className="text-muted-foreground">Gateway:</span>
-                                                            <span className="ml-2 font-medium">{selectedOrder.subscriptionDetails.gateway}</span>
-                                                        </div>
-                                                        <div>
-                                                            <span className="text-muted-foreground">Installment Amount:</span>
-                                                            <span className="ml-2 font-medium">{formatCurrency(selectedOrder.subscriptionDetails.installmentAmount)}</span>
-                                                        </div>
-                                                        <div>
-                                                            <span className="text-muted-foreground">No. of Installments:</span>
-                                                            <span className="ml-2 font-medium">{selectedOrder.subscriptionDetails.numberOfInstallments}</span>
-                                                        </div>
-                                                        <div>
-                                                            <span className="text-muted-foreground">First Installment:</span>
-                                                            <span className="ml-2 font-medium">{formatDate(selectedOrder.subscriptionDetails.firstInstallmentDate)}</span>
-                                                        </div>
-                                                        <div className="col-span-2">
-                                                            <span className="text-muted-foreground">Last Installment:</span>
-                                                            <span className="ml-2 font-medium">{formatDate(selectedOrder.subscriptionDetails.lastInstallmentDate)}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </CardContent>
-                                </Card>
+              {selectedOrder.subscriptionDetails && (
+                <div className="bg-slate-50 rounded-xl p-4">
+                  <p className="text-xs text-slate-500 uppercase font-semibold mb-2">Subscription Details</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-slate-500">Gateway:</span>
+                      <span className="ml-1 text-slate-800">{selectedOrder.subscriptionDetails.gateway}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Installment Amount:</span>
+                      <span className="ml-1 text-slate-800">{formatCurrency(selectedOrder.subscriptionDetails.installmentAmount)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">No. of Installments:</span>
+                      <span className="ml-1 text-slate-800">{selectedOrder.subscriptionDetails.numberOfInstallments}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">First Installment:</span>
+                      <span className="ml-1 text-slate-800">{formatDate(selectedOrder.subscriptionDetails.firstInstallmentDate)}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-slate-500">Last Installment:</span>
+                      <span className="ml-1 text-slate-800">{formatDate(selectedOrder.subscriptionDetails.lastInstallmentDate)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
-                                {/* Additional Information */}
-                                <Card className="overflow-hidden border-2 hover:shadow-md transition-shadow">
-                                    <CardHeader className="bg-muted/30 border-b">
-                                        <CardTitle className="text-base flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                <Info className="w-4 h-4 text-primary" />
-                                            </div>
-                                            Additional Information
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="pt-4">
-                                        <div className="space-y-3">
-                                            <div>
-                                                <p className="text-xs text-muted-foreground mb-1">Counsellor</p>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                                                        <Users className="w-3 h-3 text-primary" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-medium">{selectedOrder.counsellorName}</p>
-                                                        <p className="text-xs text-muted-foreground">{selectedOrder.counsellorId?.email}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
+          {/* Additional Information */}
+          <div className="bg-white rounded-xl border border-slate-100 p-5">
+            <h3 className="text-base font-semibold text-slate-800 mb-4">Additional Information</h3>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-slate-500 uppercase font-semibold">Counsellor</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
+                    <Users className="w-3 h-3 text-slate-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">{selectedOrder.counsellorName}</p>
+                    <p className="text-xs text-slate-400">{selectedOrder.counsellorId?.email}</p>
+                  </div>
+                </div>
+              </div>
 
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Created At</p>
-                                                    <p className="text-sm">{formatDate(selectedOrder.createdAt)}</p>
-                                                    <p className="text-xs text-muted-foreground">{format(new Date(selectedOrder.createdAt), 'hh:mm a')}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Last Updated</p>
-                                                    <p className="text-sm">{formatDate(selectedOrder.updatedAt)}</p>
-                                                    <p className="text-xs text-muted-foreground">{format(new Date(selectedOrder.updatedAt), 'hh:mm a')}</p>
-                                                </div>
-                                            </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">Created At</p>
+                  <p className="text-sm text-slate-800 mt-1">{formatDate(selectedOrder.createdAt)}</p>
+                  <p className="text-xs text-slate-400">{format(new Date(selectedOrder.createdAt), 'hh:mm a')}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">Last Updated</p>
+                  <p className="text-sm text-slate-800 mt-1">{formatDate(selectedOrder.updatedAt)}</p>
+                  <p className="text-xs text-slate-400">{format(new Date(selectedOrder.updatedAt), 'hh:mm a')}</p>
+                </div>
+              </div>
 
-                                            {selectedOrder.approvedBy && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Approved By</p>
-                                                    <p className="text-sm font-medium">{selectedOrder.approvedBy.name}</p>
-                                                    <p className="text-xs text-muted-foreground">{selectedOrder.approvedBy.email}</p>
-                                                </div>
-                                            )}
+              {selectedOrder.approvedBy && (
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">Approved By</p>
+                  <p className="text-sm font-medium text-slate-800 mt-1">{selectedOrder.approvedBy.name}</p>
+                  <p className="text-xs text-slate-400">{selectedOrder.approvedBy.email}</p>
+                </div>
+              )}
 
-                                            {selectedOrder.remarks && (
-                                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                                                    <p className="text-xs font-semibold text-yellow-800 mb-1">Remarks</p>
-                                                    <p className="text-sm text-yellow-700">{selectedOrder.remarks}</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </div>
-                        </div>
-                    )}
+              {selectedOrder.remarks && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  <p className="text-xs text-amber-600 uppercase font-semibold mb-1">Remarks</p>
+                  <p className="text-sm text-amber-700">{selectedOrder.remarks}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
 
-                    <DialogFooter className="sticky bottom-0 bg-background border-t px-6 py-4">
-                        <Button variant="outline" onClick={() => setViewModalOpen(false)}>
-                            Close
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+    <DialogFooter className="pt-4 border-t border-slate-100">
+      <Button variant="outline" onClick={() => setViewModalOpen(false)} className="rounded-xl">
+        Close
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
             {/* Edit Order Modal */}
-            <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-                <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-                    <DialogHeader>
-                        <DialogTitle>Edit Order</DialogTitle>
-                        <DialogDescription>Update order information</DialogDescription>
-                    </DialogHeader>
+<Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+  <DialogContent className="rounded-2xl max-w-4xl max-h-[80vh] overflow-y-auto 
+    [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+    
+    <DialogHeader>
+      <DialogTitle className="text-xl">Edit Order</DialogTitle>
+      <DialogDescription>Update order information</DialogDescription>
+    </DialogHeader>
 
-                    <div className="overflow-y-auto flex-1 py-4">
-                        <div className="space-y-6">
-                            {/* Student Information */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">Student Information</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Student Name *</Label>
-                                            <Input
-                                                value={orderForm.studentName}
-                                                onChange={(e) => setOrderForm({ ...orderForm, studentName: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Father's Name</Label>
-                                            <Input
-                                                value={orderForm.fatherName}
-                                                onChange={(e) => setOrderForm({ ...orderForm, fatherName: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Mobile Number *</Label>
-                                            <Input
-                                                value={orderForm.mobile}
-                                                onChange={(e) => setOrderForm({ ...orderForm, mobile: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Email *</Label>
-                                            <Input
-                                                type="email"
-                                                value={orderForm.email}
-                                                onChange={(e) => setOrderForm({ ...orderForm, email: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Date of Birth</Label>
-                                            <Input
-                                                type="date"
-                                                value={orderForm.dob}
-                                                onChange={(e) => setOrderForm({ ...orderForm, dob: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Education</Label>
-                                            <Input
-                                                value={orderForm.education}
-                                                onChange={(e) => setOrderForm({ ...orderForm, education: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Address</Label>
-                                            <Input
-                                                value={orderForm.address}
-                                                onChange={(e) => setOrderForm({ ...orderForm, address: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>City</Label>
-                                            <Input
-                                                value={orderForm.city}
-                                                onChange={(e) => setOrderForm({ ...orderForm, city: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>State</Label>
-                                            <Input
-                                                value={orderForm.state}
-                                                onChange={(e) => setOrderForm({ ...orderForm, state: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
+    <div className="space-y-6 py-2">
+      {/* Student Information */}
+      <div className="bg-white border-0 shadow-sm rounded-xl p-5">
+        <h3 className="text-base font-semibold text-slate-800 mb-4">Student Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Student Name *</Label>
+            <Input
+              value={orderForm.studentName}
+              onChange={(e) => setOrderForm({ ...orderForm, studentName: e.target.value })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Father's Name</Label>
+            <Input
+              value={orderForm.fatherName}
+              onChange={(e) => setOrderForm({ ...orderForm, fatherName: e.target.value })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Mobile Number *</Label>
+            <Input
+              value={orderForm.mobile}
+              onChange={(e) => setOrderForm({ ...orderForm, mobile: e.target.value })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Email *</Label>
+            <Input
+              type="email"
+              value={orderForm.email}
+              onChange={(e) => setOrderForm({ ...orderForm, email: e.target.value })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Date of Birth</Label>
+            <Input
+              type="date"
+              value={orderForm.dob}
+              onChange={(e) => setOrderForm({ ...orderForm, dob: e.target.value })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Education</Label>
+            <Input
+              value={orderForm.education}
+              onChange={(e) => setOrderForm({ ...orderForm, education: e.target.value })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Address</Label>
+            <Input
+              value={orderForm.address}
+              onChange={(e) => setOrderForm({ ...orderForm, address: e.target.value })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">City</Label>
+            <Input
+              value={orderForm.city}
+              onChange={(e) => setOrderForm({ ...orderForm, city: e.target.value })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">State</Label>
+            <Input
+              value={orderForm.state}
+              onChange={(e) => setOrderForm({ ...orderForm, state: e.target.value })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+        </div>
+      </div>
 
-                            {/* Course Information */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">Course Information</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label>Pool (Course Vertical)</Label>
-                                        <Select
-                                            value={orderForm.courseVertical}
-                                            onValueChange={(value) => setOrderForm({ ...orderForm, courseVertical: value })}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select pool" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {pools.map((pool) => (
-                                                    <SelectItem key={pool._id} value={pool._id}>
-                                                        {pool.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Course Name</Label>
-                                            <Input
-                                                value={orderForm.courseName}
-                                                onChange={(e) => setOrderForm({ ...orderForm, courseName: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Course Duration (days)</Label>
-                                            <Input
-                                                value={orderForm.courseDuration}
-                                                onChange={(e) => setOrderForm({ ...orderForm, courseDuration: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Total Fee *</Label>
-                                            <Input
-                                                type="number"
-                                                value={orderForm.totalFee}
-                                                onChange={(e) => setOrderForm({ ...orderForm, totalFee: parseInt(e.target.value) || 0 })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Discount</Label>
-                                            <Input
-                                                type="number"
-                                                value={orderForm.discount}
-                                                onChange={(e) => setOrderForm({ ...orderForm, discount: parseInt(e.target.value) || 0 })}
-                                            />
-                                        </div>
-                                    </div>
+      {/* Course Information */}
+      <div className="bg-white border-0 shadow-sm rounded-xl p-5">
+        <h3 className="text-base font-semibold text-slate-800 mb-4">Course Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Pool (Course Vertical)</Label>
+            <Select
+              value={orderForm.courseVertical}
+              onValueChange={(value) => setOrderForm({ ...orderForm, courseVertical: value })}
+            >
+              <SelectTrigger className="mt-1.5 rounded-xl">
+                <SelectValue placeholder="Select pool" />
+              </SelectTrigger>
+              <SelectContent>
+                {pools.map((pool) => (
+                  <SelectItem key={pool._id} value={pool._id}>
+                    {pool.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Course Name</Label>
+            <Input
+              value={orderForm.courseName}
+              onChange={(e) => setOrderForm({ ...orderForm, courseName: e.target.value })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Course Duration (days)</Label>
+            <Input
+              value={orderForm.courseDuration}
+              onChange={(e) => setOrderForm({ ...orderForm, courseDuration: e.target.value })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Total Fee *</Label>
+            <Input
+              type="number"
+              value={orderForm.totalFee}
+              onChange={(e) => setOrderForm({ ...orderForm, totalFee: parseInt(e.target.value) || 0 })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Discount</Label>
+            <Input
+              type="number"
+              value={orderForm.discount}
+              onChange={(e) => setOrderForm({ ...orderForm, discount: parseInt(e.target.value) || 0 })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+        </div>
 
-                                    {/* GST Section */}
-                                    <div className="space-y-4 border-t pt-4">
-                                        <div className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id="edit-gst-enabled"
-                                                checked={orderForm.GSTEnabled}
-                                                onCheckedChange={(checked) => setOrderForm({ ...orderForm, GSTEnabled: checked as boolean })}
-                                            />
-                                            <Label htmlFor="edit-gst-enabled" className="text-sm font-medium cursor-pointer">
-                                                Enable GST
-                                            </Label>
-                                        </div>
+        {/* GST Section */}
+        <div className="border-t border-slate-100 mt-4 pt-4">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={() => setOrderForm({ ...orderForm, GSTEnabled: !orderForm.GSTEnabled })}
+            >
+              <div className={`w-4 h-4 rounded border ${orderForm.GSTEnabled ? 'bg-orange-600 border-orange-600' : 'border-slate-300'} flex items-center justify-center transition-all`}>
+                {orderForm.GSTEnabled && <div className="w-2 h-2 bg-white rounded-sm" />}
+              </div>
+              <span className="text-sm font-medium text-slate-700">Enable GST</span>
+            </div>
+          </div>
+          {orderForm.GSTEnabled && (
+            <div className="mt-3">
+              <Label className="text-xs font-semibold text-slate-500 uppercase">GST Amount</Label>
+              <Input
+                type="number"
+                value={orderForm.GSTAmount}
+                onChange={(e) => setOrderForm({ ...orderForm, GSTAmount: parseInt(e.target.value) || 0 })}
+                placeholder="Enter GST amount"
+                className="mt-1.5 rounded-xl border-slate-200"
+              />
+            </div>
+          )}
+        </div>
 
-                                        {orderForm.GSTEnabled && (
-                                            <div className="space-y-2">
-                                                <Label>GST Amount</Label>
-                                                <Input
-                                                    type="number"
-                                                    value={orderForm.GSTAmount}
-                                                    onChange={(e) => setOrderForm({ ...orderForm, GSTAmount: parseInt(e.target.value) || 0 })}
-                                                    placeholder="Enter GST amount"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
+        <div className="bg-slate-50 rounded-xl p-4 mt-4">
+          <p className="text-xs font-semibold text-slate-500 uppercase">Final Fee</p>
+          <p className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(calculateFinalFee())}</p>
+          {orderForm.GSTEnabled && orderForm.GSTAmount && (
+            <p className="text-xs text-slate-400 mt-1">Including GST: {formatCurrency(orderForm.GSTAmount)}</p>
+          )}
+        </div>
+      </div>
 
-                                    <div className="bg-muted/30 p-3 rounded-lg">
-                                        <Label className="text-sm font-medium">Final Fee</Label>
-                                        <div className="text-2xl font-bold text-primary mt-1">
-                                            {formatCurrency(calculateFinalFee())}
-                                        </div>
-                                        {orderForm.GSTEnabled && orderForm.GSTAmount && (
-                                            <div className="text-xs text-muted-foreground mt-1">
-                                                Including GST: {formatCurrency(orderForm.GSTAmount)}
-                                            </div>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
+      {/* Payment Information */}
+      <div className="bg-white border-0 shadow-sm rounded-xl p-5">
+        <h3 className="text-base font-semibold text-slate-800 mb-4">Payment Information</h3>
+        <div>
+          <Label className="text-xs font-semibold text-slate-500 uppercase">Payment Mode *</Label>
+          <Select
+            value={orderForm.paymentMode}
+            onValueChange={(value) => setOrderForm({ ...orderForm, paymentMode: value })}
+          >
+            <SelectTrigger className="mt-1.5 rounded-xl">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Lumpsum">Lumpsum</SelectItem>
+              <SelectItem value="Loan">Loan</SelectItem>
+              <SelectItem value="Subscription">Subscription</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-                            {/* Payment Information */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">Payment Information</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label>Payment Mode *</Label>
-                                        <Select
-                                            value={orderForm.paymentMode}
-                                            onValueChange={(value) => setOrderForm({ ...orderForm, paymentMode: value })}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Lumpsum">Lumpsum</SelectItem>
-                                                <SelectItem value="Loan">Loan</SelectItem>
-                                                <SelectItem value="Subscription">Subscription</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Order Date</Label>
+            <Input
+              type="datetime-local"
+              value={orderForm.orderDate}
+              onChange={(e) => setOrderForm({ ...orderForm, orderDate: e.target.value })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Fee Deposit Date</Label>
+            <Input
+              type="datetime-local"
+              value={orderForm.feeDepositDate}
+              onChange={(e) => setOrderForm({ ...orderForm, feeDepositDate: e.target.value })}
+              className="mt-1.5 rounded-xl border-slate-200"
+            />
+          </div>
+        </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Order Date</Label>
-                                            <Input
-                                                type="datetime-local"
-                                                value={orderForm.orderDate}
-                                                onChange={(e) => setOrderForm({ ...orderForm, orderDate: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Fee Deposit Date</Label>
-                                            <Input
-                                                type="datetime-local"
-                                                value={orderForm.feeDepositDate}
-                                                onChange={(e) => setOrderForm({ ...orderForm, feeDepositDate: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
+        <div className="mt-4">
+          <Label className="text-xs font-semibold text-slate-500 uppercase">Remarks</Label>
+          <Textarea
+            value={orderForm.remarks}
+            onChange={(e) => setOrderForm({ ...orderForm, remarks: e.target.value })}
+            rows={3}
+            className="mt-1.5 rounded-xl border-slate-200"
+          />
+        </div>
+      </div>
+    </div>
 
-                                    <div className="space-y-2">
-                                        <Label>Remarks</Label>
-                                        <Textarea
-                                            value={orderForm.remarks}
-                                            onChange={(e) => setOrderForm({ ...orderForm, remarks: e.target.value })}
-                                            rows={3}
-                                        />
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </div>
-
-                    <DialogFooter className="pt-4 border-t">
-                        <Button variant="outline" onClick={() => setEditModalOpen(false)} disabled={updatingOrder}>
-                            Cancel
-                        </Button>
-                        <Button onClick={handleUpdateOrder} disabled={updatingOrder}>
-                            {updatingOrder ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Updating...
-                                </>
-                            ) : (
-                                'Update Order'
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+    <DialogFooter className="pt-4 border-t border-slate-100">
+      <Button variant="outline" onClick={() => setEditModalOpen(false)} disabled={updatingOrder} className="rounded-xl">
+        Cancel
+      </Button>
+      <Button onClick={handleUpdateOrder} disabled={updatingOrder} className="bg-orange-600 hover:bg-orange-700 rounded-xl">
+        {updatingOrder ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Updating...
+          </>
+        ) : (
+          'Update Order'
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
             {/* Payment Link Modal */}
-            <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Generate Payment Link</DialogTitle>
-                        <DialogDescription>
-                            Create a payment link for this order
-                        </DialogDescription>
-                    </DialogHeader>
+{/* Payment Link Modal */}
+<Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
+  <DialogContent className="rounded-2xl max-w-md max-h-[80vh] overflow-y-auto 
+    [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+    
+    <DialogHeader>
+      <DialogTitle className="text-xl">Generate Payment Link</DialogTitle>
+      <DialogDescription>Create a payment link for this order</DialogDescription>
+    </DialogHeader>
 
-                    {selectedOrder && (
-                        <div className="space-y-4">
-                            <div className="bg-muted/30 p-4 rounded-lg">
-                                <p className="text-sm text-muted-foreground mb-2">Order Summary</p>
-                                <p><strong>Student:</strong> {selectedOrder.studentName}</p>
-                                <p><strong>Order ID:</strong> {selectedOrder._id}</p>
-                                <p><strong>Payment Mode:</strong> {selectedOrder.paymentMode}</p>
-                                <p><strong>Total Amount:</strong> {formatCurrency(selectedOrder.finalFee)}</p>
+    {selectedOrder && (
+      <div className="space-y-5">
+        {/* Order Summary */}
+        <div className="bg-slate-50 rounded-xl p-4 space-y-2">
+          <p className="text-xs font-semibold text-slate-500 uppercase">Order Summary</p>
+          <div className="text-sm text-slate-700 space-y-1">
+            <p><span className="font-medium">Student:</span> {selectedOrder.studentName}</p>
+            <p><span className="font-medium">Order ID:</span> <span className="font-mono text-xs">{selectedOrder._id}</span></p>
+            <p><span className="font-medium">Payment Mode:</span> {selectedOrder.paymentMode}</p>
+            <p><span className="font-medium">Total Amount:</span> {formatCurrency(selectedOrder.finalFee)}</p>
+            {selectedOrder.paymentMode === 'Lumpsum' && selectedOrder.lumpsumDetails && (
+              <p><span className="font-medium">Pending Amount:</span> {formatCurrency(selectedOrder.lumpsumDetails.pendingAmount)}</p>
+            )}
+            {selectedOrder.paymentMode === 'Subscription' && selectedOrder.subscriptionDetails && (
+              <>
+                <p><span className="font-medium">Installment Amount:</span> {formatCurrency(selectedOrder.subscriptionDetails.installmentAmount)}</p>
+                <p><span className="font-medium">No. of Installments:</span> {selectedOrder.subscriptionDetails.numberOfInstallments}</p>
+              </>
+            )}
+          </div>
+        </div>
 
-                                {selectedOrder.paymentMode === 'Lumpsum' && selectedOrder.lumpsumDetails && (
-                                    <p><strong>Pending Amount:</strong> {formatCurrency(selectedOrder.lumpsumDetails.pendingAmount)}</p>
-                                )}
+        {/* Payment Amount Input */}
+        <div>
+          <Label htmlFor="paymentAmount" className="text-xs font-semibold text-slate-500 uppercase">
+            Payment Amount *
+          </Label>
+          <Input
+            id="paymentAmount"
+            type="number"
+            value={paymentAmount}
+            onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
+            placeholder="Enter amount"
+            max={getMaxAmount()}
+            min={1}
+            step={1}
+            className="mt-1.5 rounded-xl border-slate-200"
+          />
+          <p className="text-xs text-slate-400 mt-1">
+            Max amount: {formatCurrency(getMaxAmount())}
+          </p>
+        </div>
+      </div>
+    )}
 
-                                {selectedOrder.paymentMode === 'Subscription' && selectedOrder.subscriptionDetails && (
-                                    <>
-                                        <p><strong>Installment Amount:</strong> {formatCurrency(selectedOrder.subscriptionDetails.installmentAmount)}</p>
-                                        <p><strong>Number of Installments:</strong> {selectedOrder.subscriptionDetails.numberOfInstallments}</p>
-                                    </>
-                                )}
-                            </div>
+    <DialogFooter className="pt-4 border-t border-slate-100 gap-2">
+      <Button
+        variant="outline"
+        onClick={() => {
+          setPaymentModalOpen(false);
+          setPaymentAmount(0);
+          setPaymentType('UPI');
+        }}
+        disabled={paymentLoading}
+        className="rounded-xl"
+      >
+        Cancel
+      </Button>
+      <Button
+        onClick={handleCreatePaymentLink}
+        disabled={paymentLoading || paymentAmount <= 0 || paymentAmount > getMaxAmount()}
+        className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl"
+      >
+        {paymentLoading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Generating...
+          </>
+        ) : (
+          <>
+            <CreditCard className="w-4 h-4 mr-2" />
+            Generate Link
+          </>
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="paymentAmount">Payment Amount *</Label>
-                                <Input
-                                    id="paymentAmount"
-                                    type="number"
-                                    value={paymentAmount}
-                                    onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
-                                    placeholder="Enter amount"
-                                    max={getMaxAmount()}
-                                    min={1}
-                                    step={1}
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    Max amount: {formatCurrency(getMaxAmount())}
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => {
-                            setPaymentModalOpen(false);
-                            setPaymentAmount(0);
-                            setPaymentType('UPI');
-                        }} disabled={paymentLoading}>
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleCreatePaymentLink}
-                            disabled={paymentLoading || paymentAmount <= 0 || paymentAmount > getMaxAmount()}
-                        >
-                            {paymentLoading ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Generating...
-                                </>
-                            ) : (
-                                <>
-                                    <CreditCard className="w-4 h-4 mr-2" />
-                                    Generate Link
-                                </>
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Payment History Modal */}
             <Dialog open={paymentHistoryModalOpen} onOpenChange={setPaymentHistoryModalOpen}>
-                <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-                    <DialogHeader>
-                        <DialogTitle>Payment History</DialogTitle>
-                        <DialogDescription>
-                            {selectedOrder && `Payment transactions for order: ${selectedOrder._id}`}
-                        </DialogDescription>
-                    </DialogHeader>
+  <DialogContent className="rounded-2xl max-w-3xl max-h-[80vh] overflow-y-auto 
+    [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+    
+    <DialogHeader>
+      <DialogTitle className="text-xl">Payment History</DialogTitle>
+      <DialogDescription>
+        {selectedOrder && `Payment transactions for order: ${selectedOrder._id}`}
+      </DialogDescription>
+    </DialogHeader>
 
-                    <div className="overflow-y-auto flex-1 py-4">
-                        {loadingPayments ? (
-                            <div className="text-center py-8">
-                                <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
-                                <p className="mt-2 text-muted-foreground">Loading payment history...</p>
-                            </div>
-                        ) : paymentHistory.length === 0 ? (
-                            <div className="text-center py-8">
-                                <CreditCard className="w-12 h-12 mx-auto text-muted-foreground" />
-                                <h3 className="mt-4 text-lg font-semibold">No payments found</h3>
-                                <p className="text-muted-foreground">No payment transactions recorded for this order</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {/* Summary Cards */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <Card>
-                                        <CardContent className="pt-4">
-                                            <p className="text-sm text-muted-foreground">Total Payments</p>
-                                            <p className="text-2xl font-bold">{paymentHistory.length}</p>
-                                        </CardContent>
-                                    </Card>
-                                    <Card>
-                                        <CardContent className="pt-4">
-                                            <p className="text-sm text-muted-foreground">Total Amount Paid</p>
-                                            <p className="text-2xl font-bold">
-                                                {formatCurrency(paymentHistory.reduce((sum, p) => sum + p.link_amount_paid, 0))}
-                                            </p>
-                                        </CardContent>
-                                    </Card>
-                                    <Card>
-                                        <CardContent className="pt-4">
-                                            <p className="text-sm text-muted-foreground">Successful Payments</p>
-                                            <p className="text-2xl font-bold text-green-600">
-                                                {paymentHistory.filter(p => p.transaction_status === 'SUCCESS').length}
-                                            </p>
-                                        </CardContent>
-                                    </Card>
-                                </div>
+    {loadingPayments ? (
+      <div className="py-16 text-center">
+        <Loader2 className="w-8 h-8 animate-spin mx-auto text-orange-400" />
+        <p className="mt-3 text-slate-500">Loading payment history...</p>
+      </div>
+    ) : paymentHistory.length === 0 ? (
+      <div className="py-16 text-center">
+        <CreditCard className="w-12 h-12 mx-auto text-slate-300" />
+        <h3 className="mt-3 text-base font-medium text-slate-700">No payments found</h3>
+        <p className="text-sm text-slate-400">No payment transactions recorded for this order</p>
+      </div>
+    ) : (
+      <div className="space-y-5 py-2">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white border-0 shadow-sm rounded-xl p-4">
+            <p className="text-xs font-semibold text-slate-500 uppercase">Total Payments</p>
+            <p className="text-2xl font-bold text-slate-800 mt-1">{paymentHistory.length}</p>
+          </div>
+          <div className="bg-white border-0 shadow-sm rounded-xl p-4">
+            <p className="text-xs font-semibold text-slate-500 uppercase">Total Amount Paid</p>
+            <p className="text-2xl font-bold text-emerald-600 mt-1">
+              {formatCurrency(paymentHistory.reduce((sum, p) => sum + p.link_amount_paid, 0))}
+            </p>
+          </div>
+          <div className="bg-white border-0 shadow-sm rounded-xl p-4">
+            <p className="text-xs font-semibold text-slate-500 uppercase">Successful</p>
+            <p className="text-2xl font-bold text-green-600 mt-1">
+              {paymentHistory.filter(p => p.transaction_status === 'SUCCESS').length}
+            </p>
+          </div>
+        </div>
 
-                                {/* Payments Table */}
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>Amount</TableHead>
-                                            <TableHead>Transaction ID</TableHead>
-                                            <TableHead>Status</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {paymentHistory.map((payment) => (
-                                            <TableRow key={payment._id}>
-                                                <TableCell className="whitespace-nowrap">
-                                                    {formatDateTime(payment.event_time || payment.createdAt)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {formatCurrency(payment.link_amount_paid)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="font-mono text-xs">
-                                                        {payment.transaction_id}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {payment.transaction_status === 'SUCCESS' ? (
-                                                        <Badge className="bg-green-100 text-green-700 border-green-200">
-                                                            Success
-                                                        </Badge>
-                                                    ) : (
-                                                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                                                            {payment.transaction_status}
-                                                        </Badge>
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        )}
-                    </div>
+        {/* Payments Table */}
+        <div className="bg-white border-0 shadow-sm rounded-xl overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-slate-50 border-b border-slate-100">
+                <TableHead className="text-xs font-semibold text-slate-500 uppercase">Date</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-500 uppercase">Amount</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-500 uppercase">Transaction ID</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-500 uppercase">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paymentHistory.map((payment) => (
+                <TableRow key={payment._id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                  <TableCell className="whitespace-nowrap text-sm text-slate-600">
+                    {formatDateTime(payment.event_time || payment.createdAt)}
+                  </TableCell>
+                  <TableCell className="text-sm text-slate-800">
+                    {formatCurrency(payment.link_amount_paid)}
+                  </TableCell>
+                  <TableCell>
+                    <span className="font-mono text-xs text-slate-600">
+                      {payment.transaction_id}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {payment.transaction_status === 'SUCCESS' ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Success
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                        <Clock className="w-3 h-3" />
+                        {payment.transaction_status}
+                      </span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    )}
 
-                    <DialogFooter>
-                        <Button onClick={() => setPaymentHistoryModalOpen(false)}>Close</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+    <DialogFooter className="pt-4 border-t border-slate-100">
+      <Button onClick={() => setPaymentHistoryModalOpen(false)} className="rounded-xl">
+        Close
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
             {/* Subscription Creation Modal */}
-            <Dialog open={subscriptionModalOpen} onOpenChange={setSubscriptionModalOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Create Subscription</DialogTitle>
-                        <DialogDescription>
-                            Create the Cashfree subscription session for the approved order.
-                        </DialogDescription>
-                    </DialogHeader>
+<Dialog open={subscriptionModalOpen} onOpenChange={setSubscriptionModalOpen}>
+  <DialogContent className="rounded-2xl max-w-md max-h-[80vh] overflow-y-auto 
+    [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+    
+    <DialogHeader>
+      <DialogTitle className="text-xl">Create Subscription</DialogTitle>
+      <DialogDescription>
+        Create the Cashfree subscription session for the approved order.
+      </DialogDescription>
+    </DialogHeader>
 
-                    {selectedOrder && (
-                        <div className="space-y-4">
-                            <div className="bg-muted/30 p-4 rounded-lg space-y-2">
-                                <p className="text-sm text-muted-foreground mb-2">Order Summary</p>
-                                <p><strong>Student:</strong> {selectedOrder.studentName}</p>
-                                <p><strong>Order ID:</strong> {selectedOrder._id}</p>
-                                <p><strong>Payment Mode:</strong> {selectedOrder.paymentMode}</p>
-                                <p><strong>Total Amount:</strong> {formatCurrency(selectedOrder.finalFee)}</p>
-                            </div>
+    {selectedOrder && (
+      <div className="space-y-5">
+        {/* Order Summary */}
+        <div className="bg-slate-50 rounded-xl p-4 space-y-2">
+          <p className="text-xs font-semibold text-slate-500 uppercase">Order Summary</p>
+          <div className="text-sm text-slate-700 space-y-1">
+            <p><span className="font-medium">Student:</span> {selectedOrder.studentName}</p>
+            <p><span className="font-medium">Order ID:</span> <span className="font-mono text-xs">{selectedOrder._id}</span></p>
+            <p><span className="font-medium">Payment Mode:</span> {selectedOrder.paymentMode}</p>
+            <p><span className="font-medium">Total Amount:</span> {formatCurrency(selectedOrder.finalFee)}</p>
+          </div>
+        </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="subscriptionPlanId">Plan ID (optional)</Label>
-                                <Input
-                                    id="subscriptionPlanId"
-                                    value={subscriptionPlanId}
-                                    onChange={(e) => setSubscriptionPlanId(e.target.value)}
-                                    placeholder="Enter Cashfree plan ID"
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    Leave blank to create the subscription with only the order ID.
-                                </p>
-                            </div>
-                        </div>
-                    )}
+        {/* Plan ID Input */}
+        <div>
+          <Label htmlFor="subscriptionPlanId" className="text-xs font-semibold text-slate-500 uppercase">
+            Plan ID (optional)
+          </Label>
+          <Input
+            id="subscriptionPlanId"
+            value={subscriptionPlanId}
+            onChange={(e) => setSubscriptionPlanId(e.target.value)}
+            placeholder="Enter Cashfree plan ID"
+            className="mt-1.5 rounded-xl border-slate-200"
+          />
+          <p className="text-xs text-slate-400 mt-1">
+            Leave blank to create the subscription with only the order ID.
+          </p>
+        </div>
+      </div>
+    )}
 
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setSubscriptionModalOpen(false)} disabled={subscriptionCreating}>
-                            Cancel
-                        </Button>
-                        <Button onClick={handleCreateSubscription} disabled={subscriptionCreating}>
-                            {subscriptionCreating ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Creating...
-                                </>
-                            ) : (
-                                'Create Subscription'
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+    <DialogFooter className="pt-4 border-t border-slate-100 gap-2">
+      <Button
+        variant="outline"
+        onClick={() => setSubscriptionModalOpen(false)}
+        disabled={subscriptionCreating}
+        className="rounded-xl"
+      >
+        Cancel
+      </Button>
+      <Button
+        onClick={handleCreateSubscription}
+        disabled={subscriptionCreating}
+        className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl"
+      >
+        {subscriptionCreating ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Creating...
+          </>
+        ) : (
+          'Create Subscription'
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
             {/* Subscription Auth Modal */}
-            <Dialog open={subscriptionAuthModalOpen} onOpenChange={setSubscriptionAuthModalOpen}>
-                <DialogContent className="max-w-[95vw] sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[90vh] p-0 sm:p-6">
-                    <div className="flex flex-col h-full overflow-hidden">
-                        <DialogHeader className="px-4 pt-4 pb-2 sm:px-6 sm:pt-6">
-                            <DialogTitle className="text-lg sm:text-xl">Subscription Auth Link</DialogTitle>
-                            <DialogDescription className="text-xs sm:text-sm">
-                                Generate the shareable Cashfree auth link for the created subscription session.
-                            </DialogDescription>
-                        </DialogHeader>
+<Dialog open={subscriptionAuthModalOpen} onOpenChange={setSubscriptionAuthModalOpen}>
+  <DialogContent className="rounded-2xl max-w-xl max-h-[80vh] overflow-y-auto 
+    [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+    
+    <DialogHeader>
+      <DialogTitle className="text-xl">Subscription Auth Link</DialogTitle>
+      <DialogDescription>
+        Generate the shareable Cashfree auth link for the created subscription session.
+      </DialogDescription>
+    </DialogHeader>
 
-                        <div className="flex-1 overflow-y-auto px-4 py-2 sm:px-6 space-y-4">
-                            <div className="bg-muted/30 p-3 sm:p-4 rounded-lg space-y-2">
-                                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Subscription Session</p>
-                                <div className="grid grid-cols-1 gap-2 text-xs sm:text-sm">
-                                    <div className="flex justify-between sm:justify-start sm:block">
-                                        <span className="text-muted-foreground">Student:</span>
-                                        <span className="font-medium ml-2 sm:ml-0 sm:block break-words">{selectedOrder?.studentName}</span>
-                                    </div>
-                                    <div className="flex justify-between sm:justify-start sm:block">
-                                        <span className="text-muted-foreground">Email:</span>
-                                        <span className="font-medium ml-2 sm:ml-0 sm:block break-words">{selectedOrder?.email}</span>
-                                    </div>
-                                    <div className="flex justify-between sm:justify-start sm:block">
-                                        <span className="text-muted-foreground">Phone:</span>
-                                        <span className="font-medium ml-2 sm:ml-0 sm:block break-words">{selectedOrder?.mobile}</span>
-                                    </div>
-                                </div>
-                            </div>
+    <div className="space-y-5 py-2">
+      {/* Subscription Session Summary */}
+      <div className="bg-slate-50 rounded-xl p-4 space-y-2">
+        <p className="text-xs font-semibold text-slate-500 uppercase">Subscription Session</p>
+        <div className="text-sm text-slate-700 space-y-1">
+          <p><span className="font-medium">Student:</span> {selectedOrder?.studentName}</p>
+          <p><span className="font-medium">Email:</span> {selectedOrder?.email}</p>
+          <p><span className="font-medium">Phone:</span> {selectedOrder?.mobile}</p>
+        </div>
+      </div>
 
-                            <div className="space-y-2">
-                                <Label className="text-xs sm:text-sm">Auth Link</Label>
-                                {subscriptionAuthUrl ? (
-                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                                        <Input
-                                            value={subscriptionAuthUrl}
-                                            readOnly
-                                            className="font-mono text-xs sm:text-sm flex-1 break-all"
-                                        />
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                                navigator.clipboard.writeText(subscriptionAuthUrl);
-                                                toast({
-                                                    title: 'Copied!',
-                                                    description: 'Subscription auth link copied to clipboard.',
-                                                });
-                                            }}
-                                            className="shrink-0 w-full sm:w-auto"
-                                        >
-                                            <svg
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                width="14"
-                                                height="14"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                className="mr-2"
-                                            >
-                                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                            </svg>
-                                            Copy
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <Button onClick={handleGenerateSubscriptionAuthLink} className="w-full sm:w-auto">
-                                        Generate Auth Link
-                                    </Button>
-                                )}
-                                <p className="text-xs text-muted-foreground">
-                                    Generate the link, then copy or open it to share the Cashfree subscription checkout.
-                                </p>
-                            </div>
-                        </div>
+      {/* Auth Link Section */}
+      <div>
+        <Label className="text-xs font-semibold text-slate-500 uppercase">Auth Link</Label>
+        {subscriptionAuthUrl ? (
+          <div className="mt-1.5 space-y-2">
+            <div className="flex items-center gap-2">
+              <Input
+                value={subscriptionAuthUrl}
+                readOnly
+                className="font-mono text-sm rounded-xl border-slate-200 flex-1"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(subscriptionAuthUrl);
+                  toast({
+                    title: 'Copied!',
+                    description: 'Subscription auth link copied to clipboard.',
+                  });
+                }}
+                className="shrink-0 rounded-xl border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mr-2"
+                >
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                Copy
+              </Button>
+            </div>
+            <p className="text-xs text-slate-400">
+              Link generated – copy or open to share the Cashfree subscription checkout.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-1.5">
+            <Button
+              onClick={handleGenerateSubscriptionAuthLink}
+              className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl"
+            >
+              Generate Auth Link
+            </Button>
+            <p className="text-xs text-slate-400 mt-1">
+              Generate the link, then copy or open it to share the Cashfree subscription checkout.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
 
-                        <DialogFooter className="px-4 py-3 sm:px-6 sm:py-4 border-t mt-2 flex-col sm:flex-row gap-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => setSubscriptionAuthModalOpen(false)}
-                                className="w-full sm:w-auto order-2 sm:order-1"
-                            >
-                                Close
-                            </Button>
-                            <Button
-                                onClick={() => {
-                                    if (subscriptionAuthUrl) {
-                                        window.open(subscriptionAuthUrl, '_blank');
-                                    }
-                                }}
-                                disabled={!subscriptionAuthUrl}
-                                className="w-full sm:w-auto order-1 sm:order-2"
-                            >
-                                <ExternalLink className="mr-2 h-4 w-4" />
-                                Open Auth Link
-                            </Button>
-                        </DialogFooter>
-                    </div>
-                </DialogContent>
-            </Dialog>
+    <DialogFooter className="pt-4 border-t border-slate-100 gap-2">
+      <Button
+        variant="outline"
+        onClick={() => setSubscriptionAuthModalOpen(false)}
+        className="rounded-xl"
+      >
+        Close
+      </Button>
+      <Button
+        onClick={() => {
+          if (subscriptionAuthUrl) {
+            window.open(subscriptionAuthUrl, '_blank');
+          }
+        }}
+        disabled={!subscriptionAuthUrl}
+        className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl"
+      >
+        <ExternalLink className="mr-2 h-4 w-4" />
+        Open Auth Link
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
             {/* Generated Link Modal */}
-            <Dialog open={generatedLinkModalOpen} onOpenChange={setGeneratedLinkModalOpen}>
-                <DialogContent className="max-w-[95vw] sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[90vh] p-0 sm:p-6">
-                    <div className="flex flex-col h-full overflow-hidden">
-                        <DialogHeader className="px-4 pt-4 pb-2 sm:px-6 sm:pt-6">
-                            <DialogTitle className="text-lg sm:text-xl">Payment Link Generated</DialogTitle>
-                            <DialogDescription className="text-xs sm:text-sm">
-                                Share this payment link with the student to complete the payment
-                            </DialogDescription>
-                        </DialogHeader>
+<Dialog open={generatedLinkModalOpen} onOpenChange={setGeneratedLinkModalOpen}>
+  <DialogContent className="rounded-2xl max-w-xl max-h-[80vh] overflow-y-auto 
+    [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+    
+    <DialogHeader>
+      <DialogTitle className="text-xl">Payment Link Generated</DialogTitle>
+      <DialogDescription>
+        Share this payment link with the student to complete the payment
+      </DialogDescription>
+    </DialogHeader>
 
-                        <div className="flex-1 overflow-y-auto px-4 py-2 sm:px-6 space-y-4">
-                            {/* Payment Summary */}
-                            <div className="bg-muted/30 p-3 sm:p-4 rounded-lg space-y-2">
-                                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Payment Summary</p>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
-                                    <div className="flex justify-between sm:justify-start sm:block">
-                                        <span className="text-muted-foreground">Student:</span>
-                                        <span className="font-medium ml-2 sm:ml-0 sm:block break-words">{selectedOrder?.studentName}</span>
-                                    </div>
-                                    <div className="flex justify-between sm:justify-start sm:block">
-                                        <span className="text-muted-foreground">Amount:</span>
-                                        <span className="font-medium ml-2 sm:ml-0 sm:block">{formatCurrency(paymentAmount)}</span>
-                                    </div>
-                                    <div className="flex justify-between sm:justify-start sm:block">
-                                        <span className="text-muted-foreground">Payment Mode:</span>
-                                        <span className="font-medium ml-2 sm:ml-0 sm:block">{selectedOrder?.paymentMode}</span>
-                                    </div>
-                                    <div className="col-span-1 sm:col-span-2 flex justify-between sm:justify-start sm:block">
-                                        <span className="text-muted-foreground">Order ID:</span>
-                                        <span className="font-mono text-xs ml-2 sm:ml-0 sm:block break-all">{selectedOrder?._id}</span>
-                                    </div>
-                                </div>
-                            </div>
+    <div className="space-y-5 py-2">
+      {/* Payment Summary */}
+      <div className="bg-slate-50 rounded-xl p-4 space-y-2">
+        <p className="text-xs font-semibold text-slate-500 uppercase">Payment Summary</p>
+        <div className="text-sm text-slate-700 space-y-1">
+          <p><span className="font-medium">Student:</span> {selectedOrder?.studentName}</p>
+          <p><span className="font-medium">Amount:</span> {formatCurrency(paymentAmount)}</p>
+          <p><span className="font-medium">Payment Mode:</span> {selectedOrder?.paymentMode}</p>
+          <p><span className="font-medium">Order ID:</span> <span className="font-mono text-xs">{selectedOrder?._id}</span></p>
+        </div>
+      </div>
 
-                            {/* Payment Link Display */}
-                            <div className="space-y-2">
-                                <Label className="text-xs sm:text-sm">Payment Link</Label>
-                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                                    <Input
-                                        value={generatedLink}
-                                        readOnly
-                                        className="font-mono text-xs sm:text-sm flex-1 break-all"
-                                    />
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(generatedLink);
-                                            toast({
-                                                title: "Copied!",
-                                                description: "Payment link copied to clipboard",
-                                            });
-                                        }}
-                                        className="shrink-0 w-full sm:w-auto"
-                                    >
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="14"
-                                            height="14"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            className="mr-2"
-                                        >
-                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                        </svg>
-                                        Copy
-                                    </Button>
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                    Share this link with the student to complete the payment
-                                </p>
-                            </div>
-                        </div>
+      {/* Payment Link Display */}
+      <div>
+        <Label className="text-xs font-semibold text-slate-500 uppercase">Payment Link</Label>
+        <div className="mt-1.5 flex items-center gap-2">
+          <Input
+            value={generatedLink}
+            readOnly
+            className="font-mono text-sm rounded-xl border-slate-200 flex-1"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              navigator.clipboard.writeText(generatedLink);
+              toast({
+                title: "Copied!",
+                description: "Payment link copied to clipboard",
+              });
+            }}
+            className="shrink-0 rounded-xl border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="mr-2"
+            >
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            Copy
+          </Button>
+        </div>
+        <p className="text-xs text-slate-400 mt-1">
+          Share this link with the student to complete the payment
+        </p>
+      </div>
+    </div>
 
-                        <DialogFooter className="px-4 py-3 sm:px-6 sm:py-4 border-t mt-2 flex-col sm:flex-row gap-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => setGeneratedLinkModalOpen(false)}
-                                className="w-full sm:w-auto order-2 sm:order-1"
-                            >
-                                Close
-                            </Button>
-                            <Button
-                                onClick={() => {
-                                    window.open(generatedLink, '_blank');
-                                }}
-                                className="w-full sm:w-auto order-1 sm:order-2"
-                            >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="16"
-                                    height="16"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="mr-2"
-                                >
-                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                    <polyline points="15 3 21 3 21 9" />
-                                    <line x1="10" y1="14" x2="21" y2="3" />
-                                </svg>
-                                Open Link
-                            </Button>
-                        </DialogFooter>
-                    </div>
-                </DialogContent>
-            </Dialog>
+    <DialogFooter className="pt-4 border-t border-slate-100 gap-2">
+      <Button
+        variant="outline"
+        onClick={() => setGeneratedLinkModalOpen(false)}
+        className="rounded-xl"
+      >
+        Close
+      </Button>
+      <Button
+        onClick={() => {
+          window.open(generatedLink, '_blank');
+        }}
+        className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="mr-2"
+        >
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+          <polyline points="15 3 21 3 21 9" />
+          <line x1="10" y1="14" x2="21" y2="3" />
+        </svg>
+        Open Link
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
         </div>
     );
 }

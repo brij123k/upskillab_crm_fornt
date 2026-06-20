@@ -1,4 +1,5 @@
-
+export { StateWiseEmployeeReport } from './StateWiseEmployeeReport';
+export { StateWiseReport } from './StateWiseReport';
 export { StageSummaryReport } from './StageSummaryReport';
 export { EmployeeStagesReport } from './EmployeeStagesReport';
 export { PoolStagesReport } from './PoolStagesReport';

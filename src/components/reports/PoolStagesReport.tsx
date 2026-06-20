@@ -1,194 +1,523 @@
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Building2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Loader2,
+  RefreshCw,
+  Download,
+  Filter,
+  Search,
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  Layers,
+} from 'lucide-react';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
+import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
-interface PoolStagesReportProps {
-  data: any;
+interface StageItem {
+  stage: string;    // API returns "stage" not "leadStage"
+  count: number;
 }
 
-export function PoolStagesReport({ data }: PoolStagesReportProps) {
-  const [currentPage, setCurrentPage] = useState(0);
+interface PoolData {
+  poolId: string;
+  poolName: string;
+  totalLead: number;
+  stages: StageItem[];
+}
+
+interface ReportData {
+  poolWiseData: PoolData[];
+  totalLeads: number;
+  totalPools: number;
+}
+
+interface LevelType {
+  _id: string;
+  name: string;
+}
+
+const dateFilterOptions = [
+  { value: 'today', label: 'Today' },
+  { value: 'week', label: 'This Week' },
+  { value: 'month', label: 'This Month' },
+  { value: 'year', label: 'This Year' },
+  { value: 'custom', label: 'Custom Range' },
+];
+
+const POOLS_PER_PAGE = 6;
+
+export function PoolStagesReport() {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<ReportData | null>(null);
   const [allStages, setAllStages] = useState<string[]>([]);
   const [loadingStages, setLoadingStages] = useState(true);
-  const poolsPerPage = 5;
-  
-  if (!data?.poolWiseData) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Building2 className="h-10 w-10 text-muted-foreground mb-3" />
-        <p className="text-sm text-muted-foreground">No pool data available</p>
-      </div>
-    );
-  }
-  
-  // Fetch all stages from API
+
+  // Filter states
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Level filter
+  const [levels, setLevels] = useState<LevelType[]>([]);
+  const [selectedLevel, setSelectedLevel] = useState<string>('1'); // default level "1" as value from fetched levels? We'll store level name or ID? The API probably expects level number (like 1,2,3). We'll use level name extracted from levels list (e.g., "L1" -> 1). We'll let user select a level by name, then extract numeric part.
+  const [levelInput, setLevelInput] = useState<string>('1'); // For manual level number input? No, we'll use radio buttons.
+
+  // Date filter
+  const [dateFilter, setDateFilter] = useState('today');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+
+  // Pool search (client-side)
+  const [poolSearch, setPoolSearch] = useState('');
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(0);
+
+  // Fetch levels for radio buttons
+  useEffect(() => {
+    const fetchLevels = async () => {
+      try {
+        const response = await getDataHandlerWithToken('getAllLevels', null, null);
+        if (response) {
+          setLevels(response);
+          // If we have levels, set default selected to the first one's numeric part
+          if (response.length > 0) {
+            const firstLevelNumeric = extractLevelNumber(response[0].name);
+            setSelectedLevel(firstLevelNumeric.toString());
+            setLevelInput(firstLevelNumeric.toString());
+          }
+        }
+      } catch (error) {
+        toast({ title: 'Error', description: 'Failed to fetch levels', variant: 'destructive' });
+      }
+    };
+    fetchLevels();
+  }, []);
+
+  // Helper to extract number from "L12"
+  const extractLevelNumber = (levelName: string): number => {
+    const match = levelName.match(/\d+/);
+    return match ? parseInt(match[0], 10) : 1;
+  };
+
+  // Fetch stages for headers
   useEffect(() => {
     const fetchStages = async () => {
       try {
         const response = await getDataHandlerWithToken(ApiConfig.getAllStages, null, null, true);
         const stagesData = response?.data || response || [];
-        
-        if (Array.isArray(stagesData) && stagesData.length > 0) {
-          // Extract stage names
-          const stageNames = stagesData.map((stage: any) => stage.stageName || stage.name || stage.title);
-          setAllStages(stageNames);
+        if (Array.isArray(stagesData) && stagesData.length) {
+          const names = stagesData.map((s: any) => s.stageName || s.name);
+          setAllStages(names);
+        } else {
+          setAllStages([]);
         }
       } catch (error) {
-        console.error('Failed to fetch stages:', error);
+        setAllStages([]);
       } finally {
         setLoadingStages(false);
       }
     };
-    
     fetchStages();
   }, []);
-  
-  const pools = data.poolWiseData;
-  
-  // Create a map of stage counts for each pool
-  const poolStageMap = pools.map((pool: any) => {
-    const stageMap = new Map();
-    pool.stages?.forEach((stage: any) => {
-      stageMap.set(stage.stage, stage.count);
-    });
-    return {
-      id: pool.poolId,
-      name: pool.poolName,
-      totalLead: pool.totalLead,
-      stages: stageMap
-    };
-  });
-  
-  // Get unique stages that appear in the data
-  const getRelevantStages = () => {
-    if (allStages.length === 0) {
-      // Fallback: extract stages from data if API fails
-      const stagesSet = new Set<string>();
-      poolStageMap.forEach(pool => {
-        pool.stages.forEach((value, key) => {
-          if (value > 0) {
-            stagesSet.add(key);
-          }
-        });
-      });
-      return Array.from(stagesSet).sort();
-    }
-    
-    // Get stages that have data in any pool
-    const stagesWithData = new Set<string>();
-    poolStageMap.forEach(pool => {
-      pool.stages.forEach((value, key) => {
-        if (value > 0) {
-          stagesWithData.add(key);
+
+  // Fetch report data
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: any = {};
+      // Level parameter – send as integer
+      params.level = parseInt(levelInput) || 1;
+
+      // Date filter
+      if (dateFilter === 'custom') {
+        if (!fromDate || !toDate) {
+          toast({ title: 'Missing Dates', description: 'Please select both start and end dates.', variant: 'destructive' });
+          setLoading(false);
+          return;
         }
-      });
+        params.fromDate = fromDate;
+        params.toDate = toDate;
+      } else {
+        params.dateFilter = dateFilter;
+      }
+
+      const response = await getDataHandlerWithToken(
+        ApiConfig.poolWiseStages,
+        params,
+        null,
+        true
+      );
+      if (response) {
+        setData({
+          poolWiseData: response.data?.poolWiseData || response.poolWiseData || [],
+          totalLeads: response.data?.totalLeads ?? response.totalLeads ?? 0,
+          totalPools: response.data?.totalPools ?? response.totalPools ?? 0,
+        });
+      } else {
+        setData(null);
+      }
+    } catch (error: any) {
+      toast({ title: 'Error', description: error?.message || 'Failed to load pool stages', variant: 'destructive' });
+      setData(null);
+    } finally {
+      setLoading(false);
+      setCurrentPage(0);
+    }
+  }, [levelInput, dateFilter, fromDate, toDate]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Export CSV
+  const handleExport = () => {
+    if (!data || !data.poolWiseData.length) {
+      toast({ title: 'No data to export' });
+      return;
+    }
+    const pools = data.poolWiseData;
+    const stageSet = new Set<string>();
+    pools.forEach(p => p.stages.forEach(s => stageSet.add(s.stage)));
+    const stageList = Array.from(stageSet);
+    const headers = ['Pool Name', 'Total Lead', ...stageList];
+    const rows = pools.map(pool => {
+      const stageMap = new Map(pool.stages.map(s => [s.stage, s.count]));
+      return [pool.poolName, pool.totalLead, ...stageList.map(s => stageMap.get(s) || 0)];
     });
-    
-    // Return stages that are in allStages and have data
-    const relevantStages = Array.from(stagesWithData).filter(stage => 
-      allStages.includes(stage)
-    ).sort();
-    
-    return relevantStages;
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pool_stages_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: 'Exported!' });
   };
-  
-  const stagesToDisplay = getRelevantStages();
-  
+
+  // Client-side pool filtering
+  const filteredPools = data?.poolWiseData
+    ? data.poolWiseData.filter(p =>
+        p.poolName.toLowerCase().includes(poolSearch.toLowerCase())
+      )
+    : [];
+
   // Pagination
-  const totalPages = Math.ceil(poolStageMap.length / poolsPerPage);
-  const paginatedPools = poolStageMap.slice(
-    currentPage * poolsPerPage,
-    (currentPage + 1) * poolsPerPage
+  const totalPages = Math.ceil(filteredPools.length / POOLS_PER_PAGE);
+  const paginatedPools = filteredPools.slice(
+    currentPage * POOLS_PER_PAGE,
+    (currentPage + 1) * POOLS_PER_PAGE
   );
-  
-  if (loadingStages) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        <p className="text-sm text-muted-foreground mt-3">Loading stages...</p>
-      </div>
-    );
-  }
-  
-  if (pools.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Building2 className="h-10 w-10 text-muted-foreground mb-3" />
-        <p className="text-sm text-muted-foreground">No pool data available</p>
-      </div>
-    );
-  }
-  
+
+  // Build stage maps for display
+  const poolStageMap = paginatedPools.map(pool => {
+    const map = new Map<string, number>();
+    pool.stages.forEach(s => map.set(s.stage, s.count));
+    return { ...pool, stageMap: map };
+  });
+
+  // Relevant stages (present in current filtered data)
+  const relevantStages = (() => {
+    const stageSet = new Set<string>();
+    poolStageMap.forEach(p => p.stageMap.forEach((_, key) => stageSet.add(key)));
+    const ordered = allStages.filter(s => stageSet.has(s));
+    const extra = Array.from(stageSet).filter(s => !ordered.includes(s));
+    return [...ordered, ...extra];
+  })();
+
+  const hasActiveFilters =
+    levelInput !== '1' ||
+    dateFilter !== 'today' ||
+    (dateFilter === 'custom' && (fromDate || toDate)) ||
+    poolSearch !== '';
+
   return (
-    <div className="space-y-4">
-      {/* Info */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="text-xs text-muted-foreground">
-          {pools.length} pools • {data.poolWiseData.reduce((sum: number, p: any) => sum + p.totalLead, 0)} total leads
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-base font-semibold text-slate-800">Pool Stages</h3>
+          <p className="text-sm text-slate-500">Lead distribution across pools</p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchData}
+            disabled={loading}
+            className="rounded-xl border-slate-200"
+          >
+            {loading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+            ) : (
+              <RefreshCw className="w-3.5 h-3.5 mr-1" />
+            )}
+            Refresh
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleExport}
+            disabled={!data || loading}
+            className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white"
+          >
+            <Download className="w-3.5 h-3.5 mr-1" />
+            Export
+          </Button>
         </div>
       </div>
-      
-      {/* Table */}
-      <div className="overflow-x-auto border rounded-lg">
-        <Table className="min-w-[800px]">
-          <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead className="text-xs font-semibold sticky left-0 bg-muted/50 min-w-[120px] z-10">
-                Lead Stage
-              </TableHead>
-              {paginatedPools.map((pool: any) => (
-                <TableHead key={pool.id} className="text-xs text-center min-w-[100px]">
-                  <div className="font-semibold">{pool.name}</div>
-                  <div className="text-[10px] font-normal text-muted-foreground mt-0.5">
-                    Total: {pool.totalLead}
-                  </div>
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {stagesToDisplay.map((stage) => (
-              <TableRow key={stage} className="hover:bg-muted/30">
-                <TableCell className="text-xs font-medium sticky left-0 bg-white border-r z-10">
-                  {stage}
-                </TableCell>
-                {paginatedPools.map((pool: any) => (
-                  <TableCell key={pool.id} className="text-xs text-center p-2">
-                    <span className={pool.stages.get(stage) > 0 ? 'font-medium' : 'text-muted-foreground'}>
-                      {pool.stages.get(stage) || '-'}
-                    </span>
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+
+      {/* Filter Bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant={showFilters ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setShowFilters(!showFilters)}
+          className="gap-1 h-8 text-xs rounded-xl"
+        >
+          <Filter className="w-3 h-3" />
+          Filters
+          {hasActiveFilters && (
+            <span className="ml-1 w-1.5 h-1.5 rounded-full bg-orange-500" />
+          )}
+          {showFilters ? (
+            <ChevronUp className="w-3 h-3 ml-1" />
+          ) : (
+            <ChevronDown className="w-3 h-3 ml-1" />
+          )}
+        </Button>
+
+        {showFilters && (
+          <div className="flex flex-wrap items-center gap-3 w-full">
+            {/* Level Radio Buttons */}
+            {levels.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Label className="text-xs font-semibold text-slate-500 uppercase whitespace-nowrap">Level</Label>
+                <div className="flex flex-wrap gap-1">
+                  {levels.map(lvl => (
+                    <button
+                      key={lvl._id}
+                      onClick={() => {
+                        const num = extractLevelNumber(lvl.name);
+                        setSelectedLevel(num.toString());
+                        setLevelInput(num.toString());
+                      }}
+                      className={cn(
+                        "px-3 py-1 text-xs font-medium rounded-lg border transition-all",
+                        selectedLevel === extractLevelNumber(lvl.name).toString()
+                          ? "bg-orange-500 text-white border-orange-500 shadow-sm"
+                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      )}
+                    >
+                      {lvl.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Date filter */}
+            <div className="w-[130px]">
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="h-8 text-xs rounded-xl">
+                  <SelectValue placeholder="Select date" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dateFilterOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {dateFilter === 'custom' && (
+              <>
+                <div className="relative w-[130px]">
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                  />
+                </div>
+                <div className="relative w-[130px]">
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400">Max 30 days</span>
+              </>
+            )}
+
+            {/* Pool search */}
+            <div className="relative w-48">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+              <Input
+                placeholder="Search pool..."
+                value={poolSearch}
+                onChange={(e) => {
+                  setPoolSearch(e.target.value);
+                  setCurrentPage(0);
+                }}
+                className="pl-7 h-8 text-xs rounded-xl border-slate-200"
+              />
+            </div>
+          </div>
+        )}
       </div>
-      
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-2">
-          <div className="text-xs text-muted-foreground">
-            Page {currentPage + 1} of {totalPages}
+
+      {/* Content */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-8 h-8 animate-spin text-orange-400" />
+          <p className="ml-2 text-sm text-slate-500">Loading pool data...</p>
+        </div>
+      ) : !data || !data.poolWiseData.length ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Building2 className="w-12 h-12 text-slate-300 mb-3" />
+          <p className="text-sm font-medium text-slate-600">No pool data found</p>
+          <p className="text-xs text-slate-400 mt-1">Adjust level or filters</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Summary row */}
+          <div className="flex items-center gap-4 text-sm text-slate-500">
+            <span className="font-medium text-slate-700">
+              {filteredPools.length} pools
+            </span>
+            <span className="w-1 h-1 rounded-full bg-slate-300" />
+            <span>
+              Total leads:{' '}
+              <span className="font-semibold text-slate-800">
+                {filteredPools.reduce((sum, p) => sum + p.totalLead, 0)}
+              </span>
+            </span>
           </div>
-          <div className="flex gap-1">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
-              disabled={currentPage === 0}
-              className="p-1 rounded border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
-              disabled={currentPage === totalPages - 1}
-              className="p-1 rounded border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
+
+          {/* Table */}
+          {loadingStages ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
+              <p className="ml-2 text-sm text-slate-500">Loading stage headers...</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
+              <Table className="min-w-[800px]">
+                <TableHeader>
+                  <TableRow className="bg-slate-50 hover:bg-slate-50 border-b border-slate-100">
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase sticky left-0 bg-slate-50 z-10 min-w-[140px]">
+                      Lead Stage
+                    </TableHead>
+                    {poolStageMap.map(pool => (
+                      <TableHead key={pool.poolId} className="text-xs text-center min-w-[110px] py-3">
+                        <div className="font-semibold text-slate-800">{pool.poolName}</div>
+                        <div className="text-[10px] font-normal text-slate-400 mt-0.5">
+                          Total: {pool.totalLead}
+                        </div>
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {relevantStages.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={poolStageMap.length + 1} className="text-center py-8 text-sm text-slate-500">
+                        No stage data for the selected level / date range.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    relevantStages.map(stageName => (
+                      <TableRow
+                        key={stageName}
+                        className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors"
+                      >
+                        <TableCell className="text-xs font-medium text-slate-700 sticky left-0 bg-white border-r z-10 py-3">
+                          {stageName}
+                        </TableCell>
+                        {poolStageMap.map(pool => {
+                          const count = pool.stageMap.get(stageName) || 0;
+                          const total = pool.totalLead || 1;
+                          const pct = ((count / total) * 100).toFixed(1);
+                          return (
+                            <TableCell key={pool.poolId} className="text-xs text-center py-3">
+                              <div className="flex flex-col items-center">
+                                <span className={cn(
+                                  'font-medium',
+                                  count > 0 ? 'text-slate-800' : 'text-slate-300'
+                                )}>
+                                  {count || '-'}
+                                </span>
+                                {count > 0 && (
+                                  <span className="text-[10px] text-slate-400 mt-0.5">
+                                    {pct}%
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <div className="text-xs text-slate-500">
+                Page {currentPage + 1} of {totalPages}
+              </div>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                  disabled={currentPage === 0}
+                  className="h-8 w-8 p-0 rounded-lg"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+                  disabled={currentPage === totalPages - 1}
+                  className="h-8 w-8 p-0 rounded-lg"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

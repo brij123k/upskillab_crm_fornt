@@ -1,9 +1,8 @@
-// AttendanceAndPolicyPage.tsx
+// AttendanceAndPolicyPage.tsx – redesigned to match CallLogs style
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, Users, RefreshCw, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { getDataHandlerWithToken, postDataHandlerWithToken, patchTokenDataHandler } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
@@ -91,78 +90,72 @@ export function AttendanceAndPolicyPage() {
   };
 
   return (
-    <div className="space-y-4 text-sm">
-      {/* Header Section */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Attendance & Policy</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Manage employee attendance and leave policies</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {fetching && (
-            <div className="flex items-center text-xs text-muted-foreground">
-              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-              Refreshing...
-            </div>
-          )}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Attendance & Policy</h1>
+            <p className="text-slate-500 mt-1">Manage employee attendance and leave policies</p>
+          </div>
           <Button
             variant="outline"
-            size="sm"
             onClick={fetchAllData}
             disabled={fetching}
-            className="h-8 text-xs"
+            className="border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl gap-2"
           >
-            <RefreshCw className={cn('w-3.5 h-3.5 mr-1.5', fetching && 'animate-spin')} />
+            <RefreshCw className={cn('w-4 h-4', fetching && 'animate-spin')} />
             Refresh
           </Button>
         </div>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+          <TabsList className="h-9 bg-slate-100 rounded-lg">
+            <TabsTrigger value="attendance" className="text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm gap-1.5">
+              <Calendar className="w-3.5 h-3.5" />
+              Attendance Calendar
+            </TabsTrigger>
+            <TabsTrigger value="leaves" className="text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm gap-1.5">
+              <Users className="w-3.5 h-3.5" />
+              Leave Management
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {/* Content */}
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
+            <p className="ml-3 text-slate-500">Loading data...</p>
+          </div>
+        ) : (
+          <>
+            {activeTab === 'attendance' && (
+              <AttendanceCalendarTab
+                employees={employees}
+                attendance={attendance}
+                leaves={leaves}
+                onRefresh={fetchAllData}
+                fetching={fetching}
+              />
+            )}
+
+            {activeTab === 'leaves' && (
+              <LeaveManagementTab
+                leaves={leaves}
+                leavePolicies={leavePolicies}
+                roles={roles}
+                employees={employees}
+                onRefresh={fetchAllData}
+                fetching={fetching}
+                onAddPolicy={handleAddLeavePolicy}
+                onUpdatePolicy={handleUpdateLeavePolicy}
+              />
+            )}
+          </>
+        )}
       </div>
-
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
-        <TabsList className="h-9">
-          <TabsTrigger value="attendance" className="flex items-center gap-1.5 text-xs">
-            <Calendar className="w-3.5 h-3.5" />
-            Attendance Calendar
-          </TabsTrigger>
-          <TabsTrigger value="leaves" className="flex items-center gap-1.5 text-xs">
-            <Users className="w-3.5 h-3.5" />
-            Leave Management
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {loading ? (
-        <Card>
-          <CardContent className="flex justify-center py-10">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {activeTab === 'attendance' && (
-            <AttendanceCalendarTab
-              employees={employees}
-              attendance={attendance}
-              leaves={leaves}
-              onRefresh={fetchAllData}
-              fetching={fetching}
-            />
-          )}
-
-          {activeTab === 'leaves' && (
-            <LeaveManagementTab
-              leaves={leaves}
-              leavePolicies={leavePolicies}
-              roles={roles}
-              employees={employees}
-              onRefresh={fetchAllData}
-              fetching={fetching}
-              onAddPolicy={handleAddLeavePolicy}
-              onUpdatePolicy={handleUpdateLeavePolicy}
-            />
-          )}
-        </>
-      )}
     </div>
   );
 }

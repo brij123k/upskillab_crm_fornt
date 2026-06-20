@@ -92,6 +92,8 @@ addNewLevel: `${url}/level`,
 
   stageSummery:`${url}/leads/report/stage-summary`,
   allEmpStages:`${url}/leads/report/all-employees-stages`,
+  stateWiseReport:`${url}/leads/report/state-wise`,
+  stateWiseEmployeeReport:`${url}/leads/report/state-wise-employee`,
   poolWiseStages:`${url}/leads/report/pool-wise-data`,
   employeePoolRevenueReport:`${url}/order/report/employee-pool-revenue`,
   employeePoolUtilizationReport:`${url}/order/report/employee-pool-utilization`,
