@@ -216,8 +216,6 @@ export function AdminDashboard() {
         ))}
       </div>
 
-      <TargetComparisonWidget managePath="/admin/targets" />
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>

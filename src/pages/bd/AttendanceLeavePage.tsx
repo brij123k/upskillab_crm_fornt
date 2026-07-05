@@ -529,8 +529,6 @@ export function AttendanceLeavePage() {
                       <TableRow className="text-xs">
                         <TableHead className="text-xs h-9">Date</TableHead>
                         <TableHead className="text-xs h-9">Login</TableHead>
-                        <TableHead className="text-xs h-9">Logout</TableHead>
-                        <TableHead className="text-xs h-9">Hours</TableHead>
                         <TableHead className="text-xs h-9">Status</TableHead>
                         <TableHead className="text-xs h-9">Reason</TableHead>
                       </TableRow>
@@ -545,15 +543,6 @@ export function AttendanceLeavePage() {
                               {record.loginTime ? formatTime(record.loginTime) : '-'}
                             </div>
                           </TableCell>
-                          <TableCell className="py-2">
-                            {record.logoutTime ? (
-                              <div className="flex items-center gap-1.5">
-                                <Clock3 className="h-3 w-3 text-muted-foreground" />
-                                {formatTime(record.logoutTime)}
-                              </div>
-                            ) : '-'}
-                          </TableCell>
-                          <TableCell className="py-2">{record.workHours > 0 ? formatHours(record.workHours) : '-'}</TableCell>
                           <TableCell className="py-2">
                             <Badge className={cn('gap-1 text-xs px-2 py-0', ATTENDANCE_STATUS_STYLES[record.status] || 'bg-slate-100 text-slate-800')}>
                               {statusLabel(record.status)}
