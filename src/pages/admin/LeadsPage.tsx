@@ -149,6 +149,7 @@ interface UserType {
     name: string;
   }
   employeeId: number;
+  status: string;
   profile?: {
     departmentId?: {
       _id: string;
@@ -1457,13 +1458,6 @@ const navigate = useNavigate();
     </Button>
 
     {/* Bulk Lead Modal */}
-    <Dialog open={bulkLeadOpen} onOpenChange={setBulkLeadOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" className="rounded-xl border-slate-200 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200">
-          <FileUp className="w-4 h-4 mr-2" />
-          Bulk Lead
-        </Button>
-      </DialogTrigger>
       <Dialog open={bulkLeadOpen} onOpenChange={setBulkLeadOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" className="rounded-xl border-slate-200 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200">
@@ -1700,7 +1694,6 @@ const navigate = useNavigate();
               </DialogFooter>
             </DialogContent>
           </Dialog>
-    </Dialog>
 
     {/* Add New Lead Modal */}
     <Dialog open={newLeadOpen} onOpenChange={setNewLeadOpen}>
@@ -2058,7 +2051,7 @@ const navigate = useNavigate();
           <SearchableDropdown
             options={[
               { value: "all", label: "All Users" },
-              ...users.map(user => ({
+              ...users.filter(user => user.status=="active").map(user => ({
                 value: user._id,
                 label: user.name,
                 role: user.role?.name,
@@ -2248,6 +2241,7 @@ const navigate = useNavigate();
           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Pool</th>
           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Status</th>
           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Last Call</th>
+          <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Created At</th>
           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Assigned To</th>
           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Actions</th>
         </tr>
@@ -2341,6 +2335,9 @@ const navigate = useNavigate();
             {/* Last Call Date */}
             <td className="px-3 py-2">
               <span className="text-slate-700">{formatDate(lead.lastCallDate)}</span>
+            </td>
+            <td className="px-3 py-2">
+              <span className="text-slate-700">{formatDate(lead.createdAt)}</span>
             </td>
             {/* Assigned To – name + employee ID, no avatar */}
             <td className="px-3 py-2">

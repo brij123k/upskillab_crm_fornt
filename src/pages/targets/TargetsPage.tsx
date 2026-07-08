@@ -104,7 +104,7 @@ export function TargetsPage() {
   // -------------------- data fetching (unchanged) --------------------
   const fetchUsers = async () => {
     try {
-      const response = await getDataHandlerWithToken('getAllProfile', null, null, true);
+      const response = await getDataHandlerWithToken(ApiConfig.getAllProfile, null, null, true);
       const rows = response?.data || response || [];
       const mapped = rows.map((row: any) => ({
         userId: row?.userId?._id || row?.userId || row?._id,

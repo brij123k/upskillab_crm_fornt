@@ -384,26 +384,26 @@ export function OrderManagementPage() {
     }, [filters]);
 
     // Fetch orders
-    const fetchOrders = async () => {
-        try {
-            setLoading(true);
-            const queryParams = buildQueryParams();
-            const response = await getDataHandlerWithToken("Order", queryParams, null);
-            if (response.data) {
-                setOrders(response.data);
-                setTotalOrders(response.total);
-                setTotalPages(response.totalPages);
-            }
-        } catch (error) {
-            toast({
-                title: "Error",
-                description: "Failed to fetch orders",
-                variant: "destructive",
-            });
-        } finally {
-            setLoading(false);
+    const fetchOrders = useCallback(async () => {
+    try {
+        setLoading(true);
+        const queryParams = buildQueryParams();
+        const response = await getDataHandlerWithToken("Order", queryParams, null);
+        if (response.data) {
+            setOrders(response.data);
+            setTotalOrders(response.total || response.data.length);
+            setTotalPages(response.totalPages || Math.ceil((response.total || response.data.length) / filters.limit));
         }
-    };
+    } catch (error) {
+        toast({
+            title: "Error",
+            description: "Failed to fetch orders",
+            variant: "destructive",
+        });
+    } finally {
+        setLoading(false);
+    }
+}, [buildQueryParams]);
 
     // Fetch leads for suggestion
     const fetchLeads = async () => {
@@ -513,7 +513,7 @@ export function OrderManagementPage() {
     // Refresh when filters or pagination changes
     useEffect(() => {
         fetchOrders();
-    }, [filters]);
+    }, [fetchOrders, filters.page, filters.limit]);
 
     // Handle lead selection from search input
     const handleLeadSelectFromSearch = (selectedLead: LeadType) => {
@@ -1264,7 +1264,7 @@ export function OrderManagementPage() {
                                         <SearchableDropdown
                                             options={[
                                                 { value: 'all', label: 'All Counsellors' },
-                                                ...counsellors.map(counsellor => ({
+                                                ...counsellors.filter(user => user.status == "active").map(counsellor => ({
                                                     value: counsellor._id,
                                                     label: counsellor.name,
                                                     empId: counsellor.employeeId

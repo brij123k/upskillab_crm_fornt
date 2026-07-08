@@ -221,16 +221,16 @@ function StageModal({
             stagesList.map(stage => (
               <div
                 key={stage.id}
-                className="flex items-center justify-between p-3 bg-slate-50 rounded-xl"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onStageClick(stage.id, stage.name);
+                  }}
+                className="flex items-center cursor-pointer justify-between p-3 bg-orange-50 rounded-xl hover:bg-orange-400"
               >
                 <span className="text-sm font-medium text-slate-700 capitalize">{stage.name}</span>
                 <Badge
                   variant="secondary"
-                  className="text-sm cursor-pointer bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onStageClick(stage.id, stage.name);
-                  }}
+                  className="text-sm bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"
                 >
                   {stage.count}
                 </Badge>

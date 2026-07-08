@@ -265,10 +265,48 @@ export function CallLogsPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const formatDate = (date: string) => {
-    const d = new Date(date);
-    return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
-  };
+  // const formatDate = (date: string) => {
+  //   const d = new Date(date);
+  //   return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+  // };
+ const formatDate = (
+  dateString?: string | null,
+  isLocalTime: boolean = false
+) => {
+  if (!dateString) return 'No Calls Yet';
+
+  let date: Date;
+
+  if (isLocalTime) {
+    // Parse without timezone conversion
+    const [datePart, timePart] = dateString.split('T');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hour, minute] = (timePart || '00:00')
+      .split(':')
+      .map(Number);
+
+    date = new Date(year, month - 1, day, hour, minute);
+  } else {
+    // Converts UTC -> Local timezone
+    date = new Date(dateString);
+  }
+
+  if (isNaN(date.getTime())) {
+    return 'Invalid Date';
+  }
+
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear()).slice(-2);
+
+  const hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+
+  const formattedHours = String(hours % 12 || 12).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+
+  return `${day}-${month}-${year} ${formattedHours}:${minutes} ${ampm}`;
+};
 
   const resetFilters = () => {
     setFilters({
@@ -367,7 +405,7 @@ export function CallLogsPage() {
             <div className={`w-4 h-4 rounded border ${filters.group === 'true' ? 'bg-orange-600 border-orange-600' : 'border-slate-300'} flex items-center justify-center transition-all`}>
               {filters.group === 'true' && <div className="w-2 h-2 bg-white rounded-sm" />}
             </div>
-            <span className="text-sm font-medium text-slate-700">Group by User</span>
+            <span className="text-sm font-medium text-slate-700">Group</span>
           </div>
         </div>
 
@@ -457,7 +495,7 @@ export function CallLogsPage() {
                 <div>
                   <Label className="text-xs font-semibold text-slate-500 uppercase">Employee</Label>
                   <SearchableDropdown
-                    options={[{ value: 'all', label: 'All Users' }, ...users.map(u => ({ value: u._id, label: u.name }))]}
+                    options={[{ value: 'all', label: 'All Users' }, ...users.filter(user => user.status == "active").map(u => ({ value: u._id, label: u.name }))]}
                     value={filters.userId} onValueChange={v => setFilters({ ...filters, userId: v })}
                     placeholder="Select user" className="mt-1.5"
                   />
@@ -562,9 +600,11 @@ export function CallLogsPage() {
                       <TableCell className="max-w-[200px]">
                         <p className="text-sm text-slate-600 truncate">{log.outcome || '—'}</p>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm text-slate-600">
-                        {formatDate(log.logType === 'call' ? log.startedAt || log.createdAt : log.interactionAt || log.createdAt)}
-                      </TableCell>
+                     <TableCell className="whitespace-nowrap text-sm text-slate-600">
+  {log.startedAt
+    ? formatDate(log.startedAt, true)
+    : formatDate(log.interactionAt || log.createdAt)}
+</TableCell>
                       <TableCell>
                         <span className="text-sm font-medium text-slate-700">{log.callCount30Days || 0}</span>
                       </TableCell>

@@ -160,6 +160,7 @@ interface UserType {
     name: string;
   }
   employeeId: number;
+  status: string;
   profile?: {
   };
 }
@@ -2152,7 +2153,7 @@ const formatDate = (dateString?: string | null) => {
             <SearchableDropdown
               options={[
                 { value: "all", label: "All Users" },
-                ...users.map(user => ({
+                ...users.filter(user => user.status=="active").map(user => ({
                   value: user._id,
                   label: user.name,
                   role: user.role?.name,
@@ -2321,6 +2322,7 @@ const formatDate = (dateString?: string | null) => {
           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Stage</th>
           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Pool</th>
           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Last Call</th>
+          <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Created At</th>
           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Actions</th>
           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Assigned To</th>
         </tr>
@@ -2405,6 +2407,9 @@ const formatDate = (dateString?: string | null) => {
             {/* Last Call Date */}
             <td className="px-3 py-2">
               <span className="text-slate-700">{formatDate(lead.lastCallDate)}</span>
+            </td>
+            <td className="px-3 py-2">
+              <span className="text-slate-700">{formatDate(lead.createdAt)}</span>
             </td>
             {/* Actions: WhatsApp, Call, FollowUp, Notify, CallNow (original icons) */}
             <td className="px-3 py-2">

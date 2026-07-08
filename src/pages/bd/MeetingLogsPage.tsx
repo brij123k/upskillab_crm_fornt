@@ -466,7 +466,7 @@ export function MeetingLogsPage() {
             <div className={`w-4 h-4 rounded border ${filters.group === 'true' ? 'bg-orange-600 border-orange-600' : 'border-slate-300'} flex items-center justify-center transition-all`}>
               {filters.group === 'true' && <div className="w-2 h-2 bg-white rounded-sm" />}
             </div>
-            <span className="text-sm font-medium text-slate-700">Group by User</span>
+            <span className="text-sm font-medium text-slate-700">Group</span>
           </div>
         </div>
 
@@ -555,7 +555,7 @@ export function MeetingLogsPage() {
                 <div>
                   <Label className="text-xs font-semibold text-slate-500 uppercase">Employee</Label>
                   <SearchableDropdown
-                    options={[{ value: 'all', label: 'All Users' }, ...users.map(u => ({ value: u._id, label: u.name }))]}
+                    options={[{ value: 'all', label: 'All Users' }, ...users.filter(user => user.status == "active").map(u => ({ value: u._id, label: u.name }))]}
                     value={filters.userId}
                     onValueChange={v => setFilters({ ...filters, userId: v })}
                     placeholder="Select user"

@@ -75,6 +75,7 @@ interface User {
   name: string;
   email: string;
   employeeId: number;
+  status:string;
 }
 
 interface Lead {
@@ -560,7 +561,7 @@ export function TaskManagementPage() {
                   <SelectTrigger className="mt-1.5 rounded-xl"><SelectValue placeholder="All users" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Users</SelectItem>
-                    {users.map((user) => (
+                    {users.filter(user => user.status == "active").map((user) => (
                       <SelectItem key={user._id} value={user._id}>{user.name}</SelectItem>
                     ))}
                   </SelectContent>

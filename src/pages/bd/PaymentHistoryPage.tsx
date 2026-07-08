@@ -156,7 +156,7 @@ export function PaymentHistoryPage() {
             setLoadingCounsellors(true);
             const response = await getDataHandlerWithToken("getAllUser", null, null);
             if (response) {
-                setCounsellors(response.map((user: any) => ({
+                setCounsellors(response.filter((user:any) => user.status == "active").map((user: any) => ({
                     _id: user._id,
                     name: user.name,
                     email: user.email,
@@ -252,11 +252,11 @@ export function PaymentHistoryPage() {
                     <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => navigate('/bd/order-management')}
+                        onClick={() => navigate(-1)}
                         className="flex items-center gap-2"
                     >
                         <ArrowLeft className="w-4 h-4" />
-                        Back to Orders
+                        Back
                     </Button>
                     <div>
                         <h1 className="text-2xl md:text-3xl font-bold text-foreground">Payment History</h1>

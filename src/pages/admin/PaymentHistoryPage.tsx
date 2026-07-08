@@ -156,7 +156,7 @@ export function PaymentHistoryPage() {
             setLoadingCounsellors(true);
             const response = await getDataHandlerWithToken("getAllUser", null, null);
             if (response) {
-                setCounsellors(response.map((user: any) => ({
+                setCounsellors(response.filter((user:any) => user.status == "active").map((user: any) => ({
                     _id: user._id,
                     name: user.name,
                     email: user.email,

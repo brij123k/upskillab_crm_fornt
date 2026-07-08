@@ -272,8 +272,8 @@ export function OrderManagementPage() {
     const [counsellors, setCounsellors] = useState<any[]>([]);
     const [loadingCounsellors, setLoadingCounsellors] = useState(false);
     // Pagination
-    const [page, setPage] = useState(1);
-    const [limit, setLimit] = useState(10);
+    // const [page, setPage] = useState(1);
+    // const [limit, setLimit] = useState(10);
     const [totalPages, setTotalPages] = useState(1);
     const [totalOrders, setTotalOrders] = useState(0);
     const [paymentAmount, setPaymentAmount] = useState(0);
@@ -369,44 +369,54 @@ export function OrderManagementPage() {
     }, [orderForm.totalFee, orderForm.discount, orderForm.GSTEnabled, orderForm.GSTAmount]);
 
     // Build query params
-    const buildQueryParams = useCallback(() => {
-        const params: Record<string, any> = {};
-        params.page = filters.page;
-        params.limit = filters.limit;
+   const buildQueryParams = useCallback(() => {
+    const params: Record<string, any> = {};
+    params.page = filters.page;  // Use filters.page instead of page
+    params.limit = filters.limit; // Use filters.limit instead of limit
 
-        if (filters.search) params.search = filters.search;
-        if (filters.paymentMode && filters.paymentMode !== "all") params.paymentMode = filters.paymentMode;
-        if (filters.status && filters.status !== "all") params.status = filters.status;
-        if (filters.dateFilter && filters.dateFilter !== "all") params.dateFilter = filters.dateFilter;
-        if (filters.fromDate) params.fromDate = filters.fromDate;
-        if (filters.toDate) params.toDate = filters.toDate;
-        if (filters.counsellorId && filters.counsellorId !== "all") params.counsellorId = filters.counsellorId;
-        if (filters.groupFilter) params.group = true;
+    if (filters.search) params.search = filters.search;
+    if (filters.paymentMode && filters.paymentMode !== "all") params.paymentMode = filters.paymentMode;
+    if (filters.status && filters.status !== "all") params.status = filters.status;
+    if (filters.dateFilter && filters.dateFilter !== "all") params.dateFilter = filters.dateFilter;
+    if (filters.fromDate) params.fromDate = filters.fromDate;
+    if (filters.toDate) params.toDate = filters.toDate;
+    if (filters.counsellorId && filters.counsellorId !== "all") params.counsellorId = filters.counsellorId;
+    if (filters.groupFilter) params.group = true;
 
-        return params;
-    }, [filters]);
+    return params;
+}, [filters]);
 
     // Fetch orders
-    const fetchOrders = async () => {
-        try {
-            setLoading(true);
-            const queryParams = buildQueryParams();
-            const response = await getDataHandlerWithToken("Order", queryParams, null);
-            if (response.data) {
-                setOrders(response.data);
-                setTotalOrders(response.total);
-                setTotalPages(response.totalPages);
-            }
-        } catch (error) {
-            toast({
-                title: "Error",
-                description: "Failed to fetch orders",
-                variant: "destructive",
-            });
-        } finally {
-            setLoading(false);
+const fetchOrders = async () => {
+    try {
+        setLoading(true);
+        const queryParams = buildQueryParams();
+        console.log('Fetching with params:', queryParams); // Debug log
+        const response = await getDataHandlerWithToken("Order", queryParams, null);
+        if (response.data) {
+            setOrders(response.data);
+            setTotalOrders(response.total);
+            setTotalPages(response.totalPages);
         }
-    };
+    } catch (error) {
+        toast({
+            title: "Error",
+            description: "Failed to fetch orders",
+            variant: "destructive",
+        });
+    } finally {
+        setLoading(false);
+    }
+};
+
+// Update the handleFilterChange function to properly update page
+const handleFilterChange = (key: keyof Filters, value: any) => {
+    setFilters(prev => ({
+        ...prev,
+        [key]: value,
+        ...(key !== 'page' && key !== 'limit' ? { page: 1 } : {}) // Reset to page 1 when changing filters
+    }));
+};
 
     // Fetch leads for suggestion
     const fetchLeads = async () => {
@@ -1085,15 +1095,6 @@ export function OrderManagementPage() {
         });
     };
 
-    // Handle filter changes
-    const handleFilterChange = (key: keyof Filters, value: any) => {
-        setFilters(prev => ({
-            ...prev,
-            [key]: value,
-            page: 1
-        }));
-    };
-
     return (
         <div className="space-y-4 md:space-y-6 p-2 md:p-0">
             {/* Header */}
@@ -1157,7 +1158,7 @@ export function OrderManagementPage() {
         >
             {filters.groupFilter && <div className="w-2 h-2 bg-white rounded-sm" />}
         </div>
-        <span className="text-sm font-medium text-slate-700">Group by User</span>
+        <span className="text-sm font-medium text-slate-700">Groups</span>
     </div>
 </div>
 
@@ -1285,7 +1286,7 @@ export function OrderManagementPage() {
           <SearchableDropdown
             options={[
               { value: 'all', label: 'All Counsellors' },
-              ...counsellors.map(counsellor => ({
+              ...counsellors.filter(user => user.status == "active").map(counsellor => ({
                 value: counsellor._id,
                 label: counsellor.name,
                 empId: counsellor.employeeId
@@ -1308,46 +1309,46 @@ export function OrderManagementPage() {
           {/* Orders Table */}
 <Card className="bg-white border-0 shadow-sm overflow-hidden">
   {/* Table Header with Title & Pagination */}
-  <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
+<div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
     <h2 className="font-semibold text-slate-800">Order Records</h2>
     <div className="flex items-center gap-3 text-sm text-slate-500">
-      <span>Page {page} of {totalPages}</span>
-      <div className="flex gap-1">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage(p => Math.max(1, p - 1))}
-          disabled={page === 1 || loading}
-          className="h-8 w-8 p-0 rounded-lg"
+        <span>Page {filters.page} of {totalPages}</span>
+        <div className="flex gap-1">
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleFilterChange('page', Math.max(1, filters.page - 1))}
+                disabled={filters.page === 1 || loading}
+                className="h-8 w-8 p-0 rounded-lg"
+            >
+                <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleFilterChange('page', Math.min(totalPages, filters.page + 1))}
+                disabled={filters.page === totalPages || loading}
+                className="h-8 w-8 p-0 rounded-lg"
+            >
+                <ChevronRight className="w-4 h-4" />
+            </Button>
+        </div>
+        <Select
+            value={filters.limit.toString()}
+            onValueChange={v => handleFilterChange('limit', parseInt(v))}
         >
-          <ChevronLeft className="w-4 h-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-          disabled={page === totalPages || loading}
-          className="h-8 w-8 p-0 rounded-lg"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </Button>
-      </div>
-      <Select
-        value={limit.toString()}
-        onValueChange={v => { setLimit(parseInt(v)); setPage(1); }}
-      >
-        <SelectTrigger className="w-20 h-8 text-sm rounded-lg">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="10">10</SelectItem>
-          <SelectItem value="25">25</SelectItem>
-          <SelectItem value="50">50</SelectItem>
-          <SelectItem value="100">100</SelectItem>
-        </SelectContent>
-      </Select>
+            <SelectTrigger className="w-20 h-8 text-sm rounded-lg">
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+            </SelectContent>
+        </Select>
     </div>
-  </div>
+</div>
 
   {/* Table Content */}
   {loading ? (
@@ -1511,13 +1512,31 @@ export function OrderManagementPage() {
   )}
 
   {/* Footer Pagination */}
-  <div className="px-5 py-3 border-t border-slate-100 flex justify-between items-center text-sm text-slate-500">
-    <span>Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, totalOrders)} of {totalOrders}</span>
+<div className="px-5 py-3 border-t border-slate-100 flex justify-between items-center text-sm text-slate-500">
+    <span>
+        Showing {((filters.page - 1) * filters.limit) + 1} to {Math.min(filters.page * filters.limit, totalOrders)} of {totalOrders}
+    </span>
     <div className="flex gap-2">
-      <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1 || loading} className="rounded-lg">Previous</Button>
-      <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || loading} className="rounded-lg">Next</Button>
+        <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => handleFilterChange('page', Math.max(1, filters.page - 1))} 
+            disabled={filters.page === 1 || loading} 
+            className="rounded-lg"
+        >
+            Previous
+        </Button>
+        <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => handleFilterChange('page', Math.min(totalPages, filters.page + 1))} 
+            disabled={filters.page === totalPages || loading} 
+            className="rounded-lg"
+        >
+            Next
+        </Button>
     </div>
-  </div>
+</div>
 </Card>
 
            {/* Create Order Modal */}

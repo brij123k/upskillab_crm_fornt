@@ -47,7 +47,6 @@ const REPORTS = [
   { id: 'source-campaign',             name: 'Source Campaign',     icon: BarChart3,    component: SourceCampaignReport },
   { id: 'source-campaign-revenue',     name: 'Revenue by Source',   icon: IndianRupee,   component: SourceCampaignRevenueReport },
   { id: 'salary-sheet',                name: 'Salary Sheet',        icon: IndianRupee,   component: SalarySheetReport,       permission: { module: 'reports', action: 'salary_sheet' } },
-  { id: 'source-campaign-comparison',  name: 'Campaign Comparison', icon: BarChart3,    component: SourceCampaignComparisonReport },
   { id: 'state-wise',  name: 'state-compaign', icon: BarChart3,    component: StateWiseReport },
   { id: 'state-wise-employee', name: 'State Employees', icon: Users, component: StateWiseEmployeeReport },
 ];
