@@ -2572,7 +2572,7 @@ const formatDate = (dateString?: string | null) => {
           <SearchableDropdown
             options={[
               { value: "", label: "Select user..." },
-              ...users.map(user => ({
+              ...users.filter(user => user.status == "active").map(user => ({
                 value: user._id,
                 label: user.name,
                 role: user.role?.name || user.role,
