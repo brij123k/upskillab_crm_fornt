@@ -178,12 +178,15 @@ addNewLevel: `${url}/level`,
 
   // leave
   createLeave:`${url}/leaves`,
-  getLeaves:`${url}/leaves`,
-  getLeavePolicies:`${url}/leaves/policies`,
+  getLeaves:`${url}/leaves/me`,
+  leavePolicies:`${url}/leaves/policies`,
   getLeavePolicyByRole:(roleId:string)=>`${url}/leaves/policies/role/${roleId}`,
-  getLeavePolicyById:(policyId:string)=>`${url}/leaves/policies/${policyId}`,
-  getMyLeaveSummary:`${url}/leaves/me/summary`,
-  getMyLeaves:`${url}/leaves/me`,
+  leavePolicyById:(policyId:string)=>`${url}/leaves/policies/${policyId}`,
+  
+  getMyLeaveSummary:`${url}/leave-balances/me/summary`,
+  getMyLeaves:`${url}/leave-balances/me`,
+  myLeavesbalHistory:`${url}/leave-balances/me/history`,
+  
   getMyLeaveById:(leaveId:string)=>`${url}/leaves/me/${leaveId}`,
   updateMyLeave:(leaveId:string)=>`${url}/leaves/me/${leaveId}`,
   cancelMyLeave:(leaveId:string)=>`${url}/leaves/me/${leaveId}/cancel`,
@@ -201,6 +204,8 @@ addNewLevel: `${url}/level`,
   getAttendance:`${url}/attendance`,
   getAttendanceByUserId:(userId:string)=>`${url}/attendance/user/${userId}`,
   getAttendanceByDate:(date:string)=>`${url}/attendance/date/${date}`,
+
+
 };
 
 export default ApiConfig;

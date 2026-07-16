@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { getUser } from '@/auth';
 import { format } from 'date-fns';
-import { CalendarDays, Clock3, Loader2, RefreshCw, ShieldAlert, Users, Eye } from 'lucide-react';
+import { CalendarDays, Clock3, Loader2, RefreshCw, TrendingUp, AlertCircle, CheckCircle2, Users, Eye, Edit2, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import ApiConfig from '@/config/apiConfig';
 import { toast } from 'sonner';
 import { FormattedTextEditor } from '@/components/editor/FormattedTextEditor';
 import { FormattedText } from '@/components/editor/FormattedText';
+import { Progress } from '@/components/ui/progress';
 
 type SeniorOption = {
   _id: string;
@@ -63,6 +64,15 @@ const formatRange = (leave: LeaveRecord) => {
   const fromText = format(new Date(from), 'MMM dd, yyyy');
   const toText = to ? format(new Date(to), 'MMM dd, yyyy') : fromText;
   return fromText === toText ? fromText : `${fromText} - ${toText}`;
+};
+
+const getDayCount = (leave: LeaveRecord): number => {
+  const from = leave.leaveFrom || leave.leaveDate;
+  const to = leave.leaveTo || leave.leaveFrom || leave.leaveDate;
+  if (!from || !to) return 1;
+  const start = new Date(from);
+  const end = new Date(to);
+  return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 };
 
 export function LeavesPage() {
@@ -261,112 +271,175 @@ export function LeavesPage() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">My Leaves</h1>
-          <p className="text-muted-foreground">Create leave requests and track approvals.</p>
+          <h1 className="text-2xl font-bold text-foreground">My Leave Requests</h1>
+          <p className="text-muted-foreground">Submit and track your leave applications.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => fetchData(true)} disabled={refreshing} className="gap-2">
             <RefreshCw className={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
             Refresh
           </Button>
-          <Button onClick={openCreate} className="gap-2">
+          <Button onClick={openCreate} className="gap-2 bg-orange-600 hover:bg-orange-700">
             <CalendarDays className="h-4 w-4" />
             New Leave
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Applied this month</p>
-            <div className="mt-2 text-3xl font-semibold">{monthCount}</div>
+      {/* Leave Balance Summary */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-blue-700 uppercase">Total Requests</p>
+                <div className="mt-2 text-3xl font-bold text-blue-900">{myLeaves.length}</div>
+              </div>
+              <CalendarDays className="h-8 w-8 text-blue-400 opacity-50" />
+            </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Max leave / month</p>
-            <div className="mt-2 text-3xl font-semibold">{currentLimit || 'No limit'}</div>
+
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-green-700 uppercase">Approved</p>
+                <div className="mt-2 text-3xl font-bold text-green-900">{myLeaves.filter(l => l.status === 'approved').length}</div>
+              </div>
+              <CheckCircle2 className="h-8 w-8 text-green-400 opacity-50" />
+            </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Your requests</p>
-            <div className="mt-2 text-3xl font-semibold">{myLeaves.length}</div>
+
+        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-yellow-700 uppercase">Pending</p>
+                <div className="mt-2 text-3xl font-bold text-yellow-900">{myLeaves.filter(l => l.status === 'pending').length}</div>
+              </div>
+              <Clock3 className="h-8 w-8 text-yellow-400 opacity-50" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-purple-700 uppercase">This Month</p>
+                <div className="mt-2 text-3xl font-bold text-purple-900">{monthCount} day(s)</div>
+              </div>
+              <TrendingUp className="h-8 w-8 text-purple-400 opacity-50" />
+            </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Leave Submission Form */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <CalendarDays className="h-5 w-5" />
-            Apply Leave
+        <CardHeader className="bg-gradient-to-r from-orange-50 to-orange-100 border-b">
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-orange-600" />
+            Submit New Leave Request
           </CardTitle>
           <CardDescription>
-            Add a subject, rich-text reason, date range, and one or more approvers.
+            Specify dates, reason, and approvers. Your request will be routed for approval.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2 md:col-span-2">
-            <Label>Report To</Label>
-            <MultiSelect
-              options={approverOptions}
-              selected={form.reportToUserIds}
-              onChange={(selected) => setForm((prev) => ({ ...prev, reportToUserIds: selected }))}
-              placeholder="Select approvers"
-              searchPlaceholder="Search approvers..."
-              emptyMessage="No approvers found"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Subject</Label>
-            <Input
-              value={form.subject}
-              onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))}
-              placeholder="Leave subject"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>From Date</Label>
-            <Input
-              type="date"
-              value={form.leaveFrom}
-              onChange={(e) => setForm((prev) => ({ ...prev, leaveFrom: e.target.value }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>To Date</Label>
-            <Input
-              type="date"
-              value={form.leaveTo}
-              onChange={(e) => setForm((prev) => ({ ...prev, leaveTo: e.target.value }))}
-            />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label>Reason</Label>
-            <FormattedTextEditor
-              value={form.reason}
-              onChange={(value) => setForm((prev) => ({ ...prev, reason: value }))}
-              placeholder="Explain why you need leave..."
-              previewLabel="Reason preview"
-            />
-          </div>
-          <div className="md:col-span-2 flex justify-end">
-            <Button onClick={submitLeave} disabled={saving} className="gap-2">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
-              {editingLeave ? 'Update Leave' : 'Submit Leave'}
-            </Button>
+        <CardContent className="pt-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="md:col-span-2 space-y-2">
+              <Label className="text-sm font-semibold">Subject *</Label>
+              <Input
+                value={form.subject}
+                onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))}
+                placeholder="e.g., Annual Leave, Medical Emergency, Family Event"
+                className="rounded-lg"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">From Date *</Label>
+              <Input
+                type="date"
+                value={form.leaveFrom}
+                onChange={(e) => setForm((prev) => ({ ...prev, leaveFrom: e.target.value }))}
+                className="rounded-lg"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">To Date *</Label>
+              <Input
+                type="date"
+                value={form.leaveTo}
+                onChange={(e) => setForm((prev) => ({ ...prev, leaveTo: e.target.value }))}
+                className="rounded-lg"
+              />
+            </div>
+
+            <div className="md:col-span-2 space-y-2">
+              <Label className="text-sm font-semibold">Approve to (Reporting Seniors) *</Label>
+              <MultiSelect
+                options={approverOptions}
+                selected={form.reportToUserIds}
+                onChange={(selected) => setForm((prev) => ({ ...prev, reportToUserIds: selected }))}
+                placeholder="Select your approvers"
+                searchPlaceholder="Search seniors..."
+                emptyMessage="No approvers found"
+              />
+              <p className="text-xs text-slate-500">Select your immediate seniors for approval</p>
+            </div>
+
+            <div className="md:col-span-2 space-y-2">
+              <Label className="text-sm font-semibold">Reason for Leave *</Label>
+              <FormattedTextEditor
+                value={form.reason}
+                onChange={(value) => setForm((prev) => ({ ...prev, reason: value }))}
+                placeholder="Explain your reason for taking leave..."
+                previewLabel="Reason preview"
+              />
+            </div>
+
+            <div className="md:col-span-2 flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => resetForm()}
+              >
+                Clear
+              </Button>
+              <Button
+                onClick={submitLeave}
+                disabled={saving}
+                className="bg-orange-600 hover:bg-orange-700 gap-2"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <CalendarDays className="h-4 w-4" />
+                    Submit Leave
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Leave History */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <ShieldAlert className="h-5 w-5" />
-            Leave History
+          <CardTitle className="flex items-center gap-2">
+            <Clock3 className="h-5 w-5" />
+            Your Leave History
           </CardTitle>
+          <CardDescription>All submitted leave requests and their current status</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -375,102 +448,142 @@ export function LeavesPage() {
             </div>
           ) : myLeaves.length === 0 ? (
             <div className="rounded-2xl border border-dashed bg-muted/20 p-8 text-center">
-              <h3 className="text-lg font-semibold">No leave requests yet</h3>
-              <p className="mt-2 text-sm text-muted-foreground">Your applied leaves will appear here.</p>
+              <CalendarDays className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
+              <h3 className="mt-3 text-lg font-semibold">No leave requests yet</h3>
+              <p className="mt-2 text-sm text-muted-foreground">Your leave requests will appear here once submitted.</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {myLeaves.map((leave) => (
-                <button
-                  key={leave._id}
-                  type="button"
-                  onClick={() => openDetails(leave)}
-                  className="w-full rounded-2xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-4">
+              {myLeaves.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((leave) => {
+                const dayCount = getDayCount(leave);
+                const isPending = leave.status === 'pending';
+                
+                return (
+                  <div
+                    key={leave._id}
+                    className={`rounded-lg border-2 p-4 transition ${
+                      isPending
+                        ? 'border-yellow-200 bg-yellow-50'
+                        : leave.status === 'approved'
+                        ? 'border-green-200 bg-green-50'
+                        : 'border-slate-200 bg-slate-50'
+                    }`}
+                  >
                     <div className="space-y-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge className={STATUS_STYLE[leave.status]}>{leave.status}</Badge>
-                        <Badge variant="outline">{formatRange(leave)}</Badge>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-foreground">{leave.subject}</h3>
-                        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                          <Clock3 className="h-3.5 w-3.5" />
-                          Created on {format(new Date(leave.createdAt), 'MMM dd, yyyy hh:mm a')}
+                      {/* Header */}
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {leave.status === 'pending' && (
+                            <Badge className="bg-yellow-100 text-yellow-800 border border-yellow-200">⏳ Pending</Badge>
+                          )}
+                          {leave.status === 'approved' && (
+                            <Badge className="bg-green-100 text-green-800 border border-green-200">✓ Approved</Badge>
+                          )}
+                          {leave.status === 'rejected' && (
+                            <Badge className="bg-red-100 text-red-800 border border-red-200">✗ Rejected</Badge>
+                          )}
+                          {leave.status === 'cancelled' && (
+                            <Badge className="bg-slate-100 text-slate-800 border border-slate-200">◯ Cancelled</Badge>
+                          )}
+                          <span className="text-xs font-medium text-slate-600">{dayCount} day(s)</span>
                         </div>
+                        <span className="text-xs text-slate-600 font-medium">{formatRange(leave)}</span>
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        Report to: {approvalNames(leave) || 'Unknown'}
-                        {leave.approvedBy ? ` | Approved by: ${leave.approvedBy.name}` : ''}
+
+                      {/* Subject */}
+                      <div>
+                        <h4 className="font-semibold text-slate-900">{leave.subject}</h4>
+                        <p className="text-xs text-slate-600 mt-1">
+                          Submitted on {format(new Date(leave.createdAt), 'MMM dd, yyyy hh:mm a')}
+                        </p>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openDetails(leave);
-                        }}
-                        className="gap-2"
-                      >
-                        <Eye className="h-4 w-4" />
-                        View
-                      </Button>
-                      {leave.status === 'pending' && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEdit(leave);
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              cancelLeave(leave._id);
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                        </>
+
+                      {/* Approval Info */}
+                      {leave.approvedBy && (
+                        <div className="flex items-start gap-2 text-xs bg-green-100 border border-green-200 rounded p-2">
+                          <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <div className="text-green-800">
+                            <span className="font-medium">Approved by {leave.approvedBy.name}</span>
+                            {leave.approvedAt && ` on ${format(new Date(leave.approvedAt), 'MMM dd, yyyy')}`}
+                          </div>
+                        </div>
                       )}
+
+                      {leave.status === 'rejected' && leave.approvalReason && (
+                        <div className="flex items-start gap-2 text-xs bg-red-100 border border-red-200 rounded p-2">
+                          <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                          <div className="text-red-800">
+                            <span className="font-medium">Rejected.</span> {leave.approvalReason}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex gap-2 pt-2 border-t border-current border-opacity-10">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openDetails(leave)}
+                          className="gap-1"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          View
+                        </Button>
+                        {leave.status === 'pending' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openEdit(leave)}
+                              className="gap-1"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => cancelLeave(leave._id)}
+                              className="gap-1"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Cancel
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
       </Card>
 
+      {/* Edit Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingLeave ? 'Update Leave' : 'Apply Leave'}</DialogTitle>
+            <DialogTitle>{editingLeave ? 'Update Leave Request' : 'New Leave Request'}</DialogTitle>
             <DialogDescription>
-              {editingLeave ? 'Update your pending leave request.' : 'Submit a new leave request.'}
+              {editingLeave ? 'Update your pending leave request before approval.' : 'Submit a new leave request to your reporting seniors.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-1">
+          <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Subject</Label>
+              <Label className="font-semibold">Subject *</Label>
               <Input
                 value={form.subject}
                 onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))}
+                placeholder="Leave subject"
               />
             </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>From Date</Label>
+                <Label className="font-semibold">From Date *</Label>
                 <Input
                   type="date"
                   value={form.leaveFrom}
@@ -478,7 +591,7 @@ export function LeavesPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>To Date</Label>
+                <Label className="font-semibold">To Date *</Label>
                 <Input
                   type="date"
                   value={form.leaveTo}
@@ -486,80 +599,112 @@ export function LeavesPage() {
                 />
               </div>
             </div>
+
             <div className="space-y-2">
-              <Label>Report To</Label>
+              <Label className="font-semibold">Approvers *</Label>
               <MultiSelect
                 options={approverOptions}
                 selected={form.reportToUserIds}
                 onChange={(selected) => setForm((prev) => ({ ...prev, reportToUserIds: selected }))}
                 placeholder="Select approvers"
-                searchPlaceholder="Search approvers..."
-                emptyMessage="No approvers found"
               />
             </div>
+
             <div className="space-y-2">
-              <Label>Reason</Label>
+              <Label className="font-semibold">Reason *</Label>
               <FormattedTextEditor
                 value={form.reason}
                 onChange={(value) => setForm((prev) => ({ ...prev, reason: value }))}
-                placeholder="Write your leave reason..."
-                previewLabel="Reason preview"
+                placeholder="Reason for leave"
               />
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>Close</Button>
+            <Button variant="outline" onClick={() => { setEditOpen(false); resetForm(); }}>
+              Cancel
+            </Button>
             <Button onClick={submitLeave} disabled={saving}>
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Save
+              {editingLeave ? 'Update' : 'Submit'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Detail Dialog */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           {detailLeave && (
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <CalendarDays className="h-5 w-5 text-primary" />
+                  <CalendarDays className="h-5 w-5" />
                   {detailLeave.subject}
                 </DialogTitle>
                 <DialogDescription>
-                  {formatRange(detailLeave)} | Report to {approvalNames(detailLeave) || 'Unknown'}
+                  {formatRange(detailLeave)} • {getDayCount(detailLeave)} day(s)
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-4 py-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className={STATUS_STYLE[detailLeave.status]}>{detailLeave.status}</Badge>
-                  <Badge variant="outline">
-                    {detailLeave.approvedBy ? `Approved by ${detailLeave.approvedBy.name}` : 'Pending approval'}
-                  </Badge>
+              <div className="space-y-4">
+                {/* Status */}
+                <div className="flex items-center gap-2">
+                  {detailLeave.status === 'pending' && (
+                    <Badge className="bg-yellow-100 text-yellow-800">⏳ Pending</Badge>
+                  )}
+                  {detailLeave.status === 'approved' && (
+                    <Badge className="bg-green-100 text-green-800">✓ Approved</Badge>
+                  )}
+                  {detailLeave.status === 'rejected' && (
+                    <Badge className="bg-red-100 text-red-800">✗ Rejected</Badge>
+                  )}
                 </div>
-                <div className="rounded-2xl border bg-muted/30 p-4">
-                  <FormattedText text={detailLeave.reason || ''} className="text-sm" />
+
+                {/* Reason */}
+                <div className="space-y-2">
+                  <Label className="font-medium">Reason</Label>
+                  <div className="p-3 bg-slate-50 rounded-lg text-sm whitespace-pre-wrap">
+                    <FormattedText text={detailLeave.reason} />
+                  </div>
                 </div>
-                {detailLeave.approvalReason && (
-                  <div className="rounded-2xl border border-dashed p-4">
-                    <h4 className="font-semibold text-sm">Approval note</h4>
-                    <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{detailLeave.approvalReason}</p>
+
+                {/* Approval Info */}
+                {detailLeave.approvedBy && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <span>Approved by <span className="font-medium">{detailLeave.approvedBy.name}</span></span>
+                    </div>
+                    {detailLeave.approvedAt && (
+                      <div className="text-xs text-green-700 mt-1">
+                        On {format(new Date(detailLeave.approvedAt), 'MMM dd, yyyy hh:mm a')}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {detailLeave.status === 'rejected' && detailLeave.approvalReason && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm whitespace-pre-wrap">
+                    <span className="font-medium">Rejection reason:</span>
+                    <p className="text-red-700 mt-1">{detailLeave.approvalReason}</p>
                   </div>
                 )}
               </div>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setDetailOpen(false)}>Close</Button>
                 {detailLeave.status === 'pending' && (
-                  <Button onClick={() => {
-                    setDetailOpen(false);
-                    openEdit(detailLeave);
-                  }}>
+                  <Button
+                    onClick={() => {
+                      setDetailOpen(false);
+                      openEdit(detailLeave);
+                    }}
+                    variant="outline"
+                  >
                     Edit Request
                   </Button>
                 )}
+                <Button onClick={() => setDetailOpen(false)}>Close</Button>
               </DialogFooter>
             </>
           )}
