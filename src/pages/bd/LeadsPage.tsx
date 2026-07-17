@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DuplicateLeadsModal } from '@/components/modal/DuplicateLeadsModal';
-import { CopyCheck, Database, MousePointer, PhoneCall, AlarmClock, CalendarDays } from 'lucide-react';
+import { CopyCheck, Database, MousePointer, PhoneCall, AlarmClock, CalendarDays, Copy, ExternalLink } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -54,6 +54,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { toast as t2 } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -3365,7 +3366,6 @@ const formatDate = (dateString?: string | null) => {
 </Dialog>
 
 
-      {/* Lead Actions Modal */}
    {/* Lead Actions Modal */}
 <Dialog open={actionsModalOpen} onOpenChange={setActionsModalOpen}>
   <DialogContent className="sm:max-w-[500px] rounded-2xl border-slate-200 p-0 overflow-hidden">
@@ -3411,6 +3411,36 @@ const formatDate = (dateString?: string | null) => {
                   PCAT Register
                 </Button>
               </div>
+
+               <div className="flex items-center gap-2 mt-1 pt-2 border-t border-orange-100">
+      <div className="flex-1 min-w-0">
+        <a 
+          href="https://upskillab.com/PCATExamPortal?e=true" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-sm text-orange-600 hover:text-orange-700 hover:underline font-medium truncate block"
+        >
+          <span className="flex items-center gap-1.5">
+            <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+            <span>PCAT Exam Portal</span>
+          </span>
+        </a>
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+  navigator.clipboard.writeText("https://upskillab.com/PCATExamPortal?e=true");
+  t2.success("Link copied to clipboard!");
+}}
+        className="h-8 w-8 p-0 rounded-lg hover:bg-orange-100 text-orange-600 shrink-0"
+        title="Copy link"
+      >
+        <Copy className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+
+
             </div>
           </div>
 
