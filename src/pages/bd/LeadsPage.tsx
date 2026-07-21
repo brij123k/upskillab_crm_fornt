@@ -522,32 +522,36 @@ const [addingFollowUp, setAddingFollowUp] = useState(false);
     }
   };
 
-  const handleStageSubmit = async (leadId: string, stageId: string) => {
-    if (!selectedLead) return;
+  const handleStageSubmit = async (leadId: string, stageId: string, reason: string) => {
+  if (!selectedLead) return;
 
-    try {
-      setChangingStage(true);
-      const endpoint = ApiConfig.changeStageLead(leadId);
-      const response = await patchTokenDataHandler(endpoint, { stageId }, true);
+  try {
+    setChangingStage(true);
+    const endpoint = ApiConfig.changeStageLead(leadId);
+    // Include reason in the request body
+    const response = await patchTokenDataHandler(endpoint, { 
+      stageId, 
+      reason: reason.trim() 
+    }, true);
 
-      toast({
-        title: "Success",
-        description: response?.message || "Lead stage updated successfully",
-      });
+    toast({
+      title: "Success",
+      description: response?.message || "Lead stage updated successfully",
+    });
 
-      setChangeStageModalOpen(false);
-      setActionsModalOpen(false);
-      fetchLeads();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to update lead stage",
-        variant: "destructive",
-      });
-    } finally {
-      setChangingStage(false);
-    }
-  };
+    setChangeStageModalOpen(false);
+    setActionsModalOpen(false);
+    fetchLeads();
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.response?.data?.message || "Failed to update lead stage",
+      variant: "destructive",
+    });
+  } finally {
+    setChangingStage(false);
+  }
+};
 
   // Initialize data
   useEffect(() => {
@@ -2463,6 +2467,16 @@ const formatDate = (dateString?: string | null) => {
                 >
                   <AlarmClock className="w-4 h-4" />
                 </button>
+                 <button
+      onClick={(e) => {
+        e.stopPropagation();
+        handleViewLeadHistory(lead);
+      }}
+      className="text-slate-500 hover:text-orange-600 transition-colors"
+      title="View History"
+    >
+      <FileText className="w-4 h-4" />
+    </button>
               </div>
             </td>
             {/* Assigned To – name + employee ID */}

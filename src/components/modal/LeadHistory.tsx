@@ -204,15 +204,23 @@ export function LeadHistoryModal({
         );
 
       case 'stage changed by calls':
-      case 'stage_changed':
-      case 'status_changed':
-        return (
-          <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg">
-            <span className="text-sm font-medium text-slate-700">{changes.status?.from || 'Unknown'}</span>
-            <TrendingUp className="w-4 h-4 text-orange-500" />
-            <span className="text-sm font-medium text-slate-700">{changes.status?.to || 'Unknown'}</span>
-          </div>
-        );
+case 'stage_changed':
+case 'status_changed':
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg">
+        <span className="text-sm font-medium text-slate-700">{changes.status?.from || changes.stage?.from || 'Unknown'}</span>
+        <TrendingUp className="w-4 h-4 text-orange-500" />
+        <span className="text-sm font-medium text-slate-700">{changes.status?.to || changes.stage?.to || 'Unknown'}</span>
+      </div>
+      {reason && (
+        <div className="pt-2 border-t border-slate-100">
+          <div className="text-xs text-slate-400 uppercase tracking-wide">Reason</div>
+          <div className="text-sm text-slate-600 mt-0.5">{reason}</div>
+        </div>
+      )}
+    </div>
+  );
 
       case 'assigned':
         return (

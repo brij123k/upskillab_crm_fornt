@@ -1948,16 +1948,18 @@ export function OrderManagementPage() {
                                                                     No loan partners available
                                                                 </div>
                                                             ) : (
-                                                                loanPartners.map((partner) => (
-                                                                    <SelectItem key={partner._id} value={partner._id}>
-                                                                        <div className="flex flex-col">
-                                                                            <span>{partner.name}</span>
-                                                                            <span className="text-xs text-muted-foreground">
-                                                                                Type: {partner.type} | Charge: {partner.submissionCharge}%
-                                                                            </span>
-                                                                        </div>
-                                                                    </SelectItem>
-                                                                ))
+                                                                loanPartners
+  .filter(partner => partner.isActive)
+  .map((partner) => (
+    <SelectItem key={partner._id} value={partner._id}>
+      <div className="flex flex-col">
+        <span>{partner.name}</span>
+        <span className="text-xs text-muted-foreground">
+          Type: {partner.type} | Charge: {partner.submissionCharge}%
+        </span>
+      </div>
+    </SelectItem>
+  ))
                                                             )}
                                                         </SelectContent>
                                                     </Select>

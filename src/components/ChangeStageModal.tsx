@@ -17,9 +17,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ArrowRight, TrendingUp, ListTodo, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, ArrowRight, TrendingUp, ListTodo, CheckCircle, AlertCircle, AlertTriangle } from 'lucide-react';
 import { StageType } from '@/types/lead';
 import { cn } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea'; // Make sure this is imported
 
 interface ChangeStageModalProps {
   open: boolean;
@@ -28,7 +29,7 @@ interface ChangeStageModalProps {
   stages: StageType[];
   loadingStages: boolean;
   changingStage: boolean;
-  onSubmit: (leadId: string, stageId: string) => Promise<void>;
+  onSubmit: (leadId: string, stageId: string, reason: string) => Promise<void>; // Added reason parameter
 }
 
 export function ChangeStageModal({
@@ -41,11 +42,13 @@ export function ChangeStageModal({
   onSubmit
 }: ChangeStageModalProps) {
   const [selectedStage, setSelectedStage] = useState<string>('');
+  const [reason, setReason] = useState<string>('');
   const [dropdownPosition, setDropdownPosition] = useState<'top' | 'bottom'>('bottom');
 
   useEffect(() => {
     if (selectedLead && open) {
       setSelectedStage(selectedLead.stageId._id);
+      setReason(''); // Reset reason when modal opens
     }
   }, [selectedLead, open]);
 
@@ -69,8 +72,12 @@ export function ChangeStageModal({
 
   const handleSubmit = async () => {
     if (!selectedLead || !selectedStage) return;
+    if (!reason.trim()) {
+      // Show error or toast - you can add a toast here
+      return;
+    }
     try {
-      await onSubmit(selectedLead._id, selectedStage);
+      await onSubmit(selectedLead._id, selectedStage, reason.trim());
       onOpenChange(false);
     } catch (error) {
       // Error handled by parent
@@ -174,6 +181,39 @@ export function ChangeStageModal({
               )}
             </div>
 
+            {/* NEW: Reason Field */}
+            {selectedStage && selectedStage !== selectedLead?.stageId._id && (
+              <div className="space-y-1.5">
+                <Label htmlFor="reason" className="text-sm font-medium text-slate-700">
+                  Reason for Stage Change *
+                </Label>
+                <Textarea
+                  id="reason"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Enter reason for changing the stage..."
+                  className="min-h-[80px] rounded-xl border-slate-200 focus:ring-orange-500 focus:border-orange-500 resize-y"
+                  disabled={changingStage}
+                  rows={3}
+                />
+                <p className="text-xs text-slate-500">
+                  This reason will be recorded in the lead history.
+                </p>
+              </div>
+            )}
+
+            {/* Validation Message */}
+            {selectedStage && selectedStage !== selectedLead?.stageId._id && !reason.trim() && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-amber-800">
+                    Please provide a reason for changing the stage
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Stage Movement Visualization */}
             {selectedStage && selectedStage !== selectedLead?.stageId._id && (
               <div className="p-4 rounded-xl border border-orange-100 bg-orange-50/30">
@@ -237,6 +277,12 @@ export function ChangeStageModal({
                       {Math.abs(selectedStageIndex - currentStageIndex)} step(s) {isMovingForward ? "forward" : "backward"}
                     </span>
                   </div>
+                  {reason && (
+                    <div className="flex justify-between text-sm pt-2 border-t border-slate-200">
+                      <span className="text-slate-500">Reason:</span>
+                      <span className="font-medium text-slate-800 truncate max-w-[60%]">{reason}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -256,7 +302,12 @@ export function ChangeStageModal({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={changingStage || !selectedStage || selectedStage === selectedLead?.stageId._id}
+              disabled={
+                changingStage || 
+                !selectedStage || 
+                selectedStage === selectedLead?.stageId._id ||
+                !reason.trim()
+              }
               className={cn(
                 "flex-1 sm:flex-none rounded-xl text-white",
                 isMovingForward ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700"

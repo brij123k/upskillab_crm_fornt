@@ -1948,7 +1948,7 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
                     ) : loanPartners.length === 0 ? (
                       <div className="px-2 py-2 text-sm text-slate-400">No loan partners available</div>
                     ) : (
-                      loanPartners.map((partner) => (
+                      loanPartners.filter(partner => partner.isActive).map((partner) => (
                         <SelectItem key={partner._id} value={partner._id}>
                           {partner.name}
                           <span className="ml-2 text-xs text-slate-400">
