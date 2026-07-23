@@ -82,6 +82,7 @@ addNewLevel: `${url}/level`,
   updateLoanPartners:(loanPartnerId:string)=>`${url}/loan-partner/${loanPartnerId}`,
   toggleLoanPartners:(loanPartnerId:string)=>`${url}/loan-partner/toggle/${loanPartnerId}`,
   createPaymentLink:`${url}/payment/create-link`,
+  leadPaymentLink:`${url}/payment/leadPayment-link`,
   getPaymentHistory:`${url}/payment`,
   getPaymentbyOrderId:(orderId:string)=>`${url}/payment/by-order-id/${orderId}`,
   createSubscription:`${url}/subscription/create`,
@@ -205,6 +206,8 @@ addNewLevel: `${url}/level`,
   getAttendanceByUserId:(userId:string)=>`${url}/attendance/user/${userId}`,
   getAttendanceByDate:(date:string)=>`${url}/attendance/date/${date}`,
 
+
+  bulkStageChange: `${url}/leads/bulkStage/change`
 
 };
 

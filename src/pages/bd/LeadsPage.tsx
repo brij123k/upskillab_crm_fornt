@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DuplicateLeadsModal } from '@/components/modal/DuplicateLeadsModal';
-import { CopyCheck, Database, MousePointer, PhoneCall, AlarmClock, CalendarDays, Copy, ExternalLink } from 'lucide-react';
+import { CopyCheck, Database, MousePointer, PhoneCall, AlarmClock, CalendarDays, Copy, ExternalLink, CreditCard } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -82,7 +82,7 @@ import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 import { LeadHistoryModal } from '@/components/modal/LeadHistory';
 import { hasModulePermission } from '@/utils/modulePermissions';
 import { PoolType } from '@/types/user';
-
+import { LeadPaymentModal } from '@/components/modal/PaymentModal';
 interface LeadType {
   _id: string;
   leadId: number;
@@ -247,6 +247,12 @@ const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
 const [followUpLead, setFollowUpLead] = useState<LeadType | null>(null);
 const [followUpDateTime, setFollowUpDateTime] = useState('');
 const [addingFollowUp, setAddingFollowUp] = useState(false);
+const [paymentModalOpen, setLeadPaymentModalOpen] = useState(false);
+// Add after the changePoolModalOpen state
+const [changeStageBulkModalOpen, setChangeStageBulkModalOpen] = useState(false);
+const [selectedBulkStageId, setSelectedBulkStageId] = useState<string>('');
+const [bulkStageChangeReason, setBulkStageChangeReason] = useState('');
+const [changingBulkStage, setChangingBulkStage] = useState(false);
   // Filters
   const [filters, setFilters] = useState<Filters>({
     search: '',
@@ -354,6 +360,65 @@ const [addingFollowUp, setAddingFollowUp] = useState(false);
 
     fetchOngoingExam();
   }, [actionsModalOpen, selectedLead?._id]);
+
+  // Handle bulk stage change
+const handleBulkStageChange = async () => {
+  if (selectedLeads.length === 0) {
+    toast({
+      title: "Error",
+      description: "Please select at least one lead",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  if (!selectedBulkStageId) {
+    toast({
+      title: "Error",
+      description: "Please select a stage",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  if (!bulkStageChangeReason.trim()) {
+    toast({
+      title: "Error",
+      description: "Please enter a reason for stage change",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  try {
+    setChangingBulkStage(true);
+    const response = await patchTokenDataHandler("bulkStageChange", {
+      leadIds: selectedLeads,
+      stageId: selectedBulkStageId,
+      reason: bulkStageChangeReason.trim()
+    });
+
+    toast({
+      title: "Success",
+      description: response?.message || "Leads stage changed successfully",
+    });
+
+    setChangeStageBulkModalOpen(false);
+    setSelectedBulkStageId('');
+    setBulkStageChangeReason('');
+    setSelectedLeads([]);
+    setIsAssignmentMode(false);
+    fetchLeads(); // Refresh leads
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.response?.data?.message || "Failed to change stage",
+      variant: "destructive",
+    });
+  } finally {
+    setChangingBulkStage(false);
+  }
+};
 
   // Build query params
   const buildQueryParams = () => {
@@ -1428,10 +1493,6 @@ const formatDate = (dateString?: string | null) => {
     <div className="space-y-4 animate-fade-in bg-transparent">
       {/* Header */}
      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-  <div>
-    <h1 className="text-xl font-bold text-slate-800">Lead Management</h1>
-    <p className="text-sm text-slate-500 mt-0.5">Lead list, filters, and quick actions.</p>
-  </div>
 
   <div className="flex flex-wrap items-center gap-2">
     {hasPermission(permissions, 'leads', 'assign') && (
@@ -1466,6 +1527,15 @@ const formatDate = (dateString?: string | null) => {
             <Database className="w-4 h-4 mr-2" />
             Change Pool ({selectedLeads.length})
           </Button>
+          <Button
+      onClick={() => setChangeStageBulkModalOpen(true)}
+      disabled={selectedLeads.length === 0}
+      variant="outline"
+      className="rounded-xl border-slate-200 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200"
+    >
+      <TrendingUp className="w-4 h-4 mr-2" />
+      Change Stage ({selectedLeads.length})
+    </Button>
         </>
       ) : (
         <Button
@@ -2477,6 +2547,18 @@ const formatDate = (dateString?: string | null) => {
     >
       <FileText className="w-4 h-4" />
     </button>
+    {/* Payment Button */}
+<button
+  onClick={(e) => {
+    e.stopPropagation();
+    setSelectedLead(lead);
+    setLeadPaymentModalOpen(true);
+  }}
+  className="text-green-500 hover:text-green-600 transition-colors"
+  title="Generate Payment"
+>
+  <CreditCard className="w-4 h-4" />
+</button>
               </div>
             </td>
             {/* Assigned To – name + employee ID */}
@@ -3759,6 +3841,196 @@ const formatDate = (dateString?: string | null) => {
   </DialogContent>
 </Dialog>
 
+
+{/* Change Stage Bulk Modal */}
+<Dialog open={changeStageBulkModalOpen} onOpenChange={setChangeStageBulkModalOpen}>
+  <DialogContent className="sm:max-w-[500px] rounded-2xl border-slate-200 p-0 overflow-hidden">
+    {/* Header */}
+    <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
+      <DialogTitle className="text-xl font-bold text-slate-800">Change Stage for Leads</DialogTitle>
+      <DialogDescription className="text-sm text-slate-500">
+        Change stage for {selectedLeads.length} selected lead(s).
+      </DialogDescription>
+    </DialogHeader>
+
+    {/* Body */}
+    <div className="px-6 py-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+      <div className="space-y-4">
+        {/* Stage Selection */}
+        <div className="space-y-1.5">
+          <Label className="text-sm font-medium text-slate-700">Select Stage *</Label>
+          <Select
+            value={selectedBulkStageId}
+            onValueChange={setSelectedBulkStageId}
+            disabled={changingBulkStage || loadingStages}
+          >
+            <SelectTrigger className="h-10 rounded-xl border-slate-200">
+              <SelectValue placeholder="Choose a stage" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl max-h-60">
+              {loadingStages ? (
+                <div className="py-2 text-center">
+                  <Loader2 className="w-4 h-4 mx-auto animate-spin text-orange-500" />
+                </div>
+              ) : (
+                stages.map((stage) => (
+                  <SelectItem key={stage._id} value={stage._id}>
+                    {stage.name}
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Reason */}
+        <div className="space-y-1.5">
+          <Label htmlFor="bulkStageReason" className="text-sm font-medium text-slate-700">
+            Reason for Stage Change *
+          </Label>
+          <textarea
+            id="bulkStageReason"
+            value={bulkStageChangeReason}
+            onChange={(e) => setBulkStageChangeReason(e.target.value)}
+            placeholder="Enter reason for changing stage for these leads..."
+            className="w-full min-h-[100px] p-3 border border-slate-200 rounded-xl text-sm resize-y focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
+            disabled={changingBulkStage}
+            required
+            rows={4}
+          />
+          <p className="text-xs text-slate-500">
+            This reason will be recorded in the lead history.
+          </p>
+        </div>
+
+        {/* Validation Message */}
+        {(!selectedBulkStageId || !bulkStageChangeReason.trim()) && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-amber-800">
+                Please select a stage and enter a reason for the change
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Selected Leads Preview */}
+        <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-medium text-slate-700">
+              Selected Leads ({selectedLeads.length})
+            </p>
+            <Badge variant="outline" className="border-slate-200 text-slate-500 bg-white rounded-lg">
+              {selectedLeads.length} selected
+            </Badge>
+          </div>
+
+          <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
+            {leads
+              .filter(lead => selectedLeads.includes(lead._id))
+              .slice(0, 5)
+              .map((lead) => (
+                <div
+                  key={lead._id}
+                  className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 text-sm"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-slate-800 truncate">{lead.name}</div>
+                    <div className="text-xs text-slate-500 truncate">
+                      #{lead.leadId} • {lead.stageId?.name || "No stage"}
+                    </div>
+                  </div>
+                  <Badge variant="secondary" className="ml-2 flex-shrink-0 bg-slate-100 text-slate-600 border-slate-200 rounded-lg">
+                    Current: {lead.stageId?.name || "N/A"}
+                  </Badge>
+                </div>
+              ))}
+
+            {selectedLeads.length > 5 && (
+              <div className="text-center py-2">
+                <p className="text-xs text-slate-500">
+                  + {selectedLeads.length - 5} more lead{selectedLeads.length - 5 > 1 ? 's' : ''}
+                </p>
+              </div>
+            )}
+
+            {selectedLeads.length === 0 && (
+              <div className="text-center py-4">
+                <p className="text-sm text-slate-500">No leads selected</p>
+              </div>
+            )}
+          </div>
+
+          {/* Stage Summary */}
+          {selectedLeads.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-slate-200">
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500 font-medium">Current Stages:</p>
+                <div className="flex flex-wrap gap-1">
+                  {Array.from(new Set(
+                    leads
+                      .filter(lead => selectedLeads.includes(lead._id))
+                      .map(lead => lead.stageId?.name)
+                      .filter(Boolean)
+                  )).map((stageName, idx) => (
+                    <Badge key={idx} variant="outline" className="text-xs border-slate-200 bg-white">
+                      {stageName}
+                    </Badge>
+                  ))}
+                </div>
+                {selectedBulkStageId && (
+                  <div className="mt-2 flex items-center gap-2 text-xs">
+                    <span className="text-slate-500">Will change to:</span>
+                    <Badge className="bg-orange-100 text-orange-700 border-orange-200">
+                      {stages.find(s => s._id === selectedBulkStageId)?.name || "Selected Stage"}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+
+    {/* Footer */}
+    <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-white">
+      <div className="flex gap-3 w-full sm:w-auto">
+        <Button
+          variant="outline"
+          onClick={() => {
+            setChangeStageBulkModalOpen(false);
+            setSelectedBulkStageId('');
+            setBulkStageChangeReason('');
+          }}
+          disabled={changingBulkStage}
+          className="flex-1 sm:flex-none rounded-xl border-slate-200 hover:bg-slate-50"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleBulkStageChange}
+          disabled={!selectedBulkStageId || !bulkStageChangeReason.trim() || changingBulkStage}
+          className="flex-1 sm:flex-none rounded-xl bg-orange-500 hover:bg-orange-600 text-white"
+        >
+          {changingBulkStage ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Changing Stage...
+            </>
+          ) : (
+            <>
+              <TrendingUp className="mr-2 h-4 w-4" />
+              Change Stage
+            </>
+          )}
+        </Button>
+      </div>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
       {/* Change Stage Modal */}
       <ChangeStageModal
         open={changeStageModalOpen}
@@ -3788,6 +4060,17 @@ const formatDate = (dateString?: string | null) => {
         selectedLeadName={selectedLead?.name}
         onRefresh={() => selectedLead && fetchLeadHistory(selectedLead.leadId.toString())}
       />
+
+      <LeadPaymentModal
+  open={paymentModalOpen}
+  onOpenChange={setLeadPaymentModalOpen}
+  lead={selectedLead}
+  onSuccess={() => {
+    // Refresh or update data after successful payment link generation
+    fetchLeads();
+  }}
+/>
+
     </div>
   );
 }
