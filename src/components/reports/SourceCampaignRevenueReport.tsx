@@ -267,29 +267,6 @@ export function SourceCampaignRevenueReport() {
 
         {showFilters && (
           <div className="flex flex-wrap items-center gap-3 w-full">
-            {/* Level Radio Buttons */}
-            {levels.length > 0 && (
-              <div className="flex items-center gap-2">
-                <Label className="text-xs font-semibold text-slate-500 uppercase">Level</Label>
-                <div className="flex flex-wrap gap-1">
-                  {levels.map(lvl => (
-                    <button
-                      key={lvl._id}
-                      onClick={() => setSelectedLevel(extractLevelNumber(lvl.name).toString())}
-                      className={cn(
-                        "px-3 py-1 text-xs font-medium rounded-lg border transition-all",
-                        selectedLevel === extractLevelNumber(lvl.name).toString()
-                          ? "bg-orange-500 text-white border-orange-500 shadow-sm"
-                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                      )}
-                    >
-                      {lvl.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Date Filter */}
             <div className="w-[130px]">
               <Select value={dateFilter} onValueChange={setDateFilter}>
