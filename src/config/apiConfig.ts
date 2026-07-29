@@ -8,6 +8,8 @@ const ApiConfig = {
   varify_otp:`${url}/users/verify-otp`,
   reset_password:`${url}/users/reset-password`,
 
+
+  userStats:`${url}/lead-stats`,
   uploadImage: `${url}/profile-upload/image`,
   getAllUser:`${url}/users`,
   getAllProfile:`${url}/users/profile`,

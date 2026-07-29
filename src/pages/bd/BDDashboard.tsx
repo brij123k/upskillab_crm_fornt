@@ -30,13 +30,6 @@ import { toast } from '@/hooks/use-toast';
 import { hasModulePermission } from '@/utils/modulePermissions';
 import { formatDistanceToNow } from 'date-fns';
 
-const stats = [
-  { title: 'My Leads', value: '47', change: '+8 new today', changeType: 'positive' as const, icon: Target, iconClassName: 'bd-gradient' },
-  { title: 'Follow-ups Today', value: '12', change: '3 overdue', changeType: 'negative' as const, icon: Phone, iconClassName: 'bg-warning' },
-  { title: 'Conversions', value: '8', change: 'This month', changeType: 'positive' as const, icon: TrendingUp, iconClassName: 'bg-success' },
-  { title: 'Revenue', value: '$45.2K', change: '+22% from last month', changeType: 'positive' as const, icon: DollarSign, iconClassName: 'bg-info' },
-];
-
 const conversionData = [
   { month: 'Jan', leads: 120, conversions: 24 },
   { month: 'Feb', leads: 150, conversions: 35 },
@@ -111,6 +104,32 @@ export function BDDashboard() {
   const [announcementCount, setAnnouncementCount] = useState(0);
   const [fetchingData, setFetchingData] = useState(false);
   const [recentActivities, setRecentActivities] = useState<DashboardActivity[]>([]);
+
+
+  const [userStats, setUserStats] = useState({
+  totalLeads: 0,
+  todayFollowUps: 0,
+  monthlyConversions: 0,
+  approvedOrders: 0,
+  monthlyRevenue: 0,
+});
+
+const fetchUserStats = async () => {
+  try {
+    const response = await getDataHandlerWithToken(
+      ApiConfig.userStats,
+      {},
+      null,
+      true,
+    );
+
+    if (response) {
+      setUserStats(response);
+    }
+  } catch (error) {
+    console.error("Error fetching user stats", error);
+  }
+};
 
   const dynamicQuickActions = [
     ...quickActions,
@@ -236,6 +255,7 @@ export function BDDashboard() {
       if (hasModulePermission(permissions, "payments")) {
         await fetchRecentPayments();
       }
+      await fetchUserStats();
       await fetchRecentTasks();
       await fetchScheduledCalls();
       if (hasModulePermission(permissions, "announcements")) {
@@ -260,6 +280,41 @@ export function BDDashboard() {
   useEffect(() => {
     fetchAllData();
   }, []);
+
+  const stats = [
+  {
+    title: "My Leads",
+    value: userStats.totalLeads.toString(),
+    change: "Assigned Leads",
+    changeType: "positive" as const,
+    icon: Target,
+    iconClassName: "bd-gradient",
+  },
+  {
+    title: "Follow-ups Today",
+    value: userStats.todayFollowUps.toString(),
+    change: "Today's Schedule",
+    changeType: "positive" as const,
+    icon: Phone,
+    iconClassName: "bg-warning",
+  },
+  {
+    title: "Conversions",
+    value: userStats.monthlyConversions.toString(),
+    change: "This Month",
+    changeType: "positive" as const,
+    icon: TrendingUp,
+    iconClassName: "bg-success",
+  },
+  {
+    title: "Revenue",
+    value: `₹${userStats.monthlyRevenue.toLocaleString("en-IN")}`,
+    change: `${userStats.approvedOrders} Approved Orders`,
+    changeType: "positive" as const,
+    icon: DollarSign,
+    iconClassName: "bg-info",
+  },
+];
 
   // Check if user has any permissions
   const hasAnyPermission = 
