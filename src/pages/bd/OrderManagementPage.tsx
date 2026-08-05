@@ -657,7 +657,6 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
                 courseDuration: orderForm.courseDuration,
                 totalFee: orderForm.totalFee,
                 discount: orderForm.discount,
-                finalFee: finalFee,
                 paymentMode: orderForm.paymentMode,
                 orderDate: new Date(orderForm.orderDate).toISOString(),
                 feeDepositDate: new Date(orderForm.feeDepositDate).toISOString(),

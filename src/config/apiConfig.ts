@@ -209,8 +209,13 @@ addNewLevel: `${url}/level`,
   getAttendanceByDate:(date:string)=>`${url}/attendance/date/${date}`,
 
 
-  bulkStageChange: `${url}/leads/bulkStage/change`
+  bulkStageChange: `${url}/leads/bulkStage/change`,
 
+
+  // Whatsapp part
+
+  bulkWhatsappSend: `${url}/whatsapp/bulk-send`,
+  getWhatsappTemplates: `${url}/whatsapp/templates`,
 };
 
 export default ApiConfig;
