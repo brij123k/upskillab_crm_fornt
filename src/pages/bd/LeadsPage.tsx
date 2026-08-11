@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DuplicateLeadsModal } from '@/components/modal/DuplicateLeadsModal';
-import { CopyCheck, Database, MousePointer, PhoneCall, AlarmClock, CalendarDays, Copy, ExternalLink, CreditCard } from 'lucide-react';
+import { CopyCheck, Database, MousePointer, PhoneCall, AlarmClock, CalendarDays, Copy, ExternalLink, CreditCard, MessageSquare } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -83,6 +83,7 @@ import { LeadHistoryModal } from '@/components/modal/LeadHistory';
 import { hasModulePermission } from '@/utils/modulePermissions';
 import { PoolType } from '@/types/user';
 import { LeadPaymentModal } from '@/components/modal/PaymentModal';
+import { SendWhatsAppModal } from '@/components/whatsapp/SendWhatsAppModal';
 interface LeadType {
   _id: string;
   leadId: number;
@@ -334,11 +335,19 @@ const [changingBulkStage, setChangingBulkStage] = useState(false);
 
   const [assignUserId, setAssignUserId] = useState<string>('');
 
+    const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
+  const [msgprogressModalOpen, setMSGProgressModalOpen] = useState(false);
+  const [currentCampaignId, setCurrentCampaignId] = useState('');
+  const [currentTemplateName, setCurrentTemplateName] = useState('');
+  const [totalRecipients, setTotalRecipients] = useState(0);
+
   useEffect(() => {
     if (!actionsModalOpen || !selectedLead) {
       setOngoingExam(null);
       return;
     }
+
+
 
     const fetchOngoingExam = async () => {
       try {
@@ -361,6 +370,19 @@ const [changingBulkStage, setChangingBulkStage] = useState(false);
     fetchOngoingExam();
   }, [actionsModalOpen, selectedLead?._id]);
 
+  const handleWhatsAppSend = (campaignId: string) => {
+  setCurrentCampaignId(campaignId);
+  setMSGProgressModalOpen(true);
+};
+
+const handleProgressModalClose = () => {
+  setMSGProgressModalOpen(false);
+  setCurrentCampaignId('');
+  setIsAssignmentMode(false);
+  setSelectedLeads([]);
+  // Fetch leads to refresh the list
+  fetchLeads();
+};
   // Handle bulk stage change
 const handleBulkStageChange = async () => {
   if (selectedLeads.length === 0) {
@@ -1536,6 +1558,16 @@ const formatDate = (dateString?: string | null) => {
       <TrendingUp className="w-4 h-4 mr-2" />
       Change Stage ({selectedLeads.length})
     </Button>
+
+    <Button
+          onClick={() => setWhatsAppModalOpen(true)}
+          disabled={selectedLeads.length === 0}
+          variant="outline"
+          className="rounded-xl border-slate-200 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200"
+        >
+          <MessageSquare className="w-4 h-4 mr-2" />
+          Send Message ({selectedLeads.length})
+        </Button>
         </>
       ) : (
         <Button
@@ -4059,6 +4091,13 @@ const formatDate = (dateString?: string | null) => {
         loadingHistory={loadingHistory}
         selectedLeadName={selectedLead?.name}
         onRefresh={() => selectedLead && fetchLeadHistory(selectedLead.leadId.toString())}
+      />
+
+      <SendWhatsAppModal
+        open={whatsAppModalOpen}
+        onOpenChange={setWhatsAppModalOpen}
+        selectedLeads={leads.filter(lead => selectedLeads.includes(lead._id))}
+        onSendSuccess={handleWhatsAppSend}
       />
 
       <LeadPaymentModal

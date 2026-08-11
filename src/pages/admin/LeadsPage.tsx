@@ -40,7 +40,8 @@ import {
   ArrowRight,
   ListTodo,
   AlertTriangle,
-  Database
+  Database,
+  MessageSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -72,6 +73,9 @@ import { DuplicateLeadsModal } from '@/components/modal/DuplicateLeadsModal';
 import { CopyCheck } from 'lucide-react';
 import { PoolType } from '@/types/user';
 import { useNavigate } from 'react-router-dom';
+import { SendWhatsAppModal } from '@/components/whatsapp/SendWhatsAppModal';
+import { WhatsAppProgressModal } from '@/components/whatsapp/WhatsAppProgressModal';
+
 interface LeadType {
   _id: string;
   leadId: number;
@@ -280,6 +284,14 @@ const [changingBulkStage, setChangingBulkStage] = useState(false);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [isAssignmentMode, setIsAssignmentMode] = useState(false);
+  
+  //whatsapp
+
+  const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
+const [msgprogressModalOpen, setMSGProgressModalOpen] = useState(false);
+const [currentCampaignId, setCurrentCampaignId] = useState('');
+const [currentTemplateName, setCurrentTemplateName] = useState('');
+const [totalRecipients, setTotalRecipients] = useState(0);
 
   // Form states
   const [leadForm, setLeadForm] = useState<LeadForm>({
@@ -318,6 +330,21 @@ const navigate = useNavigate();
 
   const [assignUserId, setAssignUserId] = useState<string>('');
 
+
+
+  const handleWhatsAppSend = (campaignId: string) => {
+  setCurrentCampaignId(campaignId);
+  setMSGProgressModalOpen(true);
+};
+
+const handleProgressModalClose = () => {
+  setMSGProgressModalOpen(false);
+  setCurrentCampaignId('');
+  setIsAssignmentMode(false);
+  setSelectedLeads([]);
+  // Fetch leads to refresh the list
+  fetchLeads();
+};
 
   // Handle bulk stage change
 const handleBulkStageChange = async () => {
@@ -1496,6 +1523,16 @@ const handleBulkStageChange = async () => {
     >
       <TrendingUp className="w-4 h-4 mr-2" />
       Change Stage ({selectedLeads.length})
+    </Button>
+
+    <Button
+      onClick={() => setWhatsAppModalOpen(true)}
+      disabled={selectedLeads.length === 0}
+      variant="outline"
+      className="rounded-xl border-slate-200 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200"
+    >
+      <MessageSquare className="w-4 h-4 mr-2" />
+      Send Message ({selectedLeads.length})
     </Button>
       </>
     ) : (
@@ -3761,6 +3798,20 @@ const handleBulkStageChange = async () => {
           fetchLeads(); // Refresh leads after merge
         }}
       />
+<SendWhatsAppModal
+  open={whatsAppModalOpen}
+  onOpenChange={setWhatsAppModalOpen}
+  selectedLeads={leads.filter(lead => selectedLeads.includes(lead._id))}
+  onSendSuccess={handleWhatsAppSend}
+/>
+
+<WhatsAppProgressModal
+  open={progressModalOpen}
+  onOpenChange={handleProgressModalClose}
+  campaignId={currentCampaignId}
+  templateName={currentTemplateName}
+  totalRecipients={totalRecipients}
+/>
     </div>
   );
 }

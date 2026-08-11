@@ -214,8 +214,10 @@ addNewLevel: `${url}/level`,
 
   // Whatsapp part
 
-  bulkWhatsappSend: `${url}/whatsapp/bulk-send`,
+  bulkWhatsappSend: `${url}/campaigns/bulk-whatsapp`,
   getWhatsappTemplates: `${url}/whatsapp/templates`,
+  getCompaignlogs:(compaignId:any)=>`${url}/campaigns/${compaignId}/logs`,
+  getCompaigns:`${url}/campaigns`,
 };
 
 export default ApiConfig;
