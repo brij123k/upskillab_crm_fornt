@@ -632,7 +632,9 @@ export function SourceCampaignReport() {
                         </Badge>
                       </div>
                       <div className="flex items-end justify-between mt-1">
-                        <span className="text-xs font-semibold text-slate-800">{total.toLocaleString()} leads</span>
+                        <span className="text-xs font-semibold text-slate-800">
+  {(total ?? 0).toLocaleString()} leads
+</span>
                         <span className="text-[10px] text-emerald-600">{admissions} admissions</span>
                       </div>
                     </div>
