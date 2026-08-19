@@ -1882,10 +1882,18 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
                 <Input
                   type="number"
                   value={orderForm.lumpsumDetails.registrationAmount}
-                  onChange={(e) => setOrderForm({
-                    ...orderForm,
-                    lumpsumDetails: { ...orderForm.lumpsumDetails!, registrationAmount: parseInt(e.target.value) || 0 }
-                  })}
+                  onChange={(e) => {
+                    const registrationAmount = parseInt(e.target.value) || 0;
+                    setOrderForm({
+                      ...orderForm,
+                      lumpsumDetails: { 
+                        ...orderForm.lumpsumDetails!, 
+                        registrationAmount: registrationAmount,
+                        // Auto-populate totalReceived with registrationAmount
+                        totalReceived: registrationAmount
+                      }
+                    });
+                  }}
                   className="mt-1.5 rounded-xl border-slate-200"
                 />
               </div>
@@ -1975,7 +1983,7 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
                 />
               </div>
               <div>
-                <Label className="text-xs font-semibold text-slate-500 uppercase">Disbursement Amount</Label>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Disbursement Amount *</Label>
                 <Input
                   type="number"
                   value={orderForm.loanDetails.disbursementAmount}
@@ -1983,9 +1991,13 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
                     ...orderForm,
                     loanDetails: { ...orderForm.loanDetails!, disbursementAmount: parseInt(e.target.value) || 0 }
                   })}
-                  placeholder="Enter disbursement amount"
+                  placeholder="Enter disbursement amount (required)"
                   className="mt-1.5 rounded-xl border-slate-200"
+                  required
                 />
+                {(!orderForm.loanDetails.disbursementAmount || orderForm.loanDetails.disbursementAmount === 0) && (
+                  <p className="text-xs text-red-500 mt-1">Disbursement amount is required</p>
+                )}
               </div>
               <div>
                 <Label className="text-xs font-semibold text-slate-500 uppercase">First EMI Date</Label>
@@ -2106,7 +2118,11 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
       <Button variant="outline" onClick={() => setCreateModalOpen(false)} disabled={addingOrder} className="rounded-xl">
         Cancel
       </Button>
-      <Button onClick={handleCreateOrder} disabled={addingOrder} className="bg-orange-600 hover:bg-orange-700 rounded-xl">
+      <Button 
+        onClick={handleCreateOrder} 
+        disabled={addingOrder || (orderForm.paymentMode === 'Loan' && (!orderForm.loanDetails?.disbursementAmount || orderForm.loanDetails?.disbursementAmount === 0))} 
+        className="bg-orange-600 hover:bg-orange-700 rounded-xl"
+      >
         {addingOrder ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

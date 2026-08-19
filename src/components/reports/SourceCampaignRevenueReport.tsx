@@ -30,6 +30,9 @@ import {
   ChevronUp,
   ChevronDown,
   Calendar,
+  TrendingUp,
+  PieChart,
+  Layers,
 } from 'lucide-react';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
@@ -60,7 +63,7 @@ const formatCurrency = (amount: number) =>
 /* -------------------------------------------------------------------------- */
 export function SourceCampaignRevenueReport() {
   const [loading, setLoading] = useState(true);
-  const [report, setReport] = useState<any>(null);   // the full API response
+  const [report, setReport] = useState<any>(null);
   const [showFilters, setShowFilters] = useState(false);
 
   // Level filter
@@ -73,9 +76,7 @@ export function SourceCampaignRevenueReport() {
   const [toDate, setToDate] = useState('');
 
   // Client‑side filters
-  const [searchTerm, setSearchTerm] = useState('');
-  const [stageFilter, setStageFilter] = useState('all');
-  const [stateFilter, setStateFilter] = useState('all');   // not used, kept for UI consistency
+  const [sourceFilter, setSourceFilter] = useState('all');
 
   // ─── Fetch levels ───
   useEffect(() => {
@@ -125,7 +126,6 @@ export function SourceCampaignRevenueReport() {
         params.dateFilter = dateFilter;
       }
 
-      // No stage / state sent to API – they are only client-side filters for the table
       const response = await getDataHandlerWithToken(
         ApiConfig.sourcecampaignwiseleadrevenue,
         params,
@@ -148,26 +148,24 @@ export function SourceCampaignRevenueReport() {
   // ─── Derived data from the report ───
   const rows = useMemo(() => report?.data || [], [report]);
   const campaigns = useMemo(() => report?.campaigns || [], [report]);
-  const totals = report?.totals?.total || { totalLead: 0, revenue: 0 };
+  const stats = report?.stats || { totalLead: 0, totalRevenue: 0, totalOrders: 0 };
   const startDate = report?.startDate || '';
   const endDate = report?.endDate || '';
-  const byCampaign = report?.totals?.byCampaign || {};
 
-  // Available stages for filter dropdown (unique source names)
-  const availableStages = useMemo(() => {
+  // Available sources for filter dropdown
+  const availableSources = useMemo(() => {
     if (!rows.length) return ['all'];
-    const stages = rows.map((r: any) => r.source).filter(Boolean);
-    return ['all', ...Array.from(new Set(stages))];
+    const sources = rows.map((r: any) => r.source).filter(Boolean);
+    return ['all', ...Array.from(new Set(sources))];
   }, [rows]);
 
   // Client‑side filtering
   const filteredRows = useMemo(() => {
     return rows.filter((item: any) => {
-      if (searchTerm && !item.source.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-      if (stageFilter !== 'all' && item.source !== stageFilter) return false;
+      if (sourceFilter !== 'all' && item.source !== sourceFilter) return false;
       return true;
     });
-  }, [rows, searchTerm, stageFilter]);
+  }, [rows, sourceFilter]);
 
   // Filtered totals
   const filteredTotals = useMemo(() => {
@@ -198,8 +196,7 @@ export function SourceCampaignRevenueReport() {
     selectedLevel !== '1' ||
     dateFilter !== 'today' ||
     (dateFilter === 'custom' && (fromDate || toDate)) ||
-    stageFilter !== 'all' ||
-    searchTerm !== '';
+    sourceFilter !== 'all';
 
   // ─── Export CSV ───
   const handleExport = () => {
@@ -208,7 +205,7 @@ export function SourceCampaignRevenueReport() {
       return;
     }
     const headers = ['Source', ...campaigns.flatMap(c => [`${c}_leads`, `${c}_revenue`]), 'Total Leads', 'Total Revenue'];
-    const csvRows = filteredRows.map(item => [
+    const csvRows = filteredRows.map((item: any) => [
       item.source,
       ...campaigns.flatMap(c => [item[`${c}_lead`] || 0, item[`${c}_revenue`] || 0]),
       item.totalLead || 0,
@@ -240,11 +237,22 @@ export function SourceCampaignRevenueReport() {
           <p className="text-sm text-slate-500">Lead & revenue metrics per source campaign</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading} className="rounded-xl border-slate-200">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchData}
+            disabled={loading}
+            className="rounded-xl border-slate-200"
+          >
             {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
             Refresh
           </Button>
-          <Button size="sm" onClick={handleExport} disabled={!report || loading} className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white">
+          <Button
+            size="sm"
+            onClick={handleExport}
+            disabled={!report || loading}
+            className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white"
+          >
             <Download className="w-3.5 h-3.5 mr-1" />
             Export
           </Button>
@@ -267,10 +275,40 @@ export function SourceCampaignRevenueReport() {
 
         {showFilters && (
           <div className="flex flex-wrap items-center gap-3 w-full">
+            {/* Level Selection */}
+            {levels.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Level</Label>
+                <div className="flex flex-wrap gap-1">
+                  {levels.map(lvl => {
+                    const num = extractLevelNumber(lvl.name);
+                    const isActive = selectedLevel === num.toString();
+                    return (
+                      <button
+                        key={lvl._id}
+                        onClick={() => setSelectedLevel(num.toString())}
+                        className={cn(
+                          "px-3 py-1 text-xs font-medium rounded-lg border transition-all",
+                          isActive
+                            ? "bg-orange-500 text-white border-orange-500 shadow-sm"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                        )}
+                      >
+                        {lvl.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="w-px h-6 bg-slate-200" />
+
             {/* Date Filter */}
-            <div className="w-[130px]">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
               <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="h-8 text-xs rounded-xl">
+                <SelectTrigger className="h-8 w-32 text-xs rounded-xl border-slate-200">
                   <SelectValue placeholder="Select date" />
                 </SelectTrigger>
                 <SelectContent>
@@ -284,52 +322,41 @@ export function SourceCampaignRevenueReport() {
             </div>
 
             {dateFilter === 'custom' && (
-              <>
-                <div className="relative w-[130px]">
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                  />
-                </div>
-                <div className="relative w-[130px]">
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                  />
-                </div>
-                <span className="text-[10px] text-slate-400">Max 30 days</span>
-              </>
+              <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-xl">
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="h-7 px-2 text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400 rounded"
+                />
+                <span className="text-xs text-slate-400">→</span>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="h-7 px-2 text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400 rounded"
+                />
+                <span className="text-[10px] text-slate-400 bg-white px-2 py-0.5 rounded-full">Max 30 days</span>
+              </div>
             )}
 
-            {/* Stage Filter (client‑side only) */}
-            <div className="w-[130px]">
-              <Select value={stageFilter} onValueChange={setStageFilter}>
-                <SelectTrigger className="h-8 text-xs rounded-xl">
+            <div className="w-px h-6 bg-slate-200" />
+
+            {/* Source Filter */}
+            <div className="flex items-center gap-2">
+              <Layers className="w-3.5 h-3.5 text-slate-400" />
+              <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                <SelectTrigger className="h-8 w-40 text-xs rounded-xl border-slate-200">
                   <SelectValue placeholder="All Sources" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableStages.map(stage => (
-                    <SelectItem key={stage} value={stage} className="text-xs">
-                      {stage === 'all' ? 'All Sources' : stage}
+                  {availableSources.map(source => (
+                    <SelectItem key={source} value={source} className="text-xs">
+                      {source === 'all' ? 'All Sources' : source}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            {/* Search */}
-            <div className="relative w-48">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
-              <Input
-                placeholder="Search source..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-7 h-8 text-xs rounded-xl border-slate-200"
-              />
             </div>
           </div>
         )}
@@ -337,48 +364,50 @@ export function SourceCampaignRevenueReport() {
 
       {/* Content */}
       {loading ? (
-        <div className="flex items-center justify-center py-16">
+        <div className="flex items-center justify-center py-20 bg-white rounded-xl border border-slate-200">
           <Loader2 className="w-8 h-8 animate-spin text-orange-400" />
           <p className="ml-2 text-sm text-slate-500">Loading revenue data...</p>
         </div>
       ) : !report || (!rows.length && !campaigns.length) ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="flex flex-col items-center justify-center py-16 bg-white rounded-xl border border-slate-200">
           <IndianRupee className="w-12 h-12 text-slate-300 mb-3" />
           <p className="text-sm font-medium text-slate-600">No revenue data found</p>
           <p className="text-xs text-slate-400 mt-1">Try adjusting filters or level</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <Card className="p-5 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Leads</p>
                   <p className="text-2xl font-bold text-slate-800 mt-1">
                     {filteredTotals.totalLead.toLocaleString()}
                   </p>
                 </div>
-                <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center">
-                  <Users className="w-5 h-5 text-orange-600" />
+                <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-blue-500" />
                 </div>
               </div>
             </Card>
-            <Card className="p-5 bg-white border-0 shadow-sm">
-              <div className="flex items-center justify-between">
+
+            <Card className="p-5 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Revenue</p>
                   <p className="text-2xl font-bold text-emerald-600 mt-1">
                     {formatCurrency(filteredTotals.totalRevenue)}
                   </p>
                 </div>
-                <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
-                  <IndianRupee className="w-5 h-5 text-emerald-600" />
+                <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center">
+                  <IndianRupee className="w-5 h-5 text-emerald-500" />
                 </div>
               </div>
             </Card>
-            <Card className="p-5 bg-white border-0 shadow-sm">
-              <div className="flex items-center justify-between">
+
+            <Card className="p-5 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Avg. Revenue/Lead</p>
                   <p className="text-2xl font-bold text-slate-800 mt-1">
@@ -387,116 +416,110 @@ export function SourceCampaignRevenueReport() {
                       : '—'}
                   </p>
                 </div>
-                <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-                  <BarChart3 className="w-5 h-5 text-slate-600" />
+                <div className="w-11 h-11 rounded-xl bg-purple-50 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-purple-500" />
                 </div>
               </div>
             </Card>
-            {(startDate || endDate) && (
-              <Card className="p-5 bg-white border-0 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Date Range</p>
-                    <p className="text-sm font-medium text-slate-700 mt-1">
-                      {startDate ? new Date(startDate).toLocaleDateString() : '?'} – {endDate ? new Date(endDate).toLocaleDateString() : '?'}
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-                    <Calendar className="w-5 h-5 text-slate-600" />
-                  </div>
+
+            <Card className="p-5 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Orders</p>
+                  <p className="text-2xl font-bold text-slate-800 mt-1">
+                    {stats.totalOrders?.toLocaleString() || 0}
+                  </p>
                 </div>
-              </Card>
-            )}
+                <div className="w-11 h-11 rounded-xl bg-orange-50 flex items-center justify-center">
+                  <PieChart className="w-5 h-5 text-orange-500" />
+                </div>
+              </div>
+            </Card>
           </div>
 
           {/* Main Table */}
           <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50 hover:bg-slate-50 border-b border-slate-100">
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase sticky left-0 bg-slate-50 z-10 min-w-[140px]">
-                    Source / Campaign
+                <TableRow className="bg-slate-50/80 border-b border-slate-200">
+                  <TableHead className="text-xs font-semibold text-slate-500 uppercase sticky left-0 bg-slate-50/80 z-10 min-w-[150px] px-5 py-3.5">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-3.5 h-3.5" />
+                      Source
+                    </div>
                   </TableHead>
                   {campaigns.map((campaign: string) => (
-                    <TableHead key={campaign} className="text-xs text-center min-w-[120px] py-3 font-semibold text-slate-500 uppercase">
-                      <div>{campaign}</div>
-                      <div className="text-[10px] font-normal text-slate-400">Leads / Revenue</div>
+                    <TableHead key={campaign} className="text-xs font-semibold text-slate-500 uppercase text-center min-w-[130px] px-4 py-3.5">
+                      <div className="flex flex-col items-center">
+                        <span className="text-slate-700">{campaign}</span>
+                        <span className="text-[10px] font-normal text-slate-400">Leads / Revenue</span>
+                      </div>
                     </TableHead>
                   ))}
-                  <TableHead className="text-xs text-center font-semibold text-slate-500 uppercase bg-slate-50 min-w-[120px] py-3">
-                    <div>Total</div>
-                    <div className="text-[10px] font-normal text-slate-400">Leads / Revenue</div>
+                  <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center min-w-[130px] px-4 py-3.5 bg-orange-50/50 border-l border-slate-200">
+                    <div className="flex flex-col items-center">
+                      <span className="text-orange-700">Total</span>
+                      <span className="text-[10px] font-normal text-slate-400">Leads / Revenue</span>
+                    </div>
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRows.map((item: any, idx: number) => (
-                  <TableRow key={item.source || idx} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
-                    <TableCell className="text-xs font-medium text-slate-800 sticky left-0 bg-white border-r z-10 py-3">
-                      {item.source}
-                    </TableCell>
-                    {campaigns.map(campaign => {
-                      const lead = item[`${campaign}_lead`] || 0;
-                      const rev = item[`${campaign}_revenue`] || 0;
-                      return (
-                        <TableCell key={campaign} className="text-xs text-center py-3">
-                          <div className="font-medium text-slate-700">{lead.toLocaleString()}</div>
-                          <div className="text-[10px] text-emerald-600">{formatCurrency(rev)}</div>
-                        </TableCell>
-                      );
-                    })}
-                    <TableCell className="text-xs text-center py-3 bg-slate-50/50">
-                      <div className="font-bold text-slate-800">{item.totalLead?.toLocaleString() || 0}</div>
-                      <div className="text-[10px] font-semibold text-emerald-600">{formatCurrency(item.totalRevenue || 0)}</div>
+                {filteredRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={campaigns.length + 2} className="text-center py-8 text-slate-500">
+                      No data found for selected filter
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filteredRows.map((item: any, idx: number) => (
+                    <TableRow key={item.source || idx} className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors">
+                      <TableCell className="text-sm font-medium text-slate-800 sticky left-0 bg-white border-r border-slate-100 z-10 px-5 py-3.5">
+                        {item.source}
+                      </TableCell>
+                      {campaigns.map(campaign => {
+                        const lead = item[`${campaign}_lead`] || 0;
+                        const rev = item[`${campaign}_revenue`] || 0;
+                        return (
+                          <TableCell key={campaign} className="text-sm text-center px-4 py-3.5">
+                            <div className="font-medium text-slate-700">{lead.toLocaleString()}</div>
+                            <div className="text-xs text-emerald-600 font-medium">{formatCurrency(rev)}</div>
+                          </TableCell>
+                        );
+                      })}
+                      <TableCell className="text-sm text-center px-4 py-3.5 bg-orange-50/30 border-l border-slate-200">
+                        <div className="font-bold text-slate-800">{item.totalLead?.toLocaleString() || 0}</div>
+                        <div className="text-xs font-semibold text-orange-600">{formatCurrency(item.totalRevenue || 0)}</div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
 
                 {/* Totals Row */}
                 {filteredRows.length > 0 && (
-                  <TableRow className="bg-slate-50 font-semibold border-t-2 border-slate-200">
-                    <TableCell className="text-xs font-semibold text-slate-800 sticky left-0 bg-slate-50 z-10 py-3">
+                  <TableRow className="bg-slate-50/80 border-t-2 border-slate-200">
+                    <TableCell className="text-xs font-semibold text-slate-800 sticky left-0 bg-slate-50/80 z-10 px-5 py-3.5">
                       Total
                     </TableCell>
-                    {campaigns.map(campaign => (
-                      <TableCell key={campaign} className="text-xs text-center py-3 font-semibold">
-                        <div className="text-slate-800">{columnTotals[campaign]?.lead.toLocaleString() || 0}</div>
-                        <div className="text-[10px] text-emerald-700">{formatCurrency(columnTotals[campaign]?.revenue || 0)}</div>
-                      </TableCell>
-                    ))}
-                    <TableCell className="text-xs text-center py-3 font-bold bg-slate-50">
+                    {campaigns.map(campaign => {
+                      const lead = columnTotals[campaign]?.lead || 0;
+                      const rev = columnTotals[campaign]?.revenue || 0;
+                      return (
+                        <TableCell key={campaign} className="text-sm text-center px-4 py-3.5 font-semibold">
+                          <div className="text-slate-800">{lead.toLocaleString()}</div>
+                          <div className="text-xs text-emerald-700">{formatCurrency(rev)}</div>
+                        </TableCell>
+                      );
+                    })}
+                    <TableCell className="text-sm text-center px-4 py-3.5 font-bold bg-orange-50/50 border-l border-slate-200">
                       <div className="text-slate-800">{filteredTotals.totalLead.toLocaleString()}</div>
-                      <div className="text-[10px] text-emerald-700">{formatCurrency(filteredTotals.totalRevenue)}</div>
+                      <div className="text-xs text-orange-700">{formatCurrency(filteredTotals.totalRevenue)}</div>
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
           </div>
-
-          {/* Campaign‑wise Totals Summary (only when no search/stage filters) */}
-          {Object.keys(byCampaign).length > 0 && !searchTerm && stageFilter === 'all' && (
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-2">Campaign‑wise Summary</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {Object.entries(byCampaign)
-                  .filter(([_, value]: [string, any]) => value.totalLead > 0 || value.revenue > 0)
-                  .map(([campaign, value]: [string, any]) => (
-                    <div key={campaign} className="p-3 bg-white border border-slate-200 rounded-xl">
-                      <p className="text-xs font-medium text-slate-600 truncate">{campaign}</p>
-                      <div className="flex justify-between items-center mt-2">
-                        <span className="text-xs text-slate-400">Leads:</span>
-                        <span className="text-xs font-semibold">{value.totalLead.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-slate-400">Revenue:</span>
-                        <span className="text-xs font-semibold text-emerald-600">{formatCurrency(value.revenue)}</span>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>

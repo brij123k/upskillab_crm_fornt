@@ -40,15 +40,15 @@ const REPORTS = [
   { id: 'employee-stages',             name: 'Employees',           icon: Users,         component: EmployeeStagesReport },
   { id: 'pool-stages',                 name: 'Pools',               icon: Building2,     component: PoolStagesReport },
   { id: 'pool-revenue',                name: 'Revenue',             icon: IndianRupee,   component: PoolRevenueReport },
-  { id: 'revenue-target-report',       name: 'Revenue Target',      icon: IndianRupee,   component: RevenueTargetReport },
-  { id: 'utilization',                 name: 'Utilization',         icon: PhoneCall,     component: UtilizationReport },
-  { id: 'consultant-performance',      name: 'Consultants',         icon: Award,         component: ConsultantPerformanceReport },
-  { id: 'daily-utilization',           name: 'Daily Calls',         icon: Calendar,      component: DailyUtilizationReport },
-  { id: 'source-campaign',             name: 'Source Campaign',     icon: BarChart3,    component: SourceCampaignReport },
-  { id: 'source-campaign-revenue',     name: 'Revenue by Source',   icon: IndianRupee,   component: SourceCampaignRevenueReport },
+  { id: 'revenue-target-report',       name: 'Employee Tgt vs Ach',      icon: IndianRupee,   component: RevenueTargetReport },
+  { id: 'utilization',                 name: 'Employee Efforts',         icon: PhoneCall,     component: UtilizationReport },
+  { id: 'consultant-performance',      name: 'Employee Performance',         icon: Award,         component: ConsultantPerformanceReport },
+  { id: 'daily-utilization',           name: 'Emp Inputs',         icon: Calendar,      component: DailyUtilizationReport },
+  { id: 'source-campaign',             name: 'Campaign- Lead Stage',     icon: BarChart3,    component: SourceCampaignReport },
+  { id: 'source-campaign-revenue',     name: 'Campaign- Performance',   icon: IndianRupee,   component: SourceCampaignRevenueReport },
   { id: 'salary-sheet',                name: 'Salary Sheet',        icon: IndianRupee,   component: SalarySheetReport,       permission: { module: 'reports', action: 'salary_sheet' } },
-  { id: 'state-wise',  name: 'state-compaign', icon: BarChart3,    component: StateWiseReport },
-  { id: 'state-wise-employee', name: 'State Employees', icon: Users, component: StateWiseEmployeeReport },
+  { id: 'state-wise',  name: 'State Campaign Performance Report', icon: BarChart3,    component: StateWiseReport },
+  { id: 'state-wise-employee', name: 'Employee Performance – State-wise', icon: Users, component: StateWiseEmployeeReport },
 ];
 
 export function ReportsPage() {
