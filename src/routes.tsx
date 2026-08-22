@@ -45,7 +45,7 @@ import { BDAnnouncementPage } from "./pages/bd/AnnouncementPage";
 import { MyAnnouncementsPage } from "@/pages/announcements/MyAnnouncementsPage";
 import { MyWarningsPage } from "@/pages/bd/MyWarningsPage";
 import { MyTasksPage } from "@/pages/bd/MyTasksPage";
-import { AttendanceLeavePage } from "@/pages/bd/AttendanceLeavePage";
+import { EmployeeAttendanceLeavePage } from "@/pages/bd/AttendanceLeavePage";
 import { LeaveRequestsPage } from "@/pages/bd/LeaveRequestsPage";
 import { LeadEntryPage } from "@/pages/public/LeadEntryPage";
 import { TargetsPage } from "@/pages/targets/TargetsPage";
@@ -150,10 +150,10 @@ const AppRoutes = () => {
           <Route path="my-announcements/:announcementId" element={<MyAnnouncementsPage />} />
           <Route path="my-warnings" element={<MyWarningsPage />} />
           <Route path="my-warnings/:warningId" element={<MyWarningsPage />} />
-          <Route path="leaves" element={<AttendanceLeavePage />} />
-          <Route path="leaves/:leaveId" element={<AttendanceLeavePage />} />
-          <Route path="attendance-leave" element={<AttendanceLeavePage />} />
-          <Route path="attendance-leave/:leaveId" element={<AttendanceLeavePage />} />
+          <Route path="leaves" element={<EmployeeAttendanceLeavePage />} />
+          <Route path="leaves/:leaveId" element={<EmployeeAttendanceLeavePage />} />
+          <Route path="attendance-leave" element={<EmployeeAttendanceLeavePage />} />
+          <Route path="attendance-leave/:leaveId" element={<EmployeeAttendanceLeavePage />} />
           <Route path="leave-requests" element={<LeaveRequestsPage />} />
           <Route path="leave-requests/:leaveId" element={<LeaveRequestsPage />} />
           <Route path="reports" element={<ReportsPage />} />

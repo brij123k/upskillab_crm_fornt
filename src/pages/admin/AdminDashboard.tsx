@@ -1,49 +1,71 @@
+// AdminDashboard.tsx - Completely redesigned with dynamic data
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { StatCard } from '@/components/dashboard/StatCard';
-import { RecentActivity } from '@/components/dashboard/RecentActivity';
-import { QuickActions } from '@/components/dashboard/QuickActions';
-import { TargetComparisonWidget } from '@/components/targets/TargetComparisonWidget';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Users, 
   FileText, 
   Building2, 
   AlertTriangle, 
-  Shield, 
   TrendingUp,
-  UserPlus,
-  Upload,
-  Settings,
-  Download,
   Megaphone,
   Clock,
   ListOrdered,
   CreditCard,
-  Target
+  Target,
+  DollarSign,
+  Calendar,
+  ChevronDown,
+  RefreshCw,
+  Loader2,
+  ArrowUpRight,
+  ArrowDownRight,
+  Circle,
+  BarChart3,
+  LineChart as LineChartIcon
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  Cell,
+  ReferenceLine
+} from 'recharts';
+import { cn } from '@/lib/utils';
 
-const initialRevenueData = [
-  { month: 'Jan', revenue: 65000 },
-  { month: 'Feb', revenue: 78000 },
-  { month: 'Mar', revenue: 90000 },
-  { month: 'Apr', revenue: 81000 },
-  { month: 'May', revenue: 96000 },
-  { month: 'Jun', revenue: 105000 },
-];
+type DashboardStats = {
+  users: number;
+  leads: number;
+  departments: number;
+  warnings: number;
+  announcements: number;
+  orders: number;
+  payments: number;
+};
 
-const initialDepartmentData = [
-  { name: 'Sales', performance: 85 },
-  { name: 'Marketing', performance: 72 },
-  { name: 'Support', performance: 90 },
-  { name: 'Engineering', performance: 78 },
-  { name: 'HR', performance: 88 },
-];
+type RevenueData = {
+  year: number;
+  startDate: string;
+  endDate: string;
+  data: {
+    month: string;
+    monthNumber: number;
+    revenue: number;
+  }[];
+  totalRevenue: number;
+};
 
 type DashboardActivity = {
   _id: string;
@@ -81,54 +103,170 @@ const mapActivity = (activity: any): DashboardActivity => ({
   type: getActivityType(activity?.action || ''),
 });
 
+// Custom Tooltip
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-4 min-w-[160px]">
+        <p className="text-xs font-medium text-slate-500 mb-1">{label}</p>
+        <p className="text-lg font-bold text-slate-800">
+          ₹{payload[0].value.toLocaleString()}
+        </p>
+        <p className="text-[10px] text-slate-400 mt-1">
+          Revenue for {label}
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
 export function AdminDashboard() {
   const navigate = useNavigate();
-  const [userCount, setUserCount] = useState(0);
-  const [leadCount, setLeadCount] = useState(0);
-  const [departmentCount, setDepartmentCount] = useState(0);
-  const [warningCount, setWarningCount] = useState(0);
-  const [announcementCount, setAnnouncementCount] = useState(0);
-  const [orderCount, setOrderCount] = useState(0);
-  const [paymentCount, setPaymentCount] = useState(0);
-  const [revenueData, setRevenueData] = useState(initialRevenueData);
-  const [departmentData, setDepartmentData] = useState(initialDepartmentData);
-  const [recentActivities, setRecentActivities] = useState<DashboardActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [stats, setStats] = useState<DashboardStats>({
+    users: 0,
+    leads: 0,
+    departments: 0,
+    warnings: 0,
+    announcements: 0,
+    orders: 0,
+    payments: 0
+  });
+  const [revenueData, setRevenueData] = useState<RevenueData | null>(null);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [availableYears, setAvailableYears] = useState<number[]>([2026, 2025, 2024]);
+  const [recentActivities, setRecentActivities] = useState<DashboardActivity[]>([]);
 
-  const stats = useMemo(() => [
+  const fetchRevenueData = async (year: number) => {
+    try {
+      const response = await getDataHandlerWithToken(
+        ApiConfig.revenueGraph,
+        { year },
+        null,
+        true
+      );
+      console.log(response)
+      return response;
+    } catch (error) {
+      console.error('Failed to fetch revenue data:', error);
+      return null;
+    }
+  };
+
+  const fetchDashboardData = async (showRefresh = false) => {
+    try {
+      if (showRefresh) setRefreshing(true);
+      else setLoading(true);
+
+      const [
+        usersRes,
+        leadsRes,
+        departmentsRes,
+        warningsRes,
+        announcementsRes,
+        ordersRes,
+        paymentsRes,
+        activitiesRes,
+        revenueRes
+      ] = await Promise.all([
+        getDataHandlerWithToken('getAllUser', null, null),
+        getDataHandlerWithToken('getAllLeads', { page: 1, limit: 1 }, null),
+        getDataHandlerWithToken('getAllDepartments', null, null),
+        getDataHandlerWithToken('getWarnings', { page: 1, limit: 1 }, null),
+        getDataHandlerWithToken('getAnnouncements', { page: 1, limit: 1 }, null),
+        getDataHandlerWithToken('Order', { page: 1, limit: 1 }, null),
+        getDataHandlerWithToken('getPaymentHistory', { page: 1, limit: 50 }, null),
+        getDataHandlerWithToken(ApiConfig.getLastActivities, { limit: 5 }, null, true),
+        fetchRevenueData(selectedYear)
+      ]);
+
+      setStats({
+        users: Array.isArray(usersRes) ? usersRes.length : 0,
+        leads: leadsRes?.meta?.total ?? leadsRes?.total ?? (Array.isArray(leadsRes?.data) ? leadsRes.data.length : 0),
+        departments: Array.isArray(departmentsRes) ? departmentsRes.length : 0,
+        warnings: warningsRes?.meta?.total ?? warningsRes?.total ?? (Array.isArray(warningsRes?.data) ? warningsRes.data.length : 0),
+        announcements: announcementsRes?.meta?.total ?? announcementsRes?.total ?? (Array.isArray(announcementsRes?.data) ? announcementsRes.data.length : 0),
+        orders: ordersRes?.total ?? (Array.isArray(ordersRes?.data) ? ordersRes.data.length : 0),
+        payments: Array.isArray(paymentsRes) ? paymentsRes.length : (paymentsRes?.length ?? 0)
+      });
+
+      setRecentActivities(Array.isArray(activitiesRes) ? activitiesRes.map(mapActivity) : []);
+      
+      if (revenueRes) {
+        console.log("data",revenueRes)
+        setRevenueData(revenueRes);
+        // Extract years from response or keep default
+        if (revenueRes.year) {
+          const currentYear = revenueRes.year;
+          const years = [];
+          for (let y = currentYear; y >= currentYear - 3; y--) {
+            years.push(y);
+          }
+          setAvailableYears(years);
+        }
+      }
+
+    } catch (error: any) {
+      console.error('Failed to load dashboard data', error);
+      toast.error('Unable to load dashboard metrics');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  useEffect(() => {
+    if (selectedYear) {
+      fetchRevenueData(selectedYear).then(data => {
+        if (data) setRevenueData(data);
+      });
+    }
+  }, [selectedYear]);
+
+  const statCards = useMemo(() => [
     {
       title: 'Total Users',
-      value: userCount.toLocaleString(),
-      change: userCount ? `${userCount} active` : 'Loading...',
-      changeType: 'positive' as const,
+      value: stats.users.toLocaleString(),
       icon: Users,
-      iconClassName: 'admin-gradient'
+      color: 'from-blue-500 to-blue-600',
+      bgColor: 'bg-blue-50',
+      iconColor: 'text-blue-600',
+      change: `${stats.users} active users`,
     },
     {
       title: 'Total Leads',
-      value: leadCount.toLocaleString(),
-      change: leadCount ? `${leadCount} total leads` : 'Loading...',
-      changeType: 'neutral' as const,
+      value: stats.leads.toLocaleString(),
       icon: FileText,
-      iconClassName: 'bg-info'
+      color: 'from-emerald-500 to-emerald-600',
+      bgColor: 'bg-emerald-50',
+      iconColor: 'text-emerald-600',
+      change: `${stats.leads} total leads`,
     },
     {
       title: 'Departments',
-      value: departmentCount.toLocaleString(),
-      change: departmentCount ? `${departmentCount} active` : 'Loading...',
-      changeType: 'positive' as const,
+      value: stats.departments.toLocaleString(),
       icon: Building2,
-      iconClassName: 'bg-success'
+      color: 'from-purple-500 to-purple-600',
+      bgColor: 'bg-purple-50',
+      iconColor: 'text-purple-600',
+      change: `${stats.departments} departments`,
     },
     {
       title: 'Warnings',
-      value: warningCount.toLocaleString(),
-      change: warningCount ? `${warningCount} issued` : 'Loading...',
-      changeType: warningCount > 0 ? 'negative' as const : 'positive' as const,
+      value: stats.warnings.toLocaleString(),
       icon: AlertTriangle,
-      iconClassName: 'bg-warning'
+      color: stats.warnings > 0 ? 'from-red-500 to-red-600' : 'from-green-500 to-green-600',
+      bgColor: stats.warnings > 0 ? 'bg-red-50' : 'bg-green-50',
+      iconColor: stats.warnings > 0 ? 'text-red-600' : 'text-green-600',
+      change: stats.warnings > 0 ? `${stats.warnings} warnings` : 'No warnings',
     },
-  ], [userCount, leadCount, departmentCount, warningCount]);
+  ], [stats]);
 
   const quickActions = [
     { label: 'Announcements', icon: Megaphone, onClick: () => navigate('/admin/announcements') },
@@ -139,184 +277,265 @@ export function AdminDashboard() {
     { label: 'Attendance & Policy', icon: Clock, onClick: () => navigate('/admin/attendance-policy') },
   ];
 
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      const [users, leads, departments, warnings, announcements, orders, payments, activities] = await Promise.all([
-        getDataHandlerWithToken('getAllUser', null, null),
-        getDataHandlerWithToken('getAllLeads', { page: 1, limit: 1 }, null),
-        getDataHandlerWithToken('getAllDepartments', null, null),
-        getDataHandlerWithToken('getWarnings', { page: 1, limit: 1 }, null),
-        getDataHandlerWithToken('getAnnouncements', { page: 1, limit: 1 }, null),
-        getDataHandlerWithToken('Order', { page: 1, limit: 1 }, null),
-        getDataHandlerWithToken('getPaymentHistory', { page: 1, limit: 50 }, null),
-        getDataHandlerWithToken(ApiConfig.getLastActivities, { limit: 5 }, null, true),
-      ]);
+  // Get current month index (0-11)
+  const currentMonthIndex = new Date().getMonth();
 
-      setUserCount(Array.isArray(users) ? users.length : 0);
-      setLeadCount(leads?.meta?.total ?? leads?.total ?? (Array.isArray(leads?.data) ? leads.data.length : 0));
-      setDepartmentCount(Array.isArray(departments) ? departments.length : 0);
-      setWarningCount(warnings?.meta?.total ?? warnings?.total ?? (Array.isArray(warnings?.data) ? warnings.data.length : 0));
-      setAnnouncementCount(announcements?.meta?.total ?? announcements?.total ?? (Array.isArray(announcements?.data) ? announcements.data.length : 0));
-      setOrderCount(orders?.total ?? (Array.isArray(orders?.data) ? orders.data.length : 0));
-      setPaymentCount(Array.isArray(payments) ? payments.length : (payments?.data?.length ?? 0));
-      setRecentActivities(Array.isArray(activities) ? activities.map(mapActivity) : []);
+  // Format revenue data for chart
+  const chartData = useMemo(() => {
+    if (!revenueData?.data) return [];
+    return revenueData.data.map((item, index) => ({
+      ...item,
+      isCurrentMonth: index === currentMonthIndex && new Date().getFullYear() === revenueData.year,
+      isFutureMonth: index > currentMonthIndex && new Date().getFullYear() === revenueData.year,
+    }));
+  }, [revenueData, currentMonthIndex]);
 
-      const paymentRows = Array.isArray(payments) ? payments : payments?.data ?? [];
-      const grouped = paymentRows.reduce((acc: Record<string, number>, payment: any) => {
-        const dateValue = payment.createdAt ? new Date(payment.createdAt) : payment.link_created_at ? new Date(payment.link_created_at) : null;
-        if (!dateValue) return acc;
-        const month = dateValue.toLocaleString('default', { month: 'short' });
-        acc[month] = (acc[month] || 0) + (payment.amount || payment.order_amount || payment.link_amount_paid || 0);
-        return acc;
-      }, {} as Record<string, number>);
+  // Get max revenue for chart domain
+  const maxRevenue = useMemo(() => {
+    if (!chartData.length) return 100000;
+    const max = Math.max(...chartData.map(d => d.revenue));
+    return Math.ceil(max * 1.2) || 100000;
+  }, [chartData]);
 
-      setRevenueData(Object.entries(grouped).slice(-6).map(([month, revenue]) => ({ month, revenue })));
-
-      if (Array.isArray(departments) && Array.isArray(users)) {
-        const depNames = departments.slice(0, 5).map((dept: any) => dept.name || 'Unknown');
-        const depPerformance = depNames.map((name) => ({
-          name,
-          performance: Math.min(100, Math.max(40, users.filter((user: any) => user.departmentId === name || user.departmentId?._id === name).length * 10 + 30))
-        }));
-        setDepartmentData(depPerformance.length ? depPerformance : initialDepartmentData);
-      }
-    } catch (error) {
-      console.error('Failed to load dashboard data', error);
-      toast.error('Unable to load admin dashboard metrics');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="mx-auto h-10 w-10 animate-spin text-orange-500" />
+          <p className="mt-4 text-sm text-slate-500">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="space-y-6 p-4 md:p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back! Here’s the latest from your organization.</p>
+          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Dashboard</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Overview of your organization's performance</p>
         </div>
-        <button
-          className="inline-flex items-center rounded-md border border-border bg-transparent px-3 py-2 text-sm font-medium text-foreground transition hover:bg-secondary"
-          onClick={fetchDashboardData}
-          disabled={loading}
-        >
-          <Download className={loading ? 'mr-2 h-4 w-4 animate-spin' : 'mr-2 h-4 w-4'} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchDashboardData(true)}
+            disabled={refreshing}
+            className="gap-2 border-slate-200 hover:bg-slate-50"
+          >
+            <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, index) => (
-          <StatCard key={index} {...stat} />
-        ))}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {statCards.map((stat, index) => {
+          const Icon = stat.icon;
+          return (
+            <Card key={index} className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      {stat.title}
+                    </p>
+                    <p className="text-2xl font-bold text-slate-800 mt-1">{stat.value}</p>
+                    <p className="text-xs text-slate-400 mt-1">{stat.change}</p>
+                  </div>
+                  <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center", stat.bgColor)}>
+                    <Icon className={cn("h-5 w-5", stat.iconColor)} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-success" />
-              Revenue Overview
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={revenueData.length ? revenueData : initialRevenueData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="month" className="text-xs" />
-                <YAxis className="text-xs" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }} 
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="revenue" 
-                  stroke="hsl(var(--primary))" 
-                  strokeWidth={2}
-                  dot={{ fill: 'hsl(var(--primary))' }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      {/* Revenue Graph */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="pb-3 border-b border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
+                <BarChart3 className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-semibold text-slate-800">Revenue Overview</CardTitle>
+                {revenueData && (
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Total Revenue: <span className="font-semibold text-slate-700">₹{revenueData.totalRevenue.toLocaleString()}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+                <SelectTrigger className="w-[120px] h-9 text-sm border-slate-200 rounded-lg">
+                  <Calendar className="h-3.5 w-3.5 mr-2 text-slate-400" />
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map((year) => (
+                    <SelectItem key={year} value={year.toString()} className="text-sm">
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-3 text-xs text-slate-500">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-orange-500" />
+                  <span>Revenue</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4">
+          {chartData.length === 0 || chartData.every(d => d.revenue === 0) ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <LineChartIcon className="h-12 w-12 text-slate-300" />
+              <p className="mt-3 text-sm font-medium text-slate-600">No revenue data available</p>
+              <p className="text-xs text-slate-400">Revenue data will appear here once available</p>
+            </div>
+          ) : (
+            <div className="h-[320px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="revenueGradientFuture" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#94a3b8" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis 
+                    dataKey="month" 
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    axisLine={{ stroke: '#e2e8f0' }}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`}
+                    domain={[0, maxRevenue]}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke="#f97316"
+                    strokeWidth={2.5}
+                    fill="url(#revenueGradient)"
+                    dot={{ fill: '#f97316', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, fill: '#f97316' }}
+                  />
+                  <ReferenceLine 
+                    x={chartData[currentMonthIndex]?.month} 
+                    stroke="#f97316" 
+                    strokeDasharray="5 5"
+                    label={{ 
+                      value: 'Current Month', 
+                      position: 'top', 
+                      fill: '#f97316',
+                      fontSize: 10,
+                      fontWeight: 500
+                    }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-info" />
-              Department Performance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={departmentData.length ? departmentData : initialDepartmentData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis type="number" domain={[0, 100]} />
-                <YAxis dataKey="name" type="category" width={100} className="text-xs" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }} 
-                />
-                <Bar dataKey="performance" fill="hsl(var(--info))" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
+      {/* Recent Activity & Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <RecentActivity activities={recentActivities} />
-        </div>
-        <div>
-          <QuickActions actions={quickActions} title="Admin Actions" />
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Shield className="w-5 h-5 text-success" />
-                System Health
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-3 border-b border-slate-100">
+              <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                <Clock className="h-4 w-4 text-slate-400" />
+                Recent Activity
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Server Status</span>
-                <span className="text-sm font-medium text-success">Operational</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Database</span>
-                <span className="text-sm font-medium text-success">Healthy</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Last Backup</span>
-                <span className="text-sm font-medium text-muted-foreground">2 hours ago</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Uptime</span>
-                <span className="text-sm font-medium text-foreground">99.98%</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Announcements</span>
-                <span className="text-sm font-medium">{announcementCount.toLocaleString()}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Orders</span>
-                <span className="text-sm font-medium">{orderCount.toLocaleString()}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Payments</span>
-                <span className="text-sm font-medium">{paymentCount.toLocaleString()}</span>
+            <CardContent className="pt-4">
+              {recentActivities.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                    <Clock className="h-6 w-6 text-slate-400" />
+                  </div>
+                  <p className="mt-3 text-sm font-medium text-slate-600">No recent activity</p>
+                  <p className="text-xs text-slate-400">Activities will appear here as they happen</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {recentActivities.map((activity) => {
+                    const dotColors = {
+                      success: 'bg-emerald-500',
+                      error: 'bg-red-500',
+                      warning: 'bg-amber-500',
+                      info: 'bg-blue-500'
+                    };
+                    return (
+                      <div key={activity._id} className="flex items-start gap-3 group">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <Circle className={cn("h-2.5 w-2.5 fill-current", dotColors[activity.type])} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-slate-700">{activity.action}</p>
+                          <div className="flex items-center gap-3 mt-0.5">
+                            <span className="text-xs text-slate-400">{activity.user}</span>
+                            <span className="text-xs text-slate-300">•</span>
+                            <span className="text-xs text-slate-400">{activity.time}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div>
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-3 border-b border-slate-100">
+              <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                <Target className="h-4 w-4 text-slate-400" />
+                Quick Actions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-2 gap-2">
+                {quickActions.map((action, index) => {
+                  const Icon = action.icon;
+                  return (
+                    <button
+                      key={index}
+                      onClick={action.onClick}
+                      className="flex flex-col items-center justify-center p-4 rounded-xl border border-slate-200 hover:border-orange-200 hover:bg-orange-50 transition-all duration-200 group"
+                    >
+                      <div className="w-9 h-9 rounded-lg bg-slate-100 group-hover:bg-orange-100 flex items-center justify-center transition-colors duration-200">
+                        <Icon className="h-4 w-4 text-slate-600 group-hover:text-orange-600 transition-colors duration-200" />
+                      </div>
+                      <span className="text-xs font-medium text-slate-600 group-hover:text-slate-800 mt-2 text-center">
+                        {action.label}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

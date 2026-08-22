@@ -209,10 +209,15 @@ addNewLevel: `${url}/level`,
   getAttendanceByUserId:(userId:string)=>`${url}/attendance/user/${userId}`,
   getAttendanceByDate:(date:string)=>`${url}/attendance/date/${date}`,
 
-
+  holiday:`${url}/holiday`,
+  changeHoliday:(id:string)=>`${url}/holiday/${id}`,
+  changeattendenceStatus:(id:string)=>`${url}/attendance/${id}/change-status`,
+  myattendence:`${url}/attendance/me`,
   bulkStageChange: `${url}/leads/bulkStage/change`,
+  attendenceRecheck:(id:string)=>`${url}/attendance/recheck/${id}`,
 
-
+  // Dashboard
+  revenueGraph:`${url}/order/report/monthly-revenue-graph`,
   // Whatsapp part
 
   bulkWhatsappSend: `${url}/campaigns/bulk-whatsapp`,

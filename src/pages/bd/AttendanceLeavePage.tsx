@@ -1,5 +1,5 @@
+// EmployeeAttendanceLeavePage.tsx
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
   ArrowLeft,
@@ -28,6 +28,10 @@ import {
   Check,
   X,
   Minus,
+  AlertTriangle,
+  Edit3,
+  Send,
+  Info
 } from 'lucide-react';
 import { getUser } from '@/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,7 +43,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { MultiSelect } from '@/components/ui/multi-select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getDataHandlerWithToken, patchTokenDataHandler, postDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
@@ -62,11 +65,52 @@ type AttendanceRecord = {
   loginTime: string;
   logoutTime?: string;
   workHours: number;
-  status: 'present' | 'absent' | 'late' | 'half-day' | 'leave';
+  status: 'present' | 'absent' | 'half_day' | 'week_off' | 'logged_in' | 'holiday';
   date: string;
   reason?: string;
+  kraResult?: {
+    source?: 'holiday' | 'leave';
+    holidayId?: string;
+    holidayName?: string;
+    holidayDescription?: string;
+    leaveId?: string;
+    leaveType?: string;
+    leaveStatus?: string;
+    roleId?: string;
+    userId?: string;
+    status?: string;
+    appliedCriteria?: string;
+    metrics?: {
+      dialCalls: number;
+      answeredCalls: number;
+      talkTime: number;
+      bookings: number;
+      demoConducts: number;
+    };
+    thresholds?: {
+      answeredCalls: number;
+      talkTime: number;
+      dialCalls: number;
+      bookings: number;
+      demoConducts: number;
+    };
+    reason?: string;
+    startDate?: string;
+    endDate?: string;
+  } | null;
+  attendanceRequest?: {
+    _id: string;
+    status: 'pending' | 'approved' | 'rejected';
+    requestedStatus: string;
+    requestReason: string;
+    requestedBy: UserRef;
+    createdAt: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
+  statusChangeRemark?: string;
+  statusChangedAt?: string;
+  statusChangedBy?: string;
 };
 
 type LeaveRecord = {
@@ -131,9 +175,10 @@ type LeaveFilters = {
 const ATTENDANCE_STATUS_STYLES: Record<string, string> = {
   present: 'bg-emerald-100 text-emerald-800 border-emerald-200',
   absent: 'bg-red-100 text-red-800 border-red-200',
-  late: 'bg-amber-100 text-amber-800 border-amber-200',
-  'half-day': 'bg-orange-100 text-orange-800 border-orange-200',
-  leave: 'bg-sky-100 text-sky-800 border-sky-200',
+  half_day: 'bg-orange-100 text-orange-800 border-orange-200',
+  week_off: 'bg-blue-100 text-blue-800 border-blue-200',
+  holiday: 'bg-purple-100 text-purple-800 border-purple-200',
+  logged_in: 'bg-cyan-100 text-cyan-800 border-cyan-200',
 };
 
 const LEAVE_STATUS_STYLES: Record<LeaveRecord['status'], string> = {
@@ -149,6 +194,12 @@ const LEAVE_STATUS_ICONS: Record<LeaveRecord['status'], React.ReactNode> = {
   rejected: <X className="h-3 w-3" />,
   cancelled: <Minus className="h-3 w-3" />,
 };
+
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
 
 // Utility functions
 const formatRange = (leave: LeaveRecord) => {
@@ -173,58 +224,17 @@ const formatDate = (value: string) => format(new Date(value), 'MMM dd, yyyy');
 const formatTime = (value: string) => format(new Date(value), 'hh:mm a');
 const formatDateTime = (value: string) => format(new Date(value), 'MMM dd, yyyy hh:mm a');
 
-// Rich Text Editor Component
-const RichTextDisplay = ({ content }: { content: string }) => {
-  // Simple renderer for rich text content
-  const renderContent = () => {
-    if (!content) return null;
-    
-    // Split by newlines and parse
-    const lines = content.split('\n');
-    return lines.map((line, index) => {
-      if (line.startsWith('# ')) {
-        return <h1 key={index} className="text-2xl font-bold mt-4 mb-2">{line.slice(2)}</h1>;
-      }
-      if (line.startsWith('## ')) {
-        return <h2 key={index} className="text-xl font-semibold mt-3 mb-2">{line.slice(3)}</h2>;
-      }
-      if (line.startsWith('### ')) {
-        return <h3 key={index} className="text-lg font-semibold mt-2 mb-1">{line.slice(4)}</h3>;
-      }
-      if (line.startsWith('#### ')) {
-        return <h4 key={index} className="text-base font-semibold mt-2 mb-1">{line.slice(5)}</h4>;
-      }
-      if (line.startsWith('##### ')) {
-        return <h5 key={index} className="text-sm font-semibold mt-1 mb-1">{line.slice(6)}</h5>;
-      }
-      if (line.startsWith('###### ')) {
-        return <h6 key={index} className="text-xs font-semibold mt-1 mb-1">{line.slice(7)}</h6>;
-      }
-      if (line.startsWith('- ')) {
-        return <li key={index} className="ml-4 list-disc">{line.slice(2)}</li>;
-      }
-      if (line.startsWith('* ')) {
-        return <li key={index} className="ml-4 list-disc">{line.slice(2)}</li>;
-      }
-      if (line.startsWith('> ')) {
-        return <blockquote key={index} className="border-l-4 border-slate-300 pl-4 italic text-slate-600 my-2">{line.slice(2)}</blockquote>;
-      }
-      if (line.trim() === '') {
-        return <br key={index} />;
-      }
-      return <p key={index} className="my-1">{line}</p>;
-    });
-  };
-
-  return <div className="prose prose-sm max-w-none">{renderContent()}</div>;
+// Helper to check if a date has an attendance request
+const hasAttendanceRequest = (record: AttendanceRecord | null) => {
+  return record?.attendanceRequest && record.attendanceRequest.status === 'pending';
 };
 
-export function AttendanceLeavePage() {
-  const { leaveId } = useParams<{ leaveId?: string }>();
+export function EmployeeAttendanceLeavePage() {
   const currentUser = getUser();
   const currentUserId = currentUser?._id || currentUser?.id || currentUser?.userId || '';
 
   // State
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
   const [leaveBalance, setLeaveBalance] = useState<LeaveBalance | null>(null);
@@ -232,9 +242,13 @@ export function AttendanceLeavePage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState(new Date());
-  const [selectedLeave, setSelectedLeave] = useState<LeaveRecord | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [recheckOpen, setRecheckOpen] = useState(false);
+  const [recheckReason, setRecheckReason] = useState('');
+  const [recheckSubmitting, setRecheckSubmitting] = useState(false);
+  const [selectedLeave, setSelectedLeave] = useState<LeaveRecord | null>(null);
+  const [leaveDetailOpen, setLeaveDetailOpen] = useState(false);
   const [filters, setFilters] = useState<LeaveFilters>({
     page: 1,
     limit: 10,
@@ -249,43 +263,167 @@ export function AttendanceLeavePage() {
     reportToUserId: '',
   });
 
-  // Fetch Data
-  const fetchData = async (showSpinner = false) => {
-    if (!currentUserId) return;
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth();
 
+  // Fetch attendance for current month
+  const fetchAttendance = async () => {
     try {
-      if (showSpinner) setRefreshing(true);
-      else setLoading(true);
-
-      const [attendanceRes, leavesRes, balanceRes, seniorsRes] = await Promise.all([
-        getDataHandlerWithToken(ApiConfig.getAttendanceByUserId(currentUserId), null, null, true),
-        getDataHandlerWithToken(ApiConfig.getLeaves, { ...filters, userId: currentUserId }, null, true),
-        getDataHandlerWithToken(ApiConfig.getMyLeaveSummary, null, null, true),
-        getDataHandlerWithToken(ApiConfig.getMySeniors, null, null, true),
-      ]);
-
-      const attendanceData = Array.isArray(attendanceRes?.data) ? attendanceRes.data : Array.isArray(attendanceRes) ? attendanceRes : [];
-      const leaveData = Array.isArray(leavesRes?.data) ? leavesRes.data : Array.isArray(leavesRes) ? leavesRes : [];
-      const balanceData = balanceRes?.data || balanceRes || null;
-
-      setAttendance(attendanceData.sort((a: AttendanceRecord, b: AttendanceRecord) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-      setLeaves(leaveData.sort((a: LeaveRecord, b: LeaveRecord) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-      setLeaveBalance(balanceData);
-      setSeniors(Array.isArray(seniorsRes?.data) ? seniorsRes.data : Array.isArray(seniorsRes) ? seniorsRes : []);
+      setLoading(true);
+      const query: any = {};
+      if (currentMonth !== new Date().getMonth() || currentYear !== new Date().getFullYear()) {
+        query.month = currentMonth + 1;
+        query.year = currentYear;
+      }
+      
+      const response = await getDataHandlerWithToken(
+        ApiConfig.myattendence,
+        query,
+        null,
+        true
+      );
+        console.log("response",response)
+      const data = Array.isArray(response) ? response : response?.data || [];
+      setAttendance(data);
     } catch (error) {
-      console.error('Failed to load attendance/leave data:', error);
-      toast.error('Failed to load attendance and leave data');
+      console.error('Failed to fetch attendance:', error);
+      toast.error('Failed to load attendance data');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
+  // Fetch leaves
+  const fetchLeaves = async () => {
+    try {
+      const response = await getDataHandlerWithToken(
+        ApiConfig.getLeaves,
+        { ...filters, userId: currentUserId },
+        null,
+        true
+      );
+      const data = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : [];
+      setLeaves(data.sort((a: LeaveRecord, b: LeaveRecord) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ));
+    } catch (error) {
+      console.error('Failed to fetch leaves:', error);
+      toast.error('Failed to load leave data');
+    }
+  };
+
+  // Fetch leave balance
+  const fetchLeaveBalance = async () => {
+    try {
+      const response = await getDataHandlerWithToken(ApiConfig.getMyLeaveSummary, null, null, true);
+      const data = response?.data || response || null;
+      setLeaveBalance(data);
+    } catch (error) {
+      console.error('Failed to fetch leave balance:', error);
+    }
+  };
+
+  // Fetch seniors
+  const fetchSeniors = async () => {
+    try {
+      const response = await getDataHandlerWithToken(ApiConfig.getMySeniors, null, null, true);
+      const data = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : [];
+      setSeniors(data);
+    } catch (error) {
+      console.error('Failed to fetch seniors:', error);
+    }
+  };
+
+  const fetchAllData = async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchAttendance(),
+      fetchLeaves(),
+      fetchLeaveBalance(),
+      fetchSeniors(),
+    ]);
+    setRefreshing(false);
+  };
+
+  useEffect(() => {
+    fetchAllData();
+  }, [currentDate, filters]);
+
+  // Navigation functions
+  const navigatePrevious = () => {
+    setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
+  };
+
+  const navigateNext = () => {
+    setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
+  };
+
+  const navigateToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  // Get attendance for a specific date
+  const getAttendanceForDate = (day: number) => {
+    const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const records = attendance.filter(record => {
+      const recordDate = new Date(record.date);
+      const recordDateStr = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}-${String(recordDate.getDate()).padStart(2, '0')}`;
+      return recordDateStr === dateStr;
+    });
+
+    // Sort by priority
+    const priority = { present: 0, half_day: 1, absent: 2, week_off: 3, holiday: 4, logged_in: 5 };
+    records.sort((a, b) => (priority[a.status as keyof typeof priority] || 99) - (priority[b.status as keyof typeof priority] || 99));
+    
+    return records.length > 0 ? records[0] : null;
+  };
+
+  // Handle date click
+  const handleDateClick = (day: number | null) => {
+    if (!day) return;
+    const record = getAttendanceForDate(day);
+    if (record) {
+      setSelectedRecord(record);
+      setDetailOpen(true);
+    }
+  };
+
+  // Handle recheck request
+  const handleRecheckRequest = async () => {
+    if (!selectedRecord || !recheckReason.trim()) {
+      toast.error('Please provide a reason for recheck');
+      return;
+    }
+
+    try {
+      setRecheckSubmitting(true);
+      const payload = {
+        requestedStatus: 'present',
+        requestReason: recheckReason
+      };
+      const endpoint = ApiConfig.attendenceRecheck(selectedRecord._id);
+      const response = await postDataHandlerWithToken(endpoint, payload, true);
+
+      if (response) {
+        toast.success('Recheck request submitted successfully');
+        setRecheckOpen(false);
+        setRecheckReason('');
+        setSelectedRecord(null);
+        await fetchAttendance();
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to submit recheck request');
+    } finally {
+      setRecheckSubmitting(false);
+    }
+  };
+
+  // Leave functions
   const openLeaveDetail = async (id: string) => {
     const cached = leaves.find((item) => item._id === id);
     if (cached) {
       setSelectedLeave(cached);
-      setDetailOpen(true);
+      setLeaveDetailOpen(true);
       return;
     }
 
@@ -293,40 +431,67 @@ export function AttendanceLeavePage() {
     const data = response?.data || response;
     if (data) {
       setSelectedLeave(data);
-      setDetailOpen(true);
+      setLeaveDetailOpen(true);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [currentUserId, filters]);
-
-  useEffect(() => {
-    if (leaveId) {
-      openLeaveDetail(leaveId).catch((error) => {
-        console.error('Failed to load leave detail:', error);
-      });
+  const cancelLeave = async (id: string) => {
+    try {
+      await patchTokenDataHandler(ApiConfig.cancelMyLeave(id), null, true);
+      toast.success('Leave cancelled successfully');
+      await fetchLeaves();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to cancel leave');
     }
-  }, [leaveId, leaves]);
+  };
+
+  const handleCreateLeave = async () => {
+    if (!form.subject || !form.leaveFrom || !form.reason || !form.reportToUserId) {
+      toast.error('Please fill all required fields');
+      return;
+    }
+
+    if (form.leaveType === 'CL' && (leaveBalance?.availableCL ?? 0) <= 0) {
+      toast.error('No CL leave remaining');
+      return;
+    }
+
+    if (form.leaveType === 'EL' && (leaveBalance?.availableEL ?? 0) <= 0) {
+      toast.error('No EL leave remaining');
+      return;
+    }
+
+    const payload = {
+      leaveType: form.leaveType,
+      subject: form.subject,
+      leaveFrom: form.leaveFrom,
+      leaveTo: form.leaveTo || form.leaveFrom,
+      reason: form.reason,
+      reportToUserId: form.reportToUserId,
+    };
+
+    setSaving(true);
+    try {
+      await postDataHandlerWithToken(ApiConfig.createLeave, payload, true);
+      toast.success('Leave request submitted successfully');
+      setForm({
+        leaveType: 'CL',
+        subject: '',
+        leaveFrom: '',
+        leaveTo: '',
+        reason: '',
+        reportToUserId: seniors[0]?._id || '',
+      });
+      await fetchLeaves();
+      await fetchLeaveBalance();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to submit leave');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Computed values
-  const monthAttendance = useMemo(() => {
-    return attendance.filter((record) => {
-      const recordDate = new Date(record.date);
-      return recordDate.getMonth() === selectedMonth.getMonth() && recordDate.getFullYear() === selectedMonth.getFullYear();
-    });
-  }, [attendance, selectedMonth]);
-
-  const attendanceStats = useMemo(() => {
-    const total = monthAttendance.length;
-    const present = monthAttendance.filter((record) => record.status === 'present').length;
-    const absent = monthAttendance.filter((record) => record.status === 'absent').length;
-    const late = monthAttendance.filter((record) => record.status === 'late').length;
-    const halfDay = monthAttendance.filter((record) => record.status === 'half-day').length;
-    const leave = monthAttendance.filter((record) => record.status === 'leave').length;
-    return { total, present, absent, late, halfDay, leave };
-  }, [monthAttendance]);
-
   const leaveStats = useMemo(() => {
     const approved = leaves.filter((leave) => leave.status === 'approved');
     const rejected = leaves.filter((leave) => leave.status === 'rejected');
@@ -381,6 +546,570 @@ export function AttendanceLeavePage() {
     ];
   }, [leaveStats.clRemaining, leaveStats.elRemaining]);
 
+  // Generate calendar days
+  const generateCalendarDays = () => {
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+
+    const days: (number | null)[] = [];
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null);
+    }
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(i);
+    }
+    return days;
+  };
+
+  // Get status color for calendar
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'present':
+        return 'bg-emerald-100 border-emerald-300 text-emerald-700';
+      case 'absent':
+        return 'bg-red-100 border-red-300 text-red-700';
+      case 'half_day':
+        return 'bg-orange-100 border-orange-300 text-orange-700';
+      case 'week_off':
+        return 'bg-blue-100 border-blue-300 text-blue-700';
+      case 'holiday':
+        return 'bg-purple-100 border-purple-300 text-purple-700';
+      case 'logged_in':
+        return 'bg-cyan-100 border-cyan-300 text-cyan-700';
+      default:
+        return 'bg-slate-100 border-slate-300 text-slate-700';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'present':
+        return 'Present';
+      case 'absent':
+        return 'Absent';
+      case 'half_day':
+        return 'Half Day';
+      case 'week_off':
+        return 'Week Off';
+      case 'holiday':
+        return 'Holiday';
+      case 'logged_in':
+        return 'Logged In';
+      default:
+        return status;
+    }
+  };
+
+  // Render calendar
+  const renderCalendar = () => {
+    const days = generateCalendarDays();
+    const weeks = [];
+    for (let i = 0; i < days.length; i += 7) {
+      weeks.push(days.slice(i, i + 7));
+    }
+
+    return (
+      <Card className="border-slate-200 shadow-sm">
+        <CardHeader className="pb-3 border-b border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <CalendarDays className="h-4 w-4 text-primary" />
+                Attendance Calendar
+              </CardTitle>
+              <CardDescription className="text-xs">
+                {MONTHS[currentMonth]} {currentYear} • Click on a date to view details
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={navigatePrevious} className="h-8 text-xs px-3">
+                <ChevronDown className="h-3.5 w-3.5 rotate-90" />
+              </Button>
+              <span className="min-w-[100px] text-center text-sm font-medium">
+                {MONTHS[currentMonth]} {currentYear}
+              </span>
+              <Button variant="outline" size="sm" onClick={navigateNext} className="h-8 text-xs px-3">
+                <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={navigateToday} className="h-8 text-xs px-3">
+                Today
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-7 gap-1">
+            {DAYS.map(day => (
+              <div key={day} className="text-center text-xs font-medium text-slate-500 py-2">
+                {day}
+              </div>
+            ))}
+            {weeks.map((week, weekIndex) => (
+              week.map((day, dayIndex) => {
+                const record = day ? getAttendanceForDate(day) : null;
+                const isToday = day === new Date().getDate() && 
+                               currentMonth === new Date().getMonth() && 
+                               currentYear === new Date().getFullYear();
+                const hasRequest = record ? hasAttendanceRequest(record) : false;
+
+                return (
+                  <div
+                    key={`${weekIndex}-${dayIndex}`}
+                    onClick={() => handleDateClick(day)}
+                    className={cn(
+                      "relative rounded-lg p-2 cursor-pointer transition-all duration-200 min-h-[60px]",
+                      "hover:scale-[1.02] hover:shadow-md",
+                      day === null && "hover:bg-transparent cursor-default",
+                      record && getStatusColor(record.status),
+                      isToday && "ring-2 ring-orange-500 ring-offset-1",
+                      !record && day !== null && "hover:bg-slate-50 border border-dashed border-slate-200"
+                    )}
+                  >
+                    {day !== null && (
+                      <>
+                        <div className={cn(
+                          "text-sm font-medium",
+                          record ? "text-inherit" : "text-slate-400"
+                        )}>
+                          {day}
+                        </div>
+                        {record && (
+                          <div className="mt-1">
+                            <div className="text-[10px] font-medium truncate">
+                              {getStatusLabel(record.status)}
+                            </div>
+                            {hasRequest && (
+                              <div className="absolute top-1 right-1">
+                                <AlertTriangle className="w-3 h-3 text-amber-500" />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  // Render attendance detail modal
+  const renderDetailModal = () => {
+    if (!selectedRecord) return null;
+
+    const isPast = new Date(selectedRecord.date) < new Date();
+    const canRecheck = isPast && selectedRecord.status !== 'present' && selectedRecord.status !== 'week_off' && selectedRecord.status !== 'holiday';
+    const hasRequest = hasAttendanceRequest(selectedRecord);
+
+    return (
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="rounded-2xl max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-slate-800 flex items-center gap-2">
+              <Eye className="h-5 w-5 text-orange-500" />
+              Attendance Details
+            </DialogTitle>
+            <DialogDescription>
+              {formatDate(selectedRecord.date)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5">
+            {/* Basic Info */}
+            <div className="bg-slate-50 p-4 rounded-xl">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">Status</p>
+                  <div className="mt-1">
+                    <span className={cn(
+                      "inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg",
+                      ATTENDANCE_STATUS_STYLES[selectedRecord.status] || 'bg-slate-100 text-slate-800'
+                    )}>
+                      {getStatusLabel(selectedRecord.status)}
+                    </span>
+                  </div>
+                </div>
+               
+                {selectedRecord.logoutTime && (
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase font-semibold">Logout Time</p>
+                    <p className="mt-1 text-slate-700">
+                      {formatTime(selectedRecord.logoutTime)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Attendance Request Status */}
+            {hasRequest && (
+              <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-amber-800">Recheck Request Submitted</p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      <span className="font-semibold">Status:</span> {selectedRecord.attendanceRequest?.status}
+                    </p>
+                    <p className="text-xs text-amber-700">
+                      <span className="font-semibold">Requested Status:</span> {selectedRecord.attendanceRequest?.requestedStatus}
+                    </p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      <span className="font-semibold">Reason:</span> {selectedRecord.attendanceRequest?.requestReason}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Reason */}
+            {selectedRecord.reason && (
+              <div>
+                <p className="text-xs text-slate-500 uppercase font-semibold">Reason</p>
+                <div className="mt-1 bg-slate-50 p-3 rounded-xl text-sm text-slate-700">
+                  {selectedRecord.reason}
+                </div>
+              </div>
+            )}
+
+            {/* KRA Result */}
+            {selectedRecord.kraResult && (
+              <div>
+                <p className="text-xs text-slate-500 uppercase font-semibold mb-3">
+                  {selectedRecord.kraResult.source === 'holiday' ? 'Holiday Details' : 
+                   selectedRecord.kraResult.source === 'leave' ? 'Leave Details' : 
+                   'KRA Performance'}
+                </p>
+                <div className="bg-slate-50 p-4 rounded-xl space-y-3">
+                  
+                  {/* Holiday Source */}
+                  {selectedRecord.kraResult.source === 'holiday' && (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs text-slate-500">Holiday Name</p>
+                          <p className="text-sm font-medium text-slate-700">
+                            {selectedRecord.kraResult.holidayName || 'N/A'}
+                          </p>
+                        </div>
+                         {selectedRecord.kraResult.holidayDescription && (
+                        <div>
+                          <p className="text-xs text-slate-500">Description</p>
+                          <p className="text-sm text-slate-700">
+                            {selectedRecord.kraResult.holidayDescription}
+                          </p>
+                        </div>
+                      )}
+                      </div>
+                     
+                    </div>
+                  )}
+
+                  {/* Leave Source */}
+                  {selectedRecord.kraResult.source === 'leave' && (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs text-slate-500">Leave Type</p>
+                          <p className="text-sm font-medium text-slate-700">
+                            {selectedRecord.kraResult.leaveType || 'N/A'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Leave Status</p>
+                          <p className="text-sm font-medium text-slate-700">
+                            {selectedRecord.kraResult.leaveStatus || 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                      {selectedRecord.kraResult.leaveId && (
+                        <div>
+                          <p className="text-xs text-slate-500">Leave ID</p>
+                          <p className="text-sm text-slate-700">
+                            {selectedRecord.kraResult.leaveId}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Regular KRA Result */}
+                  {!selectedRecord.kraResult.source && selectedRecord.kraResult.status && (
+                    <>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div>
+                          <p className="text-xs text-slate-500">Status</p>
+                          <p className="text-sm font-medium text-slate-700">
+                            {selectedRecord.kraResult.status}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Applied Criteria</p>
+                          <p className="text-sm font-medium text-slate-700">
+                            {selectedRecord.kraResult.appliedCriteria}
+                          </p>
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-xs text-slate-500">Reason</p>
+                          <p className="text-sm text-slate-700">
+                            {selectedRecord.kraResult.reason}
+                          </p>
+                        </div>
+                      </div>
+
+                      {selectedRecord.kraResult.metrics && (
+                        <div className="border-t border-slate-200 pt-3">
+                          <p className="text-xs text-slate-500 font-semibold mb-2">Metrics</p>
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                            <div>
+                              <p className="text-xs text-slate-400">Dial Calls</p>
+                              <p className="text-sm font-medium text-slate-700">
+                                {selectedRecord.kraResult.metrics.dialCalls}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-slate-400">Answered Calls</p>
+                              <p className="text-sm font-medium text-slate-700">
+                                {selectedRecord.kraResult.metrics.answeredCalls}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-slate-400">Talk Time (s)</p>
+                              <p className="text-sm font-medium text-slate-700">
+                                {selectedRecord.kraResult.metrics.talkTime}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-slate-400">Bookings</p>
+                              <p className="text-sm font-medium text-slate-700">
+                                {selectedRecord.kraResult.metrics.bookings}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-slate-400">Demo Conducts</p>
+                              <p className="text-sm font-medium text-slate-700">
+                                {selectedRecord.kraResult.metrics.demoConducts}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDetailOpen(false)}
+              className="rounded-xl border-slate-200"
+            >
+              Close
+            </Button>
+            {canRecheck && !hasRequest && (
+              <Button
+                onClick={() => {
+                  setDetailOpen(false);
+                  setRecheckOpen(true);
+                }}
+                className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl"
+              >
+                <Edit3 className="h-4 w-4 mr-2" />
+                Request Recheck
+              </Button>
+            )}
+            {hasRequest && (
+              <Button
+                variant="outline"
+                disabled
+                className="rounded-xl border-amber-200 text-amber-600"
+              >
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Request Pending
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  // Render recheck modal
+  const renderRecheckModal = () => {
+    return (
+      <Dialog open={recheckOpen} onOpenChange={setRecheckOpen}>
+        <DialogContent className="rounded-2xl max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-slate-800 flex items-center gap-2">
+              <Edit3 className="h-5 w-5 text-orange-500" />
+              Request Attendance Recheck
+            </DialogTitle>
+            <DialogDescription>
+              Request a recheck for your attendance on {selectedRecord ? formatDate(selectedRecord.date) : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium text-slate-700">Current Status</Label>
+              <div className="mt-1.5">
+                <span className={cn(
+                  "inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg",
+                  selectedRecord ? ATTENDANCE_STATUS_STYLES[selectedRecord.status] || 'bg-slate-100 text-slate-800' : ''
+                )}>
+                  {selectedRecord ? getStatusLabel(selectedRecord.status) : ''}
+                </span>
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-slate-700">Reason for Recheck *</Label>
+              <Textarea
+                placeholder="Explain why your attendance should be rechecked..."
+                value={recheckReason}
+                onChange={(e) => setRecheckReason(e.target.value)}
+                className="mt-1.5 rounded-xl border-slate-200 focus:border-orange-500 focus:ring-orange-500"
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRecheckOpen(false);
+                setRecheckReason('');
+              }}
+              className="rounded-xl border-slate-200"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRecheckRequest}
+              disabled={!recheckReason.trim() || recheckSubmitting}
+              className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl"
+            >
+              {recheckSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Send className="h-4 w-4 mr-2" />
+              Submit Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  // Render leave detail modal
+  const renderLeaveDetailModal = () => {
+    if (!selectedLeave) return null;
+
+    return (
+      <Dialog open={leaveDetailOpen} onOpenChange={setLeaveDetailOpen}>
+        <DialogContent className="max-w-2xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <FileText className="h-5 w-5 text-primary" />
+              {selectedLeave.subject}
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              {formatRange(selectedLeave)} • {selectedLeave.leaveType} • {statusLabel(selectedLeave.status)}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className={cn('gap-1.5 text-sm px-3 py-1', LEAVE_STATUS_STYLES[selectedLeave.status])}>
+                {LEAVE_STATUS_ICONS[selectedLeave.status]}
+                {statusLabel(selectedLeave.status)}
+              </Badge>
+              <Badge variant="outline" className={cn(
+                'text-xs',
+                selectedLeave.leaveType === 'CL' ? 'border-sky-200 text-sky-700 bg-sky-50' : 'border-violet-200 text-violet-700 bg-violet-50'
+              )}>
+                {selectedLeave.leaveType}
+              </Badge>
+              {selectedLeave.approvedBy && (
+                <Badge variant="outline" className="text-xs">
+                  <User className="h-3 w-3 mr-1" />
+                  {selectedLeave.status === 'rejected' ? 'Rejected by' : 'Approved by'} {selectedLeave.approvedBy.name}
+                </Badge>
+              )}
+            </div>
+
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
+              <p className="text-xs font-medium text-slate-500 mb-2">Reason</p>
+              <p className="text-sm text-slate-700 whitespace-pre-wrap">{selectedLeave.reason}</p>
+            </div>
+
+            {(selectedLeave.approvalReason || selectedLeave.cancelReason) && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
+                <p className="text-xs font-medium text-amber-700 mb-2">
+                  {selectedLeave.approvalReason ? 'Approval Note' : 'Cancellation Reason'}
+                </p>
+                <p className="text-sm text-amber-800 whitespace-pre-wrap">
+                  {selectedLeave.approvalReason || selectedLeave.cancelReason}
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-lg bg-slate-50 p-3">
+                <p className="text-xs text-muted-foreground">Applied At</p>
+                <p className="font-medium">{formatDateTime(selectedLeave.createdAt)}</p>
+              </div>
+              {selectedLeave.approvedAt && (
+                <div className={`rounded-lg p-3 ${selectedLeave.status === 'rejected' ? 'bg-red-50' : 'bg-emerald-50'}`}>
+                  <p className={`text-xs ${selectedLeave.status === 'rejected' ? 'text-red-600' : 'text-emerald-600'}`}>
+                    {selectedLeave.status === 'rejected' ? 'Rejected' : 'Approved'}
+                  </p>
+                  <p className="font-medium">{formatDateTime(selectedLeave.approvedAt)}</p>
+                </div>
+              )}
+              {selectedLeave.cancelledAt && (
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-xs text-muted-foreground">Cancelled</p>
+                  <p className="font-medium">{formatDateTime(selectedLeave.cancelledAt)}</p>
+                </div>
+              )}
+              <div className="rounded-lg bg-slate-50 p-3">
+                <p className="text-xs text-muted-foreground">Days</p>
+                <p className="font-medium">{countDays(selectedLeave)} day{countDays(selectedLeave) > 1 ? 's' : ''}</p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-3">
+                <p className="text-xs text-muted-foreground">Type</p>
+                <p className="font-medium">{selectedLeave.leaveType}</p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            {selectedLeave.status === 'pending' && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  cancelLeave(selectedLeave._id);
+                  setLeaveDetailOpen(false);
+                }}
+                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+              >
+                <XCircle className="h-4 w-4 mr-2" />
+                Cancel Leave
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setLeaveDetailOpen(false)} size="sm">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
   // Set default approver
   useEffect(() => {
     if (!form.reportToUserId && approverOptions.length) {
@@ -388,98 +1117,12 @@ export function AttendanceLeavePage() {
     }
   }, [approverOptions]);
 
-  useEffect(() => {
-    if (!leaveTypeOptions.find((item) => item.value === form.leaveType && !item.disabled)) {
-      const fallback = leaveTypeOptions.find((item) => !item.disabled)?.value || 'CL';
-      setForm((prev) => ({ ...prev, leaveType: fallback as 'CL' | 'EL' }));
-    }
-  }, [leaveTypeOptions]);
-
-  const resetForm = () => {
-    const defaultLeaveType = leaveTypeOptions.find((item) => !item.disabled)?.value || 'CL';
-    setForm({
-      leaveType: defaultLeaveType as 'CL' | 'EL',
-      subject: '',
-      leaveFrom: '',
-      leaveTo: '',
-      reason: '',
-      reportToUserId: approverOptions[0]?.value || '',
-    });
-  };
-
-  const handleCreateLeave = async () => {
-    if (!form.subject || !form.leaveFrom || !form.reason || !form.reportToUserId) {
-      toast.error('Please fill all required fields');
-      return;
-    }
-
-    if (form.leaveType === 'CL' && leaveStats.clRemaining <= 0) {
-      toast.error('No CL leave remaining for this month');
-      return;
-    }
-
-    if (form.leaveType === 'EL' && leaveStats.elRemaining <= 0) {
-      toast.error('No EL leave remaining for this year');
-      return;
-    }
-
-    const payload = {
-      leaveType: form.leaveType,
-      subject: form.subject,
-      leaveFrom: form.leaveFrom,
-      leaveTo: form.leaveTo || form.leaveFrom,
-      reason: form.reason,
-      reportToUserId: form.reportToUserId,
-    };
-
-    setSaving(true);
-    try {
-      await postDataHandlerWithToken(ApiConfig.createLeave, payload, true);
-      toast.success('Leave request submitted successfully');
-      resetForm();
-      await fetchData();
-    } catch (error: any) {
-      console.error('Failed to submit leave:', error);
-      toast.error(error?.response?.data?.message || error?.message || 'Failed to submit leave');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const cancelLeave = async (id: string) => {
-    try {
-      await patchTokenDataHandler(ApiConfig.cancelMyLeave(id), null, true);
-      toast.success('Leave cancelled successfully');
-      await fetchData();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to cancel leave');
-    }
-  };
-
-  const changeMonth = (offset: number) => {
-    setSelectedMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + offset, 1));
-  };
-
-  const leaveTypeBadge = (type?: string) => {
-    if (!type) return null;
-    return (
-      <Badge variant="outline" className={cn(
-        type === 'CL' ? 'border-sky-200 text-sky-700 bg-sky-50' : 'border-violet-200 text-violet-700 bg-violet-50',
-        'text-xs font-medium'
-      )}>
-        {type}
-      </Badge>
-    );
-  };
-
-  const currentLabel = format(selectedMonth, 'MMMM yyyy');
-
-  if (loading && !attendance.length && !leaves.length) {
+  if (loading && !attendance.length) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
-          <p className="mt-3 text-sm text-muted-foreground">Loading attendance and leave data...</p>
+          <p className="mt-3 text-sm text-muted-foreground">Loading attendance data...</p>
         </div>
       </div>
     );
@@ -487,7 +1130,7 @@ export function AttendanceLeavePage() {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      {/* Professional Header with Stats */}
+      {/* Header */}
       <div className="rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-6 text-white shadow-xl">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-4">
@@ -502,18 +1145,18 @@ export function AttendanceLeavePage() {
             </Button>
             <div>
               <div className="flex items-center gap-2 text-cyan-400">
-                <Plane className="h-4 w-4" />
-                <span className="text-xs font-medium tracking-wider uppercase">Employee Portal</span>
+                <User className="h-4 w-4" />
+                <span className="text-xs font-medium tracking-wider uppercase">My Dashboard</span>
               </div>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight">Attendance & Leave Management</h1>
-              <p className="mt-1 text-sm text-slate-300">Track your attendance, apply for leaves, and view balances</p>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight">My Attendance & Leave</h1>
+              <p className="mt-1 text-sm text-slate-300">Track your attendance, apply for leaves, and manage requests</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <Button 
               variant="secondary" 
               size="sm" 
-              onClick={() => fetchData(true)} 
+              onClick={fetchAllData} 
               disabled={refreshing} 
               className="gap-2 bg-white/10 text-white hover:bg-white/20 border-0"
             >
@@ -522,34 +1165,6 @@ export function AttendanceLeavePage() {
             </Button>
           </div>
         </div>
-
-        {/* Quick Stats Bar */}
-        {/* <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
-          <div className="rounded-xl bg-white/5 backdrop-blur-sm p-3 border border-white/10">
-            <p className="text-xs text-slate-400">Total Leaves</p>
-            <p className="mt-1 text-xl font-bold">{leaveStats.totalLeaves}</p>
-          </div>
-          <div className="rounded-xl bg-white/5 backdrop-blur-sm p-3 border border-white/10">
-            <p className="text-xs text-slate-400">Pending</p>
-            <p className="mt-1 text-xl font-bold text-amber-400">{leaveStats.pending}</p>
-          </div>
-          <div className="rounded-xl bg-white/5 backdrop-blur-sm p-3 border border-white/10">
-            <p className="text-xs text-slate-400">Approved</p>
-            <p className="mt-1 text-xl font-bold text-emerald-400">{leaveStats.approved}</p>
-          </div>
-          <div className="rounded-xl bg-white/5 backdrop-blur-sm p-3 border border-white/10">
-            <p className="text-xs text-slate-400">CL Balance</p>
-            <p className="mt-1 text-xl font-bold text-sky-400">{leaveStats.clRemaining}</p>
-          </div>
-          <div className="rounded-xl bg-white/5 backdrop-blur-sm p-3 border border-white/10">
-            <p className="text-xs text-slate-400">EL Balance</p>
-            <p className="mt-1 text-xl font-bold text-violet-400">{leaveStats.elRemaining}</p>
-          </div>
-          <div className="rounded-xl bg-white/5 backdrop-blur-sm p-3 border border-white/10">
-            <p className="text-xs text-slate-400">Carried Forward</p>
-            <p className="mt-1 text-xl font-bold text-amber-400">{leaveStats.carriedForward}</p>
-          </div>
-        </div> */}
       </div>
 
       {/* Main Tabs */}
@@ -567,104 +1182,7 @@ export function AttendanceLeavePage() {
 
         {/* Attendance Tab */}
         <TabsContent value="attendance" className="space-y-4">
-          {/* Attendance Stats Cards */}
-          <div className="grid gap-3 grid-cols-3 md:grid-cols-5">
-            <Card className="border-slate-200 shadow-sm">
-              <CardContent className="p-4 text-center">
-                <p className="text-xs font-medium text-slate-500">Days</p>
-                <p className="mt-1 text-2xl font-bold text-slate-800">{attendanceStats.total}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-emerald-200 shadow-sm bg-emerald-50/30">
-              <CardContent className="p-4 text-center">
-                <p className="text-xs font-medium text-emerald-600">Present</p>
-                <p className="mt-1 text-2xl font-bold text-emerald-700">{attendanceStats.present}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-red-200 shadow-sm bg-red-50/30">
-              <CardContent className="p-4 text-center">
-                <p className="text-xs font-medium text-red-600">Absent</p>
-                <p className="mt-1 text-2xl font-bold text-red-700">{attendanceStats.absent}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-amber-200 shadow-sm bg-amber-50/30">
-              <CardContent className="p-4 text-center">
-                <p className="text-xs font-medium text-amber-600">Late</p>
-                <p className="mt-1 text-2xl font-bold text-amber-700">{attendanceStats.late}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-orange-200 shadow-sm bg-orange-50/30">
-              <CardContent className="p-4 text-center">
-                <p className="text-xs font-medium text-orange-600">Half-Day</p>
-                <p className="mt-1 text-2xl font-bold text-orange-700">{attendanceStats.halfDay}</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Attendance Table */}
-          <Card className="border-slate-200 shadow-sm">
-            <CardHeader className="pb-3 border-b border-slate-100">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <CalendarDays className="h-4 w-4 text-primary" />
-                    Attendance Records
-                  </CardTitle>
-                  <CardDescription className="text-xs">Monthly attendance log with status and reason</CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => changeMonth(-1)} className="h-8 text-xs px-3">Prev</Button>
-                  <span className="min-w-[100px] text-center text-sm font-medium">{currentLabel}</span>
-                  <Button variant="outline" size="sm" onClick={() => changeMonth(1)} className="h-8 text-xs px-3">Next</Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {monthAttendance.length === 0 ? (
-                <div className="rounded-xl border border-dashed bg-muted/20 p-12 text-center m-4">
-                  <CalendarDays className="mx-auto h-10 w-10 text-muted-foreground" />
-                  <h3 className="mt-3 text-sm font-semibold">No attendance records</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">Attendance for {currentLabel} will appear here.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-slate-50/50">
-                        <TableHead className="text-xs font-semibold h-10">Date</TableHead>
-                        <TableHead className="text-xs font-semibold h-10">Login</TableHead>
-                        <TableHead className="text-xs font-semibold h-10">Status</TableHead>
-                        <TableHead className="text-xs font-semibold h-10">Reason</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {monthAttendance.map((record) => (
-                        <TableRow key={record._id} className="hover:bg-slate-50/50">
-                          <TableCell className="font-medium py-2.5 text-sm">{formatDate(record.date)}</TableCell>
-                          <TableCell className="py-2.5">
-                            <div className="flex items-center gap-2">
-                              <Clock3 className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="text-sm">{record.loginTime ? formatTime(record.loginTime) : '-'}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-2.5">
-                            <Badge className={cn('gap-1.5 text-xs px-2.5 py-1', ATTENDANCE_STATUS_STYLES[record.status] || 'bg-slate-100 text-slate-800')}>
-                              {statusLabel(record.status)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-2.5">
-                            <div className="line-clamp-1 text-sm text-muted-foreground max-w-[280px]">
-                              {record.reason || '-'}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {renderCalendar()}
         </TabsContent>
 
         {/* Leave Tab */}
@@ -784,12 +1302,12 @@ export function AttendanceLeavePage() {
                   <div className="rounded-xl bg-gradient-to-br from-sky-50 to-sky-100/50 p-4 border border-sky-200">
                     <p className="text-xs font-medium text-sky-700">Casual Leave</p>
                     <p className="mt-1 text-2xl font-bold text-sky-800">{leaveStats.clRemaining}</p>
-                    <p className="mt-0.5 text-[11px] text-sky-600">Available this month</p>
+                    <p className="mt-0.5 text-[11px] text-sky-600">Available</p>
                   </div>
                   <div className="rounded-xl bg-gradient-to-br from-violet-50 to-violet-100/50 p-4 border border-violet-200">
                     <p className="text-xs font-medium text-violet-700">Earned Leave</p>
                     <p className="mt-1 text-2xl font-bold text-violet-800">{leaveStats.elRemaining}</p>
-                    <p className="mt-0.5 text-[11px] text-violet-600">Available this year</p>
+                    <p className="mt-0.5 text-[11px] text-violet-600">Available</p>
                   </div>
                   <div className="rounded-xl bg-gradient-to-br from-amber-50 to-amber-100/50 p-4 border border-amber-200">
                     <p className="text-xs font-medium text-amber-700">Carried Forward</p>
@@ -799,7 +1317,7 @@ export function AttendanceLeavePage() {
                   <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100/50 p-4 border border-emerald-200">
                     <p className="text-xs font-medium text-emerald-700">Encashed</p>
                     <p className="mt-1 text-2xl font-bold text-emerald-800">{leaveStats.encashed}</p>
-                    <p className="mt-0.5 text-[11px] text-emerald-600">EL encashed this year</p>
+                    <p className="mt-0.5 text-[11px] text-emerald-600">EL encashed</p>
                   </div>
                 </div>
 
@@ -818,20 +1336,11 @@ export function AttendanceLeavePage() {
                     </div>
                   </div>
                 </div>
-
-                <div className="rounded-xl bg-white border border-dashed border-slate-300 p-3">
-                  <div className="flex items-center gap-2">
-                    <Timer className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground">
-                      Year {leaveStats.year} • Last credited: {leaveBalance?.lastCreditedMonth ? format(new Date(leaveBalance.year, leaveBalance.lastCreditedMonth - 1, 1), 'MMMM yyyy') : 'N/A'}
-                    </p>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Leave History with Filters */}
+          {/* Leave History */}
           <Card className="border-slate-200 shadow-sm">
             <CardHeader className="pb-3 border-b border-slate-100">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -923,7 +1432,8 @@ export function AttendanceLeavePage() {
                   {leaves.map((leave) => (
                     <div
                       key={leave._id}
-                      className="rounded-xl border border-slate-200 p-4 transition-all hover:shadow-md hover:border-slate-300 bg-white"
+                      className="rounded-xl border border-slate-200 p-4 transition-all hover:shadow-md hover:border-slate-300 bg-white cursor-pointer"
+                      onClick={() => openLeaveDetail(leave._id)}
                     >
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div className="space-y-2 flex-1">
@@ -932,7 +1442,12 @@ export function AttendanceLeavePage() {
                               {LEAVE_STATUS_ICONS[leave.status]}
                               {statusLabel(leave.status)}
                             </Badge>
-                            {leaveTypeBadge(leave.leaveType)}
+                            <Badge variant="outline" className={cn(
+                              'text-xs',
+                              leave.leaveType === 'CL' ? 'border-sky-200 text-sky-700 bg-sky-50' : 'border-violet-200 text-violet-700 bg-violet-50'
+                            )}>
+                              {leave.leaveType}
+                            </Badge>
                             <Badge variant="outline" className="text-xs bg-slate-50">
                               {formatRange(leave)}
                             </Badge>
@@ -944,32 +1459,29 @@ export function AttendanceLeavePage() {
                             <h3 className="text-sm font-semibold text-slate-800">{leave.subject}</h3>
                             <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{leave.reason}</p>
                           </div>
-                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-  <span>Applied At: {formatDateTime(leave.createdAt)}</span>
-  {leave.approvedBy && (
-    <span>
-      {leave.status === 'rejected' ? 'Rejected by' : 'Approved by'}: {leave.approvedBy.name}
-    </span>
-  )}
-  {leave.approvedAt && (
-    <span>
-      {leave.status === 'rejected' ? 'Rejected' : 'Approved'}: {formatDateTime(leave.approvedAt)}
-    </span>
-  )}
-  {leave.cancelledAt && <span>Cancelled: {formatDateTime(leave.cancelledAt)}</span>}
-</div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                            <span>Applied: {formatDateTime(leave.createdAt)}</span>
+                            {leave.approvedBy && (
+                              <span>
+                                {leave.status === 'rejected' ? 'Rejected by' : 'Approved by'}: {leave.approvedBy.name}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => openLeaveDetail(leave._id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openLeaveDetail(leave._id);
+                            }}
                             className="gap-1.5 h-8 text-xs"
                           >
                             <Eye className="h-3.5 w-3.5" />
                             View
                           </Button>
-                          {leave.status === 'pending' || leave.status ==='approved' && (
+                          {leave.status === 'pending' && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -994,91 +1506,10 @@ export function AttendanceLeavePage() {
         </TabsContent>
       </Tabs>
 
-      {/* Leave Detail Dialog */}
-      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-2xl">
-          {selectedLeave && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-lg">
-                  <FileText className="h-5 w-5 text-primary" />
-                  {selectedLeave.subject}
-                </DialogTitle>
-                <DialogDescription className="text-sm">
-                  {formatRange(selectedLeave)} • {selectedLeave.leaveType} • {statusLabel(selectedLeave.status)}
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 py-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className={cn('gap-1.5 text-sm px-3 py-1', LEAVE_STATUS_STYLES[selectedLeave.status])}>
-                    {LEAVE_STATUS_ICONS[selectedLeave.status]}
-                    {statusLabel(selectedLeave.status)}
-                  </Badge>
-                  {leaveTypeBadge(selectedLeave.leaveType)}
-                  {selectedLeave.approvedBy && (
-  <Badge variant="outline" className="text-xs">
-    <User className="h-3 w-3 mr-1" />
-    {selectedLeave.status === 'rejected' ? 'Rejected by' : 'Approved by'} {selectedLeave.approvedBy.name}
-  </Badge>
-)}
-                </div>
-
-                <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
-                  <p className="text-xs font-medium text-slate-500 mb-2">Reason</p>
-                  <RichTextDisplay content={selectedLeave.reason} />
-                </div>
-
-                {(selectedLeave.approvalReason || selectedLeave.cancelReason) && (
-                  <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
-                    <p className="text-xs font-medium text-amber-700 mb-2">
-                      {selectedLeave.approvalReason ? 'Approval Note' : 'Cancellation Reason'}
-                    </p>
-                    <p className="text-sm text-amber-800 whitespace-pre-wrap">
-                      {selectedLeave.approvalReason || selectedLeave.cancelReason}
-                    </p>
-                  </div>
-                )}
-
-               <div className="grid grid-cols-2 gap-3 text-sm">
-  <div className="rounded-lg bg-slate-50 p-3">
-    <p className="text-xs text-muted-foreground">Applied At</p>
-    <p className="font-medium">{formatDateTime(selectedLeave.createdAt)}</p>
-  </div>
-  {selectedLeave.approvedAt && (
-    <div className={`rounded-lg p-3 ${selectedLeave.status === 'rejected' ? 'bg-red-50' : 'bg-emerald-50'}`}>
-      <p className={`text-xs ${selectedLeave.status === 'rejected' ? 'text-red-600' : 'text-emerald-600'}`}>
-        {selectedLeave.status === 'rejected' ? 'Rejected' : 'Approved'}
-      </p>
-      <p className="font-medium">{formatDateTime(selectedLeave.approvedAt)}</p>
-    </div>
-  )}
-  {selectedLeave.cancelledAt && (
-    <div className="rounded-lg bg-slate-50 p-3">
-      <p className="text-xs text-muted-foreground">Cancelled</p>
-      <p className="font-medium">{formatDateTime(selectedLeave.cancelledAt)}</p>
-    </div>
-  )}
-  <div className="rounded-lg bg-slate-50 p-3">
-    <p className="text-xs text-muted-foreground">Days</p>
-    <p className="font-medium">{countDays(selectedLeave)} day{countDays(selectedLeave) > 1 ? 's' : ''}</p>
-  </div>
-  <div className="rounded-lg bg-slate-50 p-3">
-    <p className="text-xs text-muted-foreground">Type</p>
-    <p className="font-medium">{selectedLeave.leaveType}</p>
-  </div>
-</div>
-              </div>
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDetailOpen(false)} size="sm">
-                  Close
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Modals */}
+      {renderDetailModal()}
+      {renderRecheckModal()}
+      {renderLeaveDetailModal()}
     </div>
   );
 }

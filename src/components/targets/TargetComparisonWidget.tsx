@@ -9,6 +9,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { useNavigate } from 'react-router-dom';
+import { hasPermission } from '@/utils/permissions';
 
 const METRICS = [
   { value: 'calls', label: 'Calls' },
@@ -61,7 +62,9 @@ export function TargetComparisonWidget({ managePath = '/bd/targets' }: TargetCom
       mounted = false;
     };
   }, [month, metric]);
-
+ const permissions = JSON.parse(
+    localStorage.getItem("permissions") || "[]"
+  );
   const summaryMetrics = data?.summary?.metrics || [];
   const selectedSummary = summaryMetrics.find((item: any) => item.metric === metric);
   const chartRows = useMemo(() => {
@@ -85,9 +88,11 @@ export function TargetComparisonWidget({ managePath = '/bd/targets' }: TargetCom
             </CardTitle>
             <p className="text-xs text-muted-foreground">Current month target vs achieved</p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate(managePath)}>
+         {hasPermission(permissions, 'targets', 'read') && (
+            <Button variant="outline" size="sm" onClick={() => navigate(managePath)}>
             Open Targets
           </Button>
+         ) }
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

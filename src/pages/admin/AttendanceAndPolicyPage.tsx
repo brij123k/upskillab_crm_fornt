@@ -1,18 +1,19 @@
-// AttendanceAndPolicyPage.tsx – redesigned to match professional admin style
+// AttendanceAndPolicyPage.tsx – Updated with new AttendanceCalendarTab
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Users, RefreshCw, Loader2, Clock, CheckCircle2, AlertCircle, Building2, Shield, TrendingUp } from 'lucide-react';
+import { Calendar, Users, RefreshCw, Loader2, CalendarDays } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { getDataHandlerWithToken, postDataHandlerWithToken, patchTokenDataHandler } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { cn } from '@/lib/utils';
 import { AttendanceCalendarTab } from '@/components/AttendanceCalendarTab';
 import { LeaveManagementTab } from '@/components/LeaveManagementTab';
+import { HolidayCalendarTab } from '@/components/HolidayCalendarTab';
 import { Card } from '@/components/ui/card';
 
 export function AttendanceAndPolicyPage() {
-  const [activeTab, setActiveTab] = useState<'attendance' | 'leaves'>('attendance');
+  const [activeTab, setActiveTab] = useState<'attendance' | 'leaves' | 'holidays'>('attendance');
   const [employees, setEmployees] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [leaves, setLeaves] = useState<any[]>([]);
@@ -20,7 +21,6 @@ export function AttendanceAndPolicyPage() {
   const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   const fetchAllData = async () => {
     try {
@@ -38,7 +38,6 @@ export function AttendanceAndPolicyPage() {
       setLeaves(Array.isArray(leaveData) ? leaveData : []);
       setLeavePolicies(Array.isArray(policiesData.data) ? policiesData.data : []);
       setRoles(Array.isArray(rolesData) ? rolesData : []);
-      setLastUpdated(new Date());
       setLoading(false);
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -103,17 +102,13 @@ export function AttendanceAndPolicyPage() {
   const pendingLeaves = leaves.filter(l => l.status === 'pending').length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50/80 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight flex items-center gap-3">
-              <span className="bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
-                Attendance & Policy
-              </span>
-            </h1>
-            
+            <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Attendance & Policy</h1>
+            <p className="text-slate-500 mt-1">Manage attendance tracking, leave policies, and holiday schedules</p>
           </div>
           <Button
             variant="outline"
@@ -128,17 +123,17 @@ export function AttendanceAndPolicyPage() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-          <TabsList className="h-11 bg-slate-100/80 rounded-xl p-1 backdrop-blur-sm w-full sm:w-auto">
+          <TabsList className="h-11 bg-slate-100/80 rounded-xl p-1 backdrop-blur-sm w-full sm:w-auto overflow-x-auto">
             <TabsTrigger 
               value="attendance" 
-              className="text-xs font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-800 rounded-lg px-4 gap-2"
+              className="text-xs font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-800 rounded-lg px-4 gap-2 whitespace-nowrap"
             >
               <Calendar className="w-4 h-4" />
               Attendance Calendar
             </TabsTrigger>
             <TabsTrigger 
               value="leaves" 
-              className="text-xs font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-800 rounded-lg px-4 gap-2"
+              className="text-xs font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-800 rounded-lg px-4 gap-2 whitespace-nowrap"
             >
               <Users className="w-4 h-4" />
               Leave Management
@@ -148,6 +143,13 @@ export function AttendanceAndPolicyPage() {
                 </span>
               )}
             </TabsTrigger>
+            <TabsTrigger 
+              value="holidays" 
+              className="text-xs font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-800 rounded-lg px-4 gap-2 whitespace-nowrap"
+            >
+              <CalendarDays className="w-4 h-4" />
+              Holiday Calendar
+            </TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -155,14 +157,8 @@ export function AttendanceAndPolicyPage() {
         {loading ? (
           <Card className="bg-white border-0 shadow-sm">
             <div className="flex flex-col items-center justify-center py-20">
-              <div className="relative">
-                <div className="w-16 h-16 rounded-full border-4 border-slate-100 border-t-orange-500 animate-spin" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="h-8 w-8 text-orange-400 animate-pulse" />
-                </div>
-              </div>
-              <p className="mt-4 text-sm font-medium text-slate-600">Loading attendance data...</p>
-              <p className="text-xs text-slate-400 mt-1">Please wait while we fetch the latest information</p>
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-orange-400" />
+              <p className="mt-3 text-slate-500">Loading attendance data...</p>
             </div>
           </Card>
         ) : (
@@ -170,7 +166,6 @@ export function AttendanceAndPolicyPage() {
             {activeTab === 'attendance' && (
               <AttendanceCalendarTab
                 employees={employees}
-                attendance={attendance}
                 leaves={leaves}
                 onRefresh={fetchAllData}
                 fetching={fetching}
@@ -189,23 +184,16 @@ export function AttendanceAndPolicyPage() {
                 onUpdatePolicy={handleUpdateLeavePolicy}
               />
             )}
+
+            {activeTab === 'holidays' && (
+              <HolidayCalendarTab
+                onRefresh={fetchAllData}
+                fetching={fetching}
+              />
+            )}
           </>
         )}
       </div>
     </div>
   );
 }
-
-// Local Badge component since it might not be exported
-const Badge = ({ className, children, variant, ...props }: any) => {
-  const baseStyles = "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium";
-  const variantStyles = {
-    outline: "border border-slate-200 text-slate-600 bg-transparent",
-    default: "bg-slate-100 text-slate-700",
-  };
-  return (
-    <span className={cn(baseStyles, variantStyles[variant as keyof typeof variantStyles] || variantStyles.default, className)} {...props}>
-      {children}
-    </span>
-  );
-};
