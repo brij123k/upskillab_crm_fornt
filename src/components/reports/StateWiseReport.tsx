@@ -113,11 +113,11 @@ export function StateWiseReport() {
 
       if (dateFilter === 'custom') {
         if (!fromDate || !toDate) {
-          toast({
-            title: 'Missing Dates',
-            description: 'Select start and end dates.',
-            variant: 'destructive',
-          });
+          // toast({
+          //   title: 'Missing Dates',
+          //   description: 'Select start and end dates.',
+          //   variant: 'destructive',
+          // });
           setLoading(false);
           return;
         }
@@ -347,7 +347,7 @@ export function StateWiseReport() {
               )}
 
               {/* Campaign Search */}
-              <div className="relative w-48">
+              {/* <div className="relative w-48">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                 <Input
                   placeholder="Search campaign..."
@@ -355,7 +355,7 @@ export function StateWiseReport() {
                   onChange={(e) => setCampaignSearch(e.target.value)}
                   className="pl-7 h-8 text-xs rounded-xl border-slate-200"
                 />
-              </div>
+              </div> */}
 
               {/* State Search */}
               <div className="relative w-44">

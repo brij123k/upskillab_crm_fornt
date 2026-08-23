@@ -232,14 +232,14 @@ export function ConsultantPerformanceReport() {
       };
       if (dateFilter === 'custom') {
         if (!fromDate || !toDate) {
-          toast({ title: 'Missing Dates', description: 'Select start and end dates.', variant: 'destructive' });
+          // toast({ title: 'Missing Dates', description: 'Select start and end dates.', variant: 'destructive' });
           setLoading(false);
           return;
         }
         const diffTime = Math.abs(new Date(toDate).getTime() - new Date(fromDate).getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        if (diffDays > 30) {
-          toast({ title: 'Date range too large', description: 'Max 30 days', variant: 'destructive' });
+        if (diffDays > 31) {
+          toast({ title: 'Date range too large', description: 'Max 31 days', variant: 'destructive' });
           setLoading(false);
           return;
         }
@@ -622,26 +622,9 @@ export function ConsultantPerformanceReport() {
                     className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                   />
                 </div>
-                <span className="text-[10px] text-slate-400">Max 30 days</span>
+                <span className="text-[10px] text-slate-400">Max 31 days</span>
               </>
             )}
-
-            {/* User Filter */}
-            <div className="w-[180px]">
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                <SelectTrigger className="h-8 text-xs rounded-xl">
-                  <SelectValue placeholder="All Users" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-xs">All Users</SelectItem>
-                  {users.map((u: any) => (
-                    <SelectItem key={u._id || u.id} value={u._id || u.id} className="text-xs">
-                      {u.name || u.fullName || u.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
 
             {/* Consultant Search */}
             <div className="relative w-48">

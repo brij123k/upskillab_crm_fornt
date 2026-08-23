@@ -117,11 +117,11 @@ export function StateWiseEmployeeReport() {
 
       if (dateFilter === 'custom') {
         if (!fromDate || !toDate) {
-          toast({
-            title: 'Missing Dates',
-            description: 'Select start and end dates.',
-            variant: 'destructive',
-          });
+          // toast({
+          //   title: 'Missing Dates',
+          //   description: 'Select start and end dates.',
+          //   variant: 'destructive',
+          // });
           setLoading(false);
           return;
         }
@@ -357,7 +357,7 @@ export function StateWiseEmployeeReport() {
               )}
 
               {/* Employee Search */}
-              <div className="relative w-48">
+              {/* <div className="relative w-48">
                 <Users className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                 <Input
                   placeholder="Search employee..."
@@ -365,7 +365,7 @@ export function StateWiseEmployeeReport() {
                   onChange={(e) => setEmployeeSearch(e.target.value)}
                   className="pl-7 h-8 text-xs rounded-xl border-slate-200"
                 />
-              </div>
+              </div> */}
 
               {/* State Search */}
               <div className="relative w-44">

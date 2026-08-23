@@ -93,25 +93,25 @@ export function SourceCampaignReport() {
 
       if (dateFilter === 'custom') {
         if (!fromDate || !toDate) {
-          toast({
-            title: 'Missing Dates',
-            description: 'Select start and end dates.',
-            variant: 'destructive',
-          });
+          // toast({
+          //   title: 'Missing Dates',
+          //   description: 'Select start and end dates.',
+          //   variant: 'destructive',
+          // });
           setLoading(false);
           return;
         }
         const diffTime = Math.abs(new Date(toDate).getTime() - new Date(fromDate).getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        if (diffDays > 30) {
-          toast({
-            title: 'Date range too large',
-            description: 'Max 30 days allowed.',
-            variant: 'destructive',
-          });
-          setLoading(false);
-          return;
-        }
+        // if (diffDays > 30) {
+        //   toast({
+        //     title: 'Date range too large',
+        //     description: 'Max 30 days allowed.',
+        //     variant: 'destructive',
+        //   });
+        //   setLoading(false);
+        //   return;
+        // }
         params.fromDate = fromDate;
         params.toDate = toDate;
       } else {
@@ -344,7 +344,7 @@ export function SourceCampaignReport() {
                       className="w-full h-8 px-2 text-xs border rounded-xl bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                     />
                   </div>
-                  <span className="text-[10px] text-slate-400">Max 30 days</span>
+                  {/* <span className="text-[10px] text-slate-400">Max 30 days</span> */}
                 </>
               )}
 
@@ -445,72 +445,6 @@ export function SourceCampaignReport() {
             )}
           </div>
 
-          {/* Conversion Rate Cards */}
-          {Object.keys(conversionData).length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {sourceCampaigns.map(campaign => {
-                const rate = conversionData[campaign] || 0;
-                const total = totalsByCampaign[campaign] || 0;
-                const admissions = admissionByCampaign[campaign] || 0;
-                const isTop = topCampaign?.name === campaign;
-                
-                return (
-                  <Card 
-                    key={campaign} 
-                    className={cn(
-                      "p-4 bg-white border shadow-sm hover:shadow-md transition-all",
-                      isTop && rate > 0 ? "border-orange-200 bg-gradient-to-br from-orange-50/50 to-white" : "border-slate-200"
-                    )}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-slate-600 truncate">{campaign}</p>
-                        <div className="mt-1">
-                          <span className="text-lg font-bold text-slate-800">{rate}%</span>
-                          {isTop && rate > 0 && (
-                            <Badge variant="default" className="ml-2 bg-orange-500 text-[8px] px-1.5 py-0">
-                              Top
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
-                          <span>{admissions} admissions</span>
-                          <span className="w-1 h-1 rounded-full bg-slate-300" />
-                          <span>{total} leads</span>
-                        </div>
-                      </div>
-                      <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-                        rate > 20 ? "bg-emerald-100" : 
-                        rate > 10 ? "bg-amber-100" : 
-                        "bg-slate-100"
-                      )}>
-                        {rate > 20 ? (
-                          <TrendingUp className="w-4 h-4 text-emerald-600" />
-                        ) : rate > 0 ? (
-                          <TrendingUp className="w-4 h-4 text-amber-600" />
-                        ) : (
-                          <TrendingDown className="w-4 h-4 text-slate-400" />
-                        )}
-                      </div>
-                    </div>
-                    <div className="mt-2">
-                      <Progress 
-                        value={rate} 
-                        max={50}
-                        className="h-1 bg-slate-100"
-                        indicatorClassName={cn(
-                          rate > 20 ? "bg-emerald-500" : 
-                          rate > 10 ? "bg-amber-500" : 
-                          "bg-slate-300"
-                        )}
-                      />
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
 
           {/* Main Table */}
           <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
@@ -611,38 +545,6 @@ export function SourceCampaignReport() {
               </TableBody>
             </Table>
           </div>
-
-          {/* Campaign-wise Totals */}
-          {totalsByCampaign && Object.keys(totalsByCampaign).length > 0 && !searchTerm && (
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-2">Campaign Summary</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {Object.entries(totalsByCampaign).map(([campaign, total]) => {
-                  const conversion = conversionData[campaign] || 0;
-                  const admissions = admissionByCampaign[campaign] || 0;
-                  return (
-                    <div 
-                      key={campaign} 
-                      className="flex flex-col p-3 bg-white border border-slate-200 rounded-xl hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex justify-between items-start">
-                        <span className="text-xs text-slate-600 truncate flex-1">{campaign}</span>
-                        <Badge variant="outline" className="text-[8px] px-1 py-0 bg-slate-50 ml-1 shrink-0">
-                          {conversion}%
-                        </Badge>
-                      </div>
-                      <div className="flex items-end justify-between mt-1">
-                        <span className="text-xs font-semibold text-slate-800">
-  {(total ?? 0).toLocaleString()} leads
-</span>
-                        <span className="text-[10px] text-emerald-600">{admissions} admissions</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {/* Footer */}
           <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-100">

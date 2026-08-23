@@ -1,3 +1,4 @@
+// UtilizationReport.tsx - Updated with DD/MM/YY date format
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,16 +60,28 @@ const formatTime = (seconds: number) => {
   return `${mins}m`;
 };
 
+// Updated date formatter to DD/MM/YY
 const formatDate = (dateString: string) => {
   if (!dateString) return '-';
   const date = new Date(dateString);
-  return date.toLocaleString('en-IN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  if (isNaN(date.getTime())) return '-';
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear()).slice(-2);
+  return `${day}/${month}/${year}`;
+};
+
+// Updated datetime formatter to DD/MM/YY HH:MM
+const formatDateTime = (dateString: string) => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '-';
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear()).slice(-2);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${day}/${month}/${year} ${hours}:${minutes}`;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -331,14 +344,13 @@ export function UtilizationReport() {
       };
       if (dateFilter === 'custom') {
         if (!fromDate || !toDate) {
-          toast({ title: 'Missing Dates', description: 'Select start and end dates.', variant: 'destructive' });
           setLoading(false);
           return;
         }
         const diffTime = Math.abs(new Date(toDate).getTime() - new Date(fromDate).getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        if (diffDays > 30) {
-          toast({ title: 'Date range too large', description: 'Max 30 days', variant: 'destructive' });
+        if (diffDays > 31) {
+          toast({ title: 'Date range too large', description: 'Max 31 days', variant: 'destructive' });
           setLoading(false);
           return;
         }
@@ -492,6 +504,12 @@ export function UtilizationReport() {
     selectedUserId !== 'all' ||
     searchTerm !== '';
 
+  // Format date range display
+  const formatDateRange = (startDate: string, endDate: string) => {
+    if (!startDate || !endDate) return '';
+    return `${formatDate(startDate)} – ${formatDate(endDate)}`;
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -585,26 +603,9 @@ export function UtilizationReport() {
                     className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                   />
                 </div>
-                <span className="text-[10px] text-slate-400">Max 30 days</span>
+                <span className="text-[10px] text-slate-400">Max 31 days</span>
               </>
             )}
-
-            {/* User Filter */}
-            <div className="w-[180px]">
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                <SelectTrigger className="h-8 text-xs rounded-xl">
-                  <SelectValue placeholder="All Users" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-xs">All Users</SelectItem>
-                  {users.map((u: any) => (
-                    <SelectItem key={u._id || u.id} value={u._id || u.id} className="text-xs">
-                      {u.name || u.fullName || u.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
 
             {/* Employee Search */}
             <div className="relative w-48">
@@ -634,14 +635,14 @@ export function UtilizationReport() {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Summary row */}
+          {/* Summary row - updated with DD/MM/YY format */}
           <div className="flex items-center gap-4 text-sm text-slate-500">
             <span className="font-medium text-slate-700">{filteredEmployees.length} employees</span>
             {data.startDate && data.endDate && (
               <>
                 <span className="w-1 h-1 rounded-full bg-slate-300" />
                 <span>
-                  {new Date(data.startDate).toLocaleDateString()} – {new Date(data.endDate).toLocaleDateString()}
+                  {formatDateRange(data.startDate, data.endDate)}
                 </span>
               </>
             )}

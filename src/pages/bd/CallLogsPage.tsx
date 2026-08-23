@@ -95,6 +95,7 @@ interface Filters {
   sort: string;
   answered: string;
   group: string;
+  team: string;
   logType: string;
   viewType: string;
 }
@@ -132,6 +133,7 @@ export function CallLogsPage() {
     sort: 'new',
     answered: 'all',
     group: 'false',
+    team: 'false',
     logType: 'all',
     viewType: 'all',
   });
@@ -155,6 +157,7 @@ export function CallLogsPage() {
     if (filters.sort) params.sort = filters.sort;
     if (filters.answered !== 'all') params.answered = filters.answered;
     if (filters.group === 'true') params.group = true;
+    if (filters.team === 'true') params.team = true;
     if (filters.logType !== 'all') params.logType = filters.logType;
     if (filters.viewType !== 'all') params.type = filters.viewType;
     return params;
@@ -311,7 +314,7 @@ export function CallLogsPage() {
   const resetFilters = () => {
     setFilters({
       search: '', leadId: 'all', stageId: 'all', userId: 'all', dateFilter: 'today',
-      fromDate: '', toDate: '', sort: 'new', answered: 'all', group: 'false', logType: 'all', viewType: 'all'
+      fromDate: '', toDate: '', sort: 'new', answered: 'all', group: 'false',team: 'false', logType: 'all', viewType: 'all'
     });
     setPage(1);
   };
@@ -407,6 +410,17 @@ export function CallLogsPage() {
             </div>
             <span className="text-sm font-medium text-slate-700">Group</span>
           </div>
+        {filters.group === 'true' && (
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
+            setFilters(prev => ({ ...prev, team: prev.team === 'true' ? 'false' : 'true' }));
+            setPage(1);
+          }}>
+            <div className={`w-4 h-4 rounded border ${filters.team === 'true' ? 'bg-orange-600 border-orange-600' : 'border-slate-300'} flex items-center justify-center transition-all`}>
+              {filters.team === 'true' && <div className="w-2 h-2 bg-white rounded-sm" />}
+            </div>
+            <span className="text-sm font-medium text-slate-700">Team</span>
+          </div>
+        )}
         </div>
 
         {/* Filters Header */}

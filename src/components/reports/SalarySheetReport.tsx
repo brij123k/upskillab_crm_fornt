@@ -104,7 +104,7 @@ export function SalarySheetReport() {
 
       if (dateFilter === 'custom') {
         if (!fromDate || !toDate) {
-          toast({ title: 'Missing Dates', description: 'Select start and end dates.', variant: 'destructive' });
+          // toast({ title: 'Missing Dates', description: 'Select start and end dates.', variant: 'destructive' });
           setLoading(false);
           return;
         }

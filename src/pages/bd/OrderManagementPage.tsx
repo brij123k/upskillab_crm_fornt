@@ -248,6 +248,7 @@ interface Filters {
 import { useNavigate } from 'react-router-dom';
 import { hasModulePermission } from '@/utils/modulePermissions';
 import { hasPermission } from '@/utils/permissions';
+import { cn } from '@/lib/utils';
 export function OrderManagementPage() {
     // State declarations
     const [orders, setOrders] = useState<OrderType[]>([]);
@@ -548,6 +549,90 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
         });
     };
 
+    const validateLumpsum = useCallback(() => {
+  if (orderForm.paymentMode !== 'Lumpsum') return true;
+  
+  const finalFee = calculateFinalFee();
+  const registrationAmount = orderForm.lumpsumDetails?.registrationAmount || 0;
+  const totalReceived = orderForm.lumpsumDetails?.totalReceived || 0;
+  
+  if (registrationAmount > finalFee) {
+    toast({
+      title: 'Validation Error',
+      description: 'Registration amount cannot exceed the final fee',
+      variant: 'destructive',
+    });
+    return false;
+  }
+  
+  if (totalReceived > finalFee) {
+    toast({
+      title: 'Validation Error',
+      description: 'Total received cannot exceed the final fee',
+      variant: 'destructive',
+    });
+    return false;
+  }
+  
+  if (totalReceived < registrationAmount) {
+    toast({
+      title: 'Validation Error',
+      description: 'Total received cannot be less than registration amount',
+      variant: 'destructive',
+    });
+    return false;
+  }
+  
+  return true;
+}, [orderForm.paymentMode, orderForm.lumpsumDetails, calculateFinalFee]);
+
+// Validate Loan fields
+const validateLoan = useCallback(() => {
+  if (orderForm.paymentMode !== 'Loan') return true;
+  
+  const finalFee = calculateFinalFee();
+  const loanAmount = orderForm.loanDetails?.loanAmount || 0;
+  const disbursementAmount = orderForm.loanDetails?.disbursementAmount || 0;
+  
+  if (loanAmount > finalFee) {
+    toast({
+      title: 'Validation Error',
+      description: 'Loan amount cannot exceed the final fee',
+      variant: 'destructive',
+    });
+    return false;
+  }
+  
+  if (disbursementAmount > finalFee) {
+    toast({
+      title: 'Validation Error',
+      description: 'Disbursement amount cannot exceed the final fee',
+      variant: 'destructive',
+    });
+    return false;
+  }
+  
+  if (disbursementAmount > loanAmount) {
+    toast({
+      title: 'Validation Error',
+      description: 'Disbursement amount cannot exceed the loan amount',
+      variant: 'destructive',
+    });
+    return false;
+  }
+  
+  if (disbursementAmount === 0) {
+    toast({
+      title: 'Validation Error',
+      description: 'Disbursement amount is required',
+      variant: 'destructive',
+    });
+    return false;
+  }
+  
+  return true;
+}, [orderForm.paymentMode, orderForm.loanDetails, calculateFinalFee]);
+
     // Create order
     const handleCreateOrder = async () => {
         try {
@@ -562,7 +647,12 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
                 });
                 return;
             }
-
+            if (!validateLumpsum()) {
+      return;
+    }
+     if (!validateLoan()) {
+      return;
+    }
             const finalFee = calculateFinalFee();
             const dataToSend: any = {
                 mobile: orderForm.mobile,
@@ -1098,7 +1188,6 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
 
     return (
         <div className="space-y-4 md:space-y-6 p-2 md:p-0">
-            {/* Header */}
            {/* Header */}
 <div className="flex justify-between items-center">
     <div>
@@ -1862,158 +1951,270 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
         </div>
 
         {orderForm.paymentMode === 'Lumpsum' && orderForm.lumpsumDetails && (
-          <div className="border-t border-slate-100 mt-4 pt-4">
-            <h4 className="text-sm font-medium text-slate-700 mb-3">Lumpsum Details</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs font-semibold text-slate-500 uppercase">Registration Date</Label>
-                <Input
-                  type="datetime-local"
-                  value={orderForm.lumpsumDetails.registrationDate}
-                  onChange={(e) => setOrderForm({
-                    ...orderForm,
-                    lumpsumDetails: { ...orderForm.lumpsumDetails!, registrationDate: e.target.value }
-                  })}
-                  className="mt-1.5 rounded-xl border-slate-200"
-                />
-              </div>
-              <div>
-                <Label className="text-xs font-semibold text-slate-500 uppercase">Registration Amount</Label>
-                <Input
-                  type="number"
-                  value={orderForm.lumpsumDetails.registrationAmount}
-                  onChange={(e) => {
-                    const registrationAmount = parseInt(e.target.value) || 0;
-                    setOrderForm({
-                      ...orderForm,
-                      lumpsumDetails: { 
-                        ...orderForm.lumpsumDetails!, 
-                        registrationAmount: registrationAmount,
-                        // Auto-populate totalReceived with registrationAmount
-                        totalReceived: registrationAmount
-                      }
-                    });
-                  }}
-                  className="mt-1.5 rounded-xl border-slate-200"
-                />
-              </div>
-              <div>
-                <Label className="text-xs font-semibold text-slate-500 uppercase">Total Received</Label>
-                <Input
-                  type="number"
-                  value={orderForm.lumpsumDetails.totalReceived}
-                  onChange={(e) => setOrderForm({
-                    ...orderForm,
-                    lumpsumDetails: { ...orderForm.lumpsumDetails!, totalReceived: parseInt(e.target.value) || 0 }
-                  })}
-                  className="mt-1.5 rounded-xl border-slate-200"
-                />
-              </div>
-              <div>
-                <Label className="text-xs font-semibold text-slate-500 uppercase">Payment Type</Label>
-                <Select
-                  value={orderForm.lumpsumDetails.paymentType}
-                  onValueChange={(value) => setOrderForm({
-                    ...orderForm,
-                    lumpsumDetails: { ...orderForm.lumpsumDetails!, paymentType: value }
-                  })}
-                >
-                  <SelectTrigger className="mt-1.5 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UPI">UPI</SelectItem>
-                    <SelectItem value="Card">Card</SelectItem>
-                    <SelectItem value="Net Banking">Net Banking</SelectItem>
-                    <SelectItem value="Cash">Cash</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-        )}
+    <div className="border-t border-slate-100 mt-4 pt-4">
+      <h4 className="text-sm font-medium text-slate-700 mb-3">Lumpsum Details</h4>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Label className="text-xs font-semibold text-slate-500 uppercase">Registration Date</Label>
+          <Input
+            type="datetime-local"
+            value={orderForm.lumpsumDetails.registrationDate}
+            onChange={(e) => setOrderForm({
+              ...orderForm,
+              lumpsumDetails: { ...orderForm.lumpsumDetails!, registrationDate: e.target.value }
+            })}
+            className="mt-1.5 rounded-xl border-slate-200"
+          />
+        </div>
+        <div>
+          <Label className="text-xs font-semibold text-slate-500 uppercase">Registration Amount</Label>
+          <Input
+            type="number"
+            value={orderForm.lumpsumDetails.registrationAmount}
+            onChange={(e) => {
+              const registrationAmount = parseInt(e.target.value) || 0;
+              const finalFee = calculateFinalFee();
+              if (registrationAmount > finalFee) {
+                toast({
+                  title: 'Validation Error',
+                  description: 'Registration amount cannot exceed the final fee',
+                  variant: 'destructive',
+                });
+                return;
+              }
+              setOrderForm({
+                ...orderForm,
+                lumpsumDetails: { 
+                  ...orderForm.lumpsumDetails!, 
+                  registrationAmount: registrationAmount,
+                  totalReceived: registrationAmount > orderForm.lumpsumDetails!.totalReceived 
+                    ? registrationAmount 
+                    : orderForm.lumpsumDetails!.totalReceived
+                }
+              });
+            }}
+            className="mt-1.5 rounded-xl border-slate-200"
+          />
+          <p className="text-xs text-slate-400 mt-1">Cannot exceed final fee: {formatCurrency(calculateFinalFee())}</p>
+        </div>
+        <div className="md:col-span-2">
+          <Label className="text-xs font-semibold text-slate-500 uppercase">Total Received</Label>
+          <Input
+            type="number"
+            value={orderForm.lumpsumDetails.totalReceived}
+            onChange={(e) => {
+              const totalReceived = parseInt(e.target.value) || 0;
+              const finalFee = calculateFinalFee();
+              const registrationAmount = orderForm.lumpsumDetails?.registrationAmount || 0;
+              
+              // Validate total received doesn't exceed final fee
+              if (totalReceived > finalFee) {
+                toast({
+                  title: 'Validation Error',
+                  description: 'Total received cannot exceed the final fee',
+                  variant: 'destructive',
+                });
+                return;
+              }
+              
+            
+              
+              setOrderForm({
+                ...orderForm,
+                lumpsumDetails: { ...orderForm.lumpsumDetails!, totalReceived }
+              });
+            }}
+            className="mt-1.5 rounded-xl border-slate-200"
+          />
+          <p className="text-xs text-slate-400 mt-1">
+            Min: {formatCurrency(orderForm.lumpsumDetails?.registrationAmount || 0)} | 
+            Max: {formatCurrency(calculateFinalFee())}
+          </p>
+          {orderForm.lumpsumDetails.totalReceived > 0 && (
+            <p className={cn(
+              "text-xs mt-1",
+              orderForm.lumpsumDetails.totalReceived === calculateFinalFee() 
+                ? "text-emerald-600" 
+                : "text-amber-600"
+            )}>
+              {orderForm.lumpsumDetails.totalReceived === calculateFinalFee() 
+                ? "✓ Fully Paid" 
+                : `Pending Amount: ${formatCurrency(calculateFinalFee() - orderForm.lumpsumDetails.totalReceived)}`
+              }
+            </p>
+          )}
+        </div>
+        <div>
+          <Label className="text-xs font-semibold text-slate-500 uppercase">Payment Type</Label>
+          <Select
+            value={orderForm.lumpsumDetails.paymentType}
+            onValueChange={(value) => setOrderForm({
+              ...orderForm,
+              lumpsumDetails: { ...orderForm.lumpsumDetails!, paymentType: value }
+            })}
+          >
+            <SelectTrigger className="mt-1.5 rounded-xl">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="UPI">UPI</SelectItem>
+              <SelectItem value="Card">Card</SelectItem>
+              <SelectItem value="Net Banking">Net Banking</SelectItem>
+              <SelectItem value="Cash">Cash</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </div>
+  )}
 
-        {orderForm.paymentMode === 'Loan' && orderForm.loanDetails && (
-          <div className="border-t border-slate-100 mt-4 pt-4">
-            <h4 className="text-sm font-medium text-slate-700 mb-3">Loan Details</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs font-semibold text-slate-500 uppercase">Loan Partner *</Label>
-                <Select
-                  value={orderForm.loanDetails.loanPartner}
-                  onValueChange={(value) => setOrderForm({
-                    ...orderForm,
-                    loanDetails: { ...orderForm.loanDetails!, loanPartner: value }
-                  })}
-                >
-                  <SelectTrigger className="mt-1.5 rounded-xl">
-                    <SelectValue placeholder="Select loan partner" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingLoanPartners ? (
-                      <div className="flex items-center justify-center py-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      </div>
-                    ) : loanPartners.length === 0 ? (
-                      <div className="px-2 py-2 text-sm text-slate-400">No loan partners available</div>
-                    ) : (
-                      loanPartners.filter(partner => partner.isActive).map((partner) => (
-                        <SelectItem key={partner._id} value={partner._id}>
-                          {partner.name}
-                          <span className="ml-2 text-xs text-slate-400">
-                            Type: {partner.type} | Charge: {partner.submissionCharge}%
-                          </span>
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs font-semibold text-slate-500 uppercase">Loan Amount</Label>
-                <Input
-                  type="number"
-                  value={orderForm.loanDetails.loanAmount}
-                  onChange={(e) => setOrderForm({
-                    ...orderForm,
-                    loanDetails: { ...orderForm.loanDetails!, loanAmount: parseInt(e.target.value) || 0 }
-                  })}
-                  placeholder="Enter loan amount"
-                  className="mt-1.5 rounded-xl border-slate-200"
-                />
-              </div>
-              <div>
-                <Label className="text-xs font-semibold text-slate-500 uppercase">Disbursement Amount *</Label>
-                <Input
-                  type="number"
-                  value={orderForm.loanDetails.disbursementAmount}
-                  onChange={(e) => setOrderForm({
-                    ...orderForm,
-                    loanDetails: { ...orderForm.loanDetails!, disbursementAmount: parseInt(e.target.value) || 0 }
-                  })}
-                  placeholder="Enter disbursement amount (required)"
-                  className="mt-1.5 rounded-xl border-slate-200"
-                  required
-                />
-                {(!orderForm.loanDetails.disbursementAmount || orderForm.loanDetails.disbursementAmount === 0) && (
-                  <p className="text-xs text-red-500 mt-1">Disbursement amount is required</p>
-                )}
-              </div>
-              <div>
-                <Label className="text-xs font-semibold text-slate-500 uppercase">First EMI Date</Label>
-                <Input
-                  type="datetime-local"
-                  value={orderForm.loanDetails.firstEmiDate}
-                  onChange={(e) => setOrderForm({
-                    ...orderForm,
-                    loanDetails: { ...orderForm.loanDetails!, firstEmiDate: e.target.value }
-                  })}
-                  className="mt-1.5 rounded-xl border-slate-200"
-                />
-              </div>
-            </div>
-          </div>
-        )}
+  {orderForm.paymentMode === 'Loan' && orderForm.loanDetails && (
+    <div className="border-t border-slate-100 mt-4 pt-4">
+      <h4 className="text-sm font-medium text-slate-700 mb-3">Loan Details</h4>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Label className="text-xs font-semibold text-slate-500 uppercase">Loan Partner *</Label>
+          <Select
+            value={orderForm.loanDetails.loanPartner}
+            onValueChange={(value) => setOrderForm({
+              ...orderForm,
+              loanDetails: { ...orderForm.loanDetails!, loanPartner: value }
+            })}
+          >
+            <SelectTrigger className="mt-1.5 rounded-xl">
+              <SelectValue placeholder="Select loan partner" />
+            </SelectTrigger>
+            <SelectContent>
+              {loadingLoanPartners ? (
+                <div className="flex items-center justify-center py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              ) : loanPartners.length === 0 ? (
+                <div className="px-2 py-2 text-sm text-slate-400">No loan partners available</div>
+              ) : (
+                loanPartners.filter(partner => partner.isActive).map((partner) => (
+                  <SelectItem key={partner._id} value={partner._id}>
+                    {partner.name}
+                    <span className="ml-2 text-xs text-slate-400">
+                      Type: {partner.type} | Charge: {partner.submissionCharge}%
+                    </span>
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs font-semibold text-slate-500 uppercase">Loan Amount *</Label>
+          <Input
+            type="number"
+            value={orderForm.loanDetails.loanAmount}
+            onChange={(e) => {
+              const loanAmount = parseInt(e.target.value) || 0;
+              const finalFee = calculateFinalFee();
+              
+              // Validate loan amount doesn't exceed final fee
+              if (loanAmount > finalFee) {
+                toast({
+                  title: 'Validation Error',
+                  description: 'Loan amount cannot exceed the final fee',
+                  variant: 'destructive',
+                });
+                return;
+              }
+              
+              // If disbursement amount is greater than loan amount, adjust it
+              const disbursementAmount = orderForm.loanDetails?.disbursementAmount || 0;
+              const newDisbursementAmount = disbursementAmount > loanAmount ? loanAmount : disbursementAmount;
+              
+              setOrderForm({
+                ...orderForm,
+                loanDetails: { 
+                  ...orderForm.loanDetails!, 
+                  loanAmount,
+                  disbursementAmount: newDisbursementAmount
+                }
+              });
+            }}
+            placeholder="Enter loan amount"
+            className="mt-1.5 rounded-xl border-slate-200"
+          />
+          <p className="text-xs text-slate-400 mt-1">Cannot exceed final fee: {formatCurrency(calculateFinalFee())}</p>
+        </div>
+        <div>
+          <Label className="text-xs font-semibold text-slate-500 uppercase">Disbursement Amount *</Label>
+          <Input
+            type="number"
+            value={orderForm.loanDetails.disbursementAmount}
+            onChange={(e) => {
+              const disbursementAmount = parseInt(e.target.value) || 0;
+              const finalFee = calculateFinalFee();
+              const loanAmount = orderForm.loanDetails?.loanAmount || 0;
+              
+              // Validate disbursement amount doesn't exceed final fee
+              if (disbursementAmount > finalFee) {
+                toast({
+                  title: 'Validation Error',
+                  description: 'Disbursement amount cannot exceed the final fee',
+                  variant: 'destructive',
+                });
+                return;
+              }
+              
+              // Validate disbursement amount doesn't exceed loan amount
+              if (loanAmount > 0 && disbursementAmount > loanAmount) {
+                toast({
+                  title: 'Validation Error',
+                  description: 'Disbursement amount cannot exceed the loan amount',
+                  variant: 'destructive',
+                });
+                return;
+              }
+              
+              setOrderForm({
+                ...orderForm,
+                loanDetails: { ...orderForm.loanDetails!, disbursementAmount }
+              });
+            }}
+            placeholder="Enter disbursement amount"
+            className="mt-1.5 rounded-xl border-slate-200"
+            required
+          />
+          <p className="text-xs text-slate-400 mt-1">
+            Cannot exceed: {formatCurrency(Math.min(calculateFinalFee(), orderForm.loanDetails?.loanAmount || Infinity))}
+          </p>
+          {(!orderForm.loanDetails.disbursementAmount || orderForm.loanDetails.disbursementAmount === 0) && (
+            <p className="text-xs text-red-500 mt-1">Disbursement amount is required</p>
+          )}
+          {orderForm.loanDetails.disbursementAmount > 0 && orderForm.loanDetails.loanAmount > 0 && (
+            <p className={cn(
+              "text-xs mt-1",
+              orderForm.loanDetails.disbursementAmount === orderForm.loanDetails.loanAmount 
+                ? "text-emerald-600" 
+                : "text-amber-600"
+            )}>
+              {orderForm.loanDetails.disbursementAmount === orderForm.loanDetails.loanAmount 
+                ? "✓ Full disbursement" 
+                : `Remaining: ${formatCurrency(orderForm.loanDetails.loanAmount - orderForm.loanDetails.disbursementAmount)}`
+              }
+            </p>
+          )}
+        </div>
+        <div>
+          <Label className="text-xs font-semibold text-slate-500 uppercase">First EMI Date</Label>
+          <Input
+            type="datetime-local"
+            value={orderForm.loanDetails.firstEmiDate}
+            onChange={(e) => setOrderForm({
+              ...orderForm,
+              loanDetails: { ...orderForm.loanDetails!, firstEmiDate: e.target.value }
+            })}
+            className="mt-1.5 rounded-xl border-slate-200"
+          />
+        </div>
+      </div>
+    </div>
+  )}
 
         {orderForm.paymentMode === 'Subscription' && orderForm.subscriptionDetails && (
           <div className="border-t border-slate-100 mt-4 pt-4">
@@ -2115,24 +2316,40 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
     </div>
 
     <DialogFooter className="pt-4 border-t border-slate-100">
-      <Button variant="outline" onClick={() => setCreateModalOpen(false)} disabled={addingOrder} className="rounded-xl">
-        Cancel
-      </Button>
-      <Button 
-        onClick={handleCreateOrder} 
-        disabled={addingOrder || (orderForm.paymentMode === 'Loan' && (!orderForm.loanDetails?.disbursementAmount || orderForm.loanDetails?.disbursementAmount === 0))} 
-        className="bg-orange-600 hover:bg-orange-700 rounded-xl"
-      >
-        {addingOrder ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Creating...
-          </>
-        ) : (
-          'Create Order'
-        )}
-      </Button>
-    </DialogFooter>
+  <Button variant="outline" onClick={() => setCreateModalOpen(false)} disabled={addingOrder} className="rounded-xl">
+    Cancels
+  </Button>
+  <Button 
+    onClick={handleCreateOrder} 
+    disabled={
+      addingOrder || 
+      // Lumpsum validation
+      (orderForm.paymentMode === 'Lumpsum' && (
+        (orderForm.lumpsumDetails?.totalReceived || 0) > calculateFinalFee() ||
+        (orderForm.lumpsumDetails?.registrationAmount || 0) > calculateFinalFee() ||
+        (orderForm.lumpsumDetails?.totalReceived || 0) < (orderForm.lumpsumDetails?.registrationAmount || 0)
+      )) ||
+      // Loan validation
+      (orderForm.paymentMode === 'Loan' && (
+        (orderForm.loanDetails?.loanAmount || 0) > calculateFinalFee() ||
+        (orderForm.loanDetails?.disbursementAmount || 0) > calculateFinalFee() ||
+        (orderForm.loanDetails?.disbursementAmount || 0) > (orderForm.loanDetails?.loanAmount || 0) ||
+        !orderForm.loanDetails?.disbursementAmount ||
+        orderForm.loanDetails?.disbursementAmount === 0
+      ))
+    } 
+    className="bg-orange-600 hover:bg-orange-700 rounded-xl"
+  >
+    {addingOrder ? (
+      <>
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        Creating...
+      </>
+    ) : (
+      'Create Order'
+    )}
+  </Button>
+</DialogFooter>
   </DialogContent>
 </Dialog>
 

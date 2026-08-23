@@ -72,7 +72,7 @@ export function StageSummaryReport() {
       if (dateFilter === 'custom') {
         // If custom range is selected, require both dates
         if (!fromDate || !toDate) {
-          toast({ title: 'Missing Dates', description: 'Please select both start and end dates.', variant: 'destructive' });
+          // toast({ title: 'Missing Dates', description: 'Please select both start and end dates.', variant: 'destructive' });
           setLoading(false);
           return;
         }
@@ -223,7 +223,6 @@ export function StageSummaryReport() {
                     className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                   />
                 </div>
-                <span className="text-[10px] text-slate-400">Max 30 days</span>
               </>
             )}
           </div>

@@ -37,18 +37,18 @@ import {
 /* -------------------------------------------------------------------------- */
 const REPORTS = [
   { id: 'stage-summary',               name: 'Stages',              icon: PieChart,      component: StageSummaryReport },
-  { id: 'employee-stages',             name: 'Employees',           icon: Users,         component: EmployeeStagesReport },
+  { id: 'employee-stages',             name: 'Employees',           icon: Users,         component: EmployeeStagesReport,permission: { module: 'reports', action: 'employee-stages' }  },
   { id: 'pool-stages',                 name: 'Pools',               icon: Building2,     component: PoolStagesReport },
   { id: 'pool-revenue',                name: 'Revenue',             icon: IndianRupee,   component: PoolRevenueReport },
-  { id: 'revenue-target-report',       name: 'Employee Tgt vs Ach',      icon: IndianRupee,   component: RevenueTargetReport },
-  { id: 'utilization',                 name: 'Employee Efforts',         icon: PhoneCall,     component: UtilizationReport },
-  { id: 'consultant-performance',      name: 'Employee Performance',         icon: Award,         component: ConsultantPerformanceReport },
+  { id: 'revenue-target-report',       name: 'Employee Tgt vs Ach',      icon: IndianRupee,   component: RevenueTargetReport,permission: { module: 'reports', action: 'revenue-target-report' } },
+  { id: 'utilization',                 name: 'Employee Efforts',         icon: PhoneCall,     component: UtilizationReport,permission: { module: 'reports', action: 'utilization' }},
+  { id: 'consultant-performance',      name: 'Employee Performance',         icon: Award,         component: ConsultantPerformanceReport,permission: { module: 'reports', action: 'consultant-performance' }  },
   { id: 'daily-utilization',           name: 'Emp Inputs',         icon: Calendar,      component: DailyUtilizationReport },
   { id: 'source-campaign',             name: 'Campaign- Lead Stage',     icon: BarChart3,    component: SourceCampaignReport },
   { id: 'source-campaign-revenue',     name: 'Campaign- Performance',   icon: IndianRupee,   component: SourceCampaignRevenueReport },
   { id: 'salary-sheet',                name: 'Salary Sheet',        icon: IndianRupee,   component: SalarySheetReport,       permission: { module: 'reports', action: 'salary_sheet' } },
-  { id: 'state-wise',  name: 'State Campaign Performance Report', icon: BarChart3,    component: StateWiseReport },
-  { id: 'state-wise-employee', name: 'Employee Performance – State-wise', icon: Users, component: StateWiseEmployeeReport },
+  { id: 'state-wise',  name: 'State Campaign Performance Report', icon: BarChart3,    component: StateWiseReport,permission: { module: 'reports', action: 'state-wise' } },
+  { id: 'state-wise-employee', name: 'Employee Performance – State-wise', icon: Users, component: StateWiseEmployeeReport,permission: { module: 'reports', action: 'state-wise-employee' } },
 ];
 
 export function ReportsPage() {
