@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -39,6 +40,8 @@ import {
   UserCheck,
   ChevronLeft,
   ChevronRight,
+  CalendarClock,
+  UserCog,
 } from 'lucide-react';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
@@ -165,10 +168,21 @@ export function ConsultantPerformanceReport() {
   const [levels, setLevels] = useState<any[]>([]);
   const [selectedLevel, setSelectedLevel] = useState('1');
 
-  // Date filter
-  const [dateFilter, setDateFilter] = useState('today');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  // Team filter (checkbox)
+  const [showTeamOnly, setShowTeamOnly] = useState<boolean>(false);
+
+  // Date filters - all default to 'none'
+  const [leadCreatedDateFilter, setLeadCreatedDateFilter] = useState<string>('none');
+  const [leadCreatedFromDate, setLeadCreatedFromDate] = useState('');
+  const [leadCreatedToDate, setLeadCreatedToDate] = useState('');
+
+  const [leadAssignedDateFilter, setLeadAssignedDateFilter] = useState<string>('none');
+  const [leadAssignedFromDate, setLeadAssignedFromDate] = useState('');
+  const [leadAssignedToDate, setLeadAssignedToDate] = useState('');
+
+  const [orderCreatedDateFilter, setOrderCreatedDateFilter] = useState<string>('none');
+  const [orderCreatedFromDate, setOrderCreatedFromDate] = useState('');
+  const [orderCreatedToDate, setOrderCreatedToDate] = useState('');
 
   // User filter
   const [users, setUsers] = useState<any[]>([]);
@@ -223,6 +237,23 @@ export function ConsultantPerformanceReport() {
     return match ? parseInt(match[0], 10) : 1;
   };
 
+  // ─── Validate date range (max 31 days) ───
+  const validateDateRange = (from: string, to: string): boolean => {
+    if (!from || !to) return false;
+    const diffTime = Math.abs(new Date(to).getTime() - new Date(from).getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays > 31) {
+      toast({ title: 'Date range too large', description: 'Max 31 days allowed', variant: 'destructive' });
+      return false;
+    }
+    return true;
+  };
+
+  // ─── Helper to check if date filter is active ───
+  const isDateFilterActive = (filterValue: string) => {
+    return filterValue && filterValue !== 'none' && filterValue !== '';
+  };
+
   // ─── Fetch consultant data ───
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -230,27 +261,68 @@ export function ConsultantPerformanceReport() {
       const params: any = {
         level: parseInt(selectedLevel) || 1,
       };
-      if (dateFilter === 'custom') {
-        if (!fromDate || !toDate) {
-          // toast({ title: 'Missing Dates', description: 'Select start and end dates.', variant: 'destructive' });
-          setLoading(false);
-          return;
+
+      // Team filter
+      if (showTeamOnly) {
+        params.team = true;
+      }
+
+      // Lead Created Date Filter - only if not 'none'
+      if (isDateFilterActive(leadCreatedDateFilter)) {
+        if (leadCreatedDateFilter === 'custom') {
+          if (!leadCreatedFromDate || !leadCreatedToDate) {
+            setLoading(false);
+            return;
+          }
+          if (!validateDateRange(leadCreatedFromDate, leadCreatedToDate)) {
+            setLoading(false);
+            return;
+          }
+          params.leadCreatedDateFrom = leadCreatedFromDate;
+          params.leadCreatedDateTo = leadCreatedToDate;
+        } else {
+          params.leadCreatedDateFilter = leadCreatedDateFilter;
         }
-        const diffTime = Math.abs(new Date(toDate).getTime() - new Date(fromDate).getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        if (diffDays > 31) {
-          toast({ title: 'Date range too large', description: 'Max 31 days', variant: 'destructive' });
-          setLoading(false);
-          return;
+      }
+
+      // Lead Assigned Date Filter - only if not 'none'
+      if (isDateFilterActive(leadAssignedDateFilter)) {
+        if (leadAssignedDateFilter === 'custom') {
+          if (!leadAssignedFromDate || !leadAssignedToDate) {
+            setLoading(false);
+            return;
+          }
+          if (!validateDateRange(leadAssignedFromDate, leadAssignedToDate)) {
+            setLoading(false);
+            return;
+          }
+          params.leadAssignedDateFrom = leadAssignedFromDate;
+          params.leadAssignedDateTo = leadAssignedToDate;
+        } else {
+          params.leadAssignedDateFilter = leadAssignedDateFilter;
         }
-        params.fromDate = fromDate;
-        params.toDate = toDate;
-      } else {
-        params.dateFilter = dateFilter;
+      }
+
+      // Order Created Date Filter - only if not 'none'
+      if (isDateFilterActive(orderCreatedDateFilter)) {
+        if (orderCreatedDateFilter === 'custom') {
+          if (!orderCreatedFromDate || !orderCreatedToDate) {
+            setLoading(false);
+            return;
+          }
+          if (!validateDateRange(orderCreatedFromDate, orderCreatedToDate)) {
+            setLoading(false);
+            return;
+          }
+          params.orderCreatedDateFrom = orderCreatedFromDate;
+          params.orderCreatedDateTo = orderCreatedToDate;
+        } else {
+          params.orderCreatedDateFilter = orderCreatedDateFilter;
+        }
       }
 
       if (selectedUserId && selectedUserId !== 'all') {
-        params.userId = selectedUserId;
+        params.counsellorId = selectedUserId;
       }
 
       const response = await getDataHandlerWithToken(
@@ -267,7 +339,20 @@ export function ConsultantPerformanceReport() {
     } finally {
       setLoading(false);
     }
-  }, [selectedLevel, dateFilter, fromDate, toDate, selectedUserId]);
+  }, [
+    selectedLevel,
+    showTeamOnly,
+    leadCreatedDateFilter,
+    leadCreatedFromDate,
+    leadCreatedToDate,
+    leadAssignedDateFilter,
+    leadAssignedFromDate,
+    leadAssignedToDate,
+    orderCreatedDateFilter,
+    orderCreatedFromDate,
+    orderCreatedToDate,
+    selectedUserId,
+  ]);
 
   useEffect(() => {
     fetchData();
@@ -284,11 +369,39 @@ export function ConsultantPerformanceReport() {
         type: type,
       };
 
-      if (dateFilter === 'custom') {
-        if (fromDate) params.fromDate = fromDate;
-        if (toDate) params.toDate = toDate;
-      } else {
-        params.dateFilter = dateFilter;
+      // Team filter
+      if (showTeamOnly) {
+        params.team = true;
+      }
+
+      // Lead Created Date Filter - only if not 'none'
+      if (isDateFilterActive(leadCreatedDateFilter)) {
+        if (leadCreatedDateFilter === 'custom') {
+          if (leadCreatedFromDate) params.leadCreatedDateFrom = leadCreatedFromDate;
+          if (leadCreatedToDate) params.leadCreatedDateTo = leadCreatedToDate;
+        } else {
+          params.leadCreatedDateFilter = leadCreatedDateFilter;
+        }
+      }
+
+      // Lead Assigned Date Filter - only if not 'none'
+      if (isDateFilterActive(leadAssignedDateFilter)) {
+        if (leadAssignedDateFilter === 'custom') {
+          if (leadAssignedFromDate) params.leadAssignedDateFrom = leadAssignedFromDate;
+          if (leadAssignedToDate) params.leadAssignedDateTo = leadAssignedToDate;
+        } else {
+          params.leadAssignedDateFilter = leadAssignedDateFilter;
+        }
+      }
+
+      // Order Created Date Filter - only if not 'none'
+      if (isDateFilterActive(orderCreatedDateFilter)) {
+        if (orderCreatedDateFilter === 'custom') {
+          if (orderCreatedFromDate) params.orderCreatedDateFrom = orderCreatedFromDate;
+          if (orderCreatedToDate) params.orderCreatedDateTo = orderCreatedToDate;
+        } else {
+          params.orderCreatedDateFilter = orderCreatedDateFilter;
+        }
       }
 
       const response = await getDataHandlerWithToken(
@@ -384,8 +497,13 @@ export function ConsultantPerformanceReport() {
 
   const hasActiveFilters =
     selectedLevel !== '1' ||
-    dateFilter !== 'today' ||
-    (dateFilter === 'custom' && (fromDate || toDate)) ||
+    showTeamOnly ||
+    isDateFilterActive(leadCreatedDateFilter) ||
+    (leadCreatedDateFilter === 'custom' && (leadCreatedFromDate || leadCreatedToDate)) ||
+    isDateFilterActive(leadAssignedDateFilter) ||
+    (leadAssignedDateFilter === 'custom' && (leadAssignedFromDate || leadAssignedToDate)) ||
+    isDateFilterActive(orderCreatedDateFilter) ||
+    (orderCreatedDateFilter === 'custom' && (orderCreatedFromDate || orderCreatedToDate)) ||
     selectedUserId !== 'all' ||
     searchTerm !== '';
 
@@ -407,6 +525,16 @@ export function ConsultantPerformanceReport() {
   );
 
   const modalTotalPages = Math.ceil(filteredModalItems.length / ITEMS_PER_PAGE);
+
+  // Check if team mode is active
+  const isTeamMode = showTeamOnly;
+
+  // Get display label for date filter
+  const getDateFilterLabel = (filterValue: string) => {
+    if (filterValue === 'none' || !filterValue) return 'None';
+    const option = dateFilterOptions.find(o => o.value === filterValue);
+    return option?.label || filterValue;
+  };
 
   // ─── Render Lead Item ───
   const renderLeadItem = (item: LeadDetailItem) => {
@@ -459,8 +587,6 @@ export function ConsultantPerformanceReport() {
     const finalFee = item.finalFee || item.totalFee || 0;
     const discount = item.discount || 0;
     const hasDiscount = discount > 0;
-    const isFullyPaid = item.status?.toLowerCase() === 'fully paid';
-    const isPartiallyPaid = item.status?.toLowerCase() === 'partially paid';
 
     return (
       <TableRow className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors">
@@ -489,9 +615,6 @@ export function ConsultantPerformanceReport() {
             <span className="text-sm font-semibold text-emerald-600">
               {formatCurrency(revenue)}
             </span>
-            {isPartiallyPaid && (
-              <span className="text-xs text-amber-600">Partially Paid</span>
-            )}
           </div>
         </TableCell>
         <TableCell className="text-sm py-3">
@@ -588,37 +711,152 @@ export function ConsultantPerformanceReport() {
               </div>
             )}
 
-            {/* Date Filter */}
-            <div className="w-[130px]">
-              <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="h-8 text-xs rounded-xl">
-                  <SelectValue placeholder="Select date" />
-                </SelectTrigger>
-                <SelectContent>
-                  {dateFilterOptions.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Team Checkbox */}
+            <div className="flex items-center gap-2 ml-1">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="team-filter-consultant"
+                  checked={showTeamOnly}
+                  onCheckedChange={(checked) => {
+                    setShowTeamOnly(checked === true);
+                  }}
+                  className="h-4 w-4 rounded border-slate-300 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                />
+                <Label
+                  htmlFor="team-filter-consultant"
+                  className="text-xs font-medium text-slate-600 cursor-pointer"
+                >
+                  Team
+                </Label>
+              </div>
             </div>
 
-            {dateFilter === 'custom' && (
+            {/* Lead Created Date Filter */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <CalendarClock className="w-3.5 h-3.5 text-slate-400" />
+                <Label className="text-[10px] font-medium text-slate-500 uppercase whitespace-nowrap">Lead Created</Label>
+              </div>
+              <div className="w-[110px]">
+                <Select value={leadCreatedDateFilter} onValueChange={setLeadCreatedDateFilter}>
+                  <SelectTrigger className="h-8 text-xs rounded-xl">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" className="text-xs">None</SelectItem>
+                    {dateFilterOptions.map(opt => (
+                      <SelectItem key={`created-${opt.value}`} value={opt.value} className="text-xs">
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {leadCreatedDateFilter === 'custom' && (
               <>
-                <div className="relative w-[130px]">
+                <div className="relative w-[120px]">
                   <input
                     type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
+                    value={leadCreatedFromDate}
+                    onChange={(e) => setLeadCreatedFromDate(e.target.value)}
                     className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                   />
                 </div>
-                <div className="relative w-[130px]">
+                <div className="relative w-[120px]">
                   <input
                     type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
+                    value={leadCreatedToDate}
+                    onChange={(e) => setLeadCreatedToDate(e.target.value)}
+                    className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Lead Assigned Date Filter */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <CalendarIcon className="w-3.5 h-3.5 text-slate-400" />
+                <Label className="text-[10px] font-medium text-slate-500 uppercase whitespace-nowrap">Lead Assigned</Label>
+              </div>
+              <div className="w-[110px]">
+                <Select value={leadAssignedDateFilter} onValueChange={setLeadAssignedDateFilter}>
+                  <SelectTrigger className="h-8 text-xs rounded-xl">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" className="text-xs">None</SelectItem>
+                    {dateFilterOptions.map(opt => (
+                      <SelectItem key={`assigned-${opt.value}`} value={opt.value} className="text-xs">
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {leadAssignedDateFilter === 'custom' && (
+              <>
+                <div className="relative w-[120px]">
+                  <input
+                    type="date"
+                    value={leadAssignedFromDate}
+                    onChange={(e) => setLeadAssignedFromDate(e.target.value)}
+                    className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                  />
+                </div>
+                <div className="relative w-[120px]">
+                  <input
+                    type="date"
+                    value={leadAssignedToDate}
+                    onChange={(e) => setLeadAssignedToDate(e.target.value)}
+                    className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Order Created Date Filter */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5 text-slate-400" />
+                <Label className="text-[10px] font-medium text-slate-500 uppercase whitespace-nowrap">Order Created</Label>
+              </div>
+              <div className="w-[110px]">
+                <Select value={orderCreatedDateFilter} onValueChange={setOrderCreatedDateFilter}>
+                  <SelectTrigger className="h-8 text-xs rounded-xl">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" className="text-xs">None</SelectItem>
+                    {dateFilterOptions.map(opt => (
+                      <SelectItem key={`order-${opt.value}`} value={opt.value} className="text-xs">
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {orderCreatedDateFilter === 'custom' && (
+              <>
+                <div className="relative w-[120px]">
+                  <input
+                    type="date"
+                    value={orderCreatedFromDate}
+                    onChange={(e) => setOrderCreatedFromDate(e.target.value)}
+                    className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                  />
+                </div>
+                <div className="relative w-[120px]">
+                  <input
+                    type="date"
+                    value={orderCreatedToDate}
+                    onChange={(e) => setOrderCreatedToDate(e.target.value)}
                     className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                   />
                 </div>
@@ -640,6 +878,101 @@ export function ConsultantPerformanceReport() {
         )}
       </div>
 
+      {/* Filter Summary */}
+      {!loading && data && data.length > 0 && (
+        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
+          <span>
+            Level:{' '}
+            <span className="font-medium text-slate-700">
+              {levels.find(l => extractLevelNumber(l.name).toString() === selectedLevel)?.name || `Level ${selectedLevel}`}
+            </span>
+          </span>
+          <span className="w-1 h-1 rounded-full bg-slate-300" />
+          <span>
+            Team:{' '}
+            <span className="font-medium text-slate-700">
+              {isTeamMode ? (
+                <span className="flex items-center gap-1 text-orange-600">
+                  <UserCog className="w-3 h-3" />
+                  Enabled
+                </span>
+              ) : (
+                'All'
+              )}
+            </span>
+          </span>
+          {isDateFilterActive(leadCreatedDateFilter) && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Lead Created:{' '}
+                <span className="font-medium text-slate-700">
+                  {leadCreatedDateFilter === 'custom' 
+                    ? `${formatDate(leadCreatedFromDate)} – ${formatDate(leadCreatedToDate)}`
+                    : getDateFilterLabel(leadCreatedDateFilter)}
+                </span>
+              </span>
+            </>
+          )}
+          {isDateFilterActive(leadAssignedDateFilter) && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Lead Assigned:{' '}
+                <span className="font-medium text-slate-700">
+                  {leadAssignedDateFilter === 'custom' 
+                    ? `${formatDate(leadAssignedFromDate)} – ${formatDate(leadAssignedToDate)}`
+                    : getDateFilterLabel(leadAssignedDateFilter)}
+                </span>
+              </span>
+            </>
+          )}
+          {isDateFilterActive(orderCreatedDateFilter) && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Order Created:{' '}
+                <span className="font-medium text-slate-700">
+                  {orderCreatedDateFilter === 'custom' 
+                    ? `${formatDate(orderCreatedFromDate)} – ${formatDate(orderCreatedToDate)}`
+                    : getDateFilterLabel(orderCreatedDateFilter)}
+                </span>
+              </span>
+            </>
+          )}
+          {selectedUserId !== 'all' && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Consultant:{' '}
+                <span className="font-medium text-slate-700">
+                  {users.find(u => (u._id || u.id) === selectedUserId)?.name || selectedUserId}
+                </span>
+              </span>
+            </>
+          )}
+          {searchTerm && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Search:{' '}
+                <span className="font-medium text-slate-700">"{searchTerm}"</span>
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Team Mode Banner */}
+      {isTeamMode && !loading && data && data.length > 0 && (
+        <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-4 py-2">
+          <UserCog className="w-4 h-4 text-orange-600" />
+          <span className="text-sm text-orange-800">
+            <span className="font-semibold">Team Report:</span> Showing combined team data from the backend
+          </span>
+        </div>
+      )}
+
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
@@ -655,7 +988,7 @@ export function ConsultantPerformanceReport() {
       ) : (
         <div className="space-y-4">
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
@@ -689,6 +1022,19 @@ export function ConsultantPerformanceReport() {
                 </div>
               </div>
             </Card>
+            {isTeamMode && (
+              <Card className="p-5 bg-orange-50 border border-orange-200 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-orange-600 uppercase tracking-wider">Team Mode</p>
+                    <p className="text-sm font-semibold text-orange-700 mt-1">Active</p>
+                  </div>
+                  <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+                    <UserCog className="w-5 h-5 text-orange-600" />
+                  </div>
+                </div>
+              </Card>
+            )}
           </div>
 
           {/* Consultant Cards */}
@@ -707,12 +1053,6 @@ export function ConsultantPerformanceReport() {
                         <p className="text-xs text-slate-400 mt-0.5">{consultant.consultantEmail}</p>
                       )}
                     </div>
-                    {/* <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg">
-                      {formatCurrency(consultant.bookedRevenue)}
-                    </span> */}
-                    
-
-                    {/* Realised Revenue */}
                     <button
                       onClick={() => handleMetricClick(consultant, 'orders')}
                       disabled={!hasRevenue}
@@ -727,16 +1067,12 @@ export function ConsultantPerformanceReport() {
                       <p className="text-base font-bold text-orange-600">
                         {formatCurrency(consultant.realisedRevenue)}
                       </p>
-                      {/* {hasRevenue && (
-                        <Eye className="w-3 h-3 mx-auto mt-0.5 text-slate-400" />
-                      )} */}
                     </button>
                   </div>
 
                   {/* Metrics Row */}
                   <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
-                    {/* Leads Assigned */}
-                      <button
+                    <button
                       onClick={() => handleMetricClick(consultant, 'assigned-leads')}
                       disabled={!hasLeads}
                       className={cn(
@@ -750,12 +1086,8 @@ export function ConsultantPerformanceReport() {
                       <p className="text-base font-bold text-blue-600">
                         {consultant.totalLeadAssigned || 0}
                       </p>
-                      {/* {hasLeads && (
-                        <Eye className="w-3 h-3 mx-auto mt-0.5 text-slate-400" />
-                      )} */}
                     </button>
 
-                    {/* Admissions */}
                     <button
                       onClick={() => handleMetricClick(consultant, 'admission-leads')}
                       disabled={!hasAdmissions}
@@ -770,12 +1102,7 @@ export function ConsultantPerformanceReport() {
                       <p className="text-base font-bold text-emerald-600">
                         {consultant.admDone || 0}
                       </p>
-                      {/* {hasAdmissions && (
-                        <Eye className="w-3 h-3 mx-auto mt-0.5 text-slate-400" />
-                      )} */}
                     </button>
-
-                    
                   </div>
                 </Card>
               );
