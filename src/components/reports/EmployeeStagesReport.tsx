@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -29,12 +30,16 @@ import {
   ChevronRight,
   ChevronUp,
   ChevronDown,
-  AlertCircle,
+  UserCog,
 } from 'lucide-react';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Types
+// ───────────────────────────────────────────────────────────────────────────────
 
 interface StageItem {
   leadStage: string;
@@ -44,16 +49,38 @@ interface StageItem {
 interface EmployeeData {
   employeeId: string;
   employeeName: string;
-  employeeEmail?: string;
+  employeeEmail?: string | null;
+  employeeNumber?: string | null;
+  employeeEmployeeId?: string | number | null;
+  employeeLevel?: number | string | null;
   totalLead: number;
   stages: StageItem[];
+  team?: boolean;
+  teamSize?: number;
 }
 
 interface ReportData {
   employees: EmployeeData[];
   totalLeads: number;
-  totalRecords: number;
+  totalEmployees: number;
+  filters?: {
+    level?: string | number | null;
+    team?: boolean | null;
+    assignedDate?: string | null;
+    assignedDateFilter?: string | null;
+    assignedDateFrom?: string | null;
+    assignedDateTo?: string | null;
+  };
 }
+
+interface LevelType {
+  _id: string;
+  name: string;
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Constants
+// ───────────────────────────────────────────────────────────────────────────────
 
 const dateFilterOptions = [
   { value: 'today', label: 'Today' },
@@ -65,7 +92,21 @@ const dateFilterOptions = [
 
 const EMPLOYEES_PER_PAGE = 6;
 
+// ───────────────────────────────────────────────────────────────────────────────
+// Helper Functions
+// ───────────────────────────────────────────────────────────────────────────────
+
+const extractLevelNumber = (levelName: string): number => {
+  const match = levelName.match(/\d+/);
+  return match ? parseInt(match[0], 10) : 1;
+};
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Component
+// ───────────────────────────────────────────────────────────────────────────────
+
 export function EmployeeStagesReport() {
+  // ─── State ──────────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ReportData | null>(null);
   const [allStages, setAllStages] = useState<string[]>([]);
@@ -73,15 +114,50 @@ export function EmployeeStagesReport() {
 
   // Filter states
   const [showFilters, setShowFilters] = useState(false);
+
+  // Level filter (using buttons like PoolStagesReport)
+  const [levels, setLevels] = useState<LevelType[]>([]);
+  const [selectedLevel, setSelectedLevel] = useState<string>('1');
+
+  // Team filter (checkbox)
+  const [showTeamOnly, setShowTeamOnly] = useState<boolean>(false);
+
+  // Date filter
   const [dateFilter, setDateFilter] = useState('today');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+
+  // Search (client-side)
   const [searchTerm, setSearchTerm] = useState('');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(0);
 
-  // ──────────── Fetch stages for headers ────────────
+  // ─── Fetch Levels ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    const fetchLevels = async () => {
+      try {
+        const response = await getDataHandlerWithToken('getAllLevels', null, null);
+        if (response && Array.isArray(response)) {
+          setLevels(response);
+          // Set default to Level 1
+          if (response.length > 0) {
+            const firstLevelNumeric = extractLevelNumber(response[0].name);
+            setSelectedLevel(firstLevelNumeric.toString());
+          }
+        }
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch levels',
+          variant: 'destructive',
+        });
+      }
+    };
+    fetchLevels();
+  }, []);
+
+  // ─── Fetch Stages ──────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchStages = async () => {
       try {
@@ -107,18 +183,25 @@ export function EmployeeStagesReport() {
     fetchStages();
   }, []);
 
-  // ──────────── Fetch report data ────────────
+  // ─── Fetch Report Data ──────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const params: any = {};
+
+      // Level parameter
+      if (selectedLevel) {
+        params.level = parseInt(selectedLevel, 10) || 1;
+      }
+
+      // Team filter - send as boolean when checked
+      if (showTeamOnly) {
+        params.team = true;
+      }
+
+      // Date filter
       if (dateFilter === 'custom') {
         if (!fromDate || !toDate) {
-          // toast({
-          //   title: 'Missing Dates',
-          //   description: 'Please select both start and end dates.',
-          //   variant: 'destructive',
-          // });
           setLoading(false);
           return;
         }
@@ -127,9 +210,6 @@ export function EmployeeStagesReport() {
       } else {
         params.assignedDateFilter = dateFilter;
       }
-      if (searchTerm) {
-        params.search = searchTerm;
-      }
 
       const response = await getDataHandlerWithToken(
         ApiConfig.allEmpStages,
@@ -137,11 +217,13 @@ export function EmployeeStagesReport() {
         null,
         true
       );
+
       if (response) {
         setData({
           employees: response.data?.employees || response.employees || [],
           totalLeads: response.data?.totalLeads ?? response.totalLeads ?? 0,
-          totalRecords: response.data?.totalRecords ?? response.totalRecords ?? 0,
+          totalEmployees: response.data?.totalEmployees ?? response.totalEmployees ?? 0,
+          filters: response.data?.filters || response.filters || {},
         });
       } else {
         setData(null);
@@ -157,13 +239,18 @@ export function EmployeeStagesReport() {
       setLoading(false);
       setCurrentPage(0);
     }
-  }, [dateFilter, fromDate, toDate, searchTerm]);
+  }, [selectedLevel, showTeamOnly, dateFilter, fromDate, toDate]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // ──────────── Export CSV ────────────
+  // ─── Reset pagination when filters change ──────────────────────────────
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [selectedLevel, showTeamOnly, dateFilter, fromDate, toDate, searchTerm]);
+
+  // ─── Export CSV ──────────────────────────────────────────────────────────
   const handleExport = () => {
     if (!data || !data.employees.length) {
       toast({ title: 'No data to export' });
@@ -176,14 +263,18 @@ export function EmployeeStagesReport() {
       emp.stages.forEach(s => stageSet.add(s.leadStage))
     );
     const stageList = Array.from(stageSet);
-    const headers = ['Employee', 'Total Lead', ...stageList, 'Email'];
+    const headers = ['Employee', 'Employee ID', 'Level', 'Total Lead', ...stageList, 'Email', 'Phone', 'Team Size'];
     const rows = allEmployeeStages.map(emp => {
       const stageMap = new Map(emp.stages.map(s => [s.leadStage, s.count]));
       return [
         emp.employeeName,
+        emp.employeeEmployeeId || emp.employeeId || '',
+        emp.employeeLevel || '',
         emp.totalLead,
         ...stageList.map(s => stageMap.get(s) || 0),
         emp.employeeEmail || '',
+        emp.employeeNumber || '',
+        emp.teamSize || '',
       ];
     });
 
@@ -198,15 +289,20 @@ export function EmployeeStagesReport() {
     toast({ title: 'Exported!' });
   };
 
-  // ──────────── Helpers ────────────
-  const hasActiveFilters =
-    dateFilter !== 'today' ||
-    (dateFilter === 'custom' && (fromDate || toDate)) ||
-    searchTerm !== '';
+  // ─── Client-side filtering ──────────────────────────────────────────────
 
-  const filteredEmployees = data?.employees || [];
-  const totalPages = Math.ceil(filteredEmployees.length / EMPLOYEES_PER_PAGE);
-  const paginatedEmployees = filteredEmployees.slice(
+  // First, filter employees by search term (client-side)
+  const searchFilteredEmployees = data?.employees
+    ? data.employees.filter(emp =>
+        emp.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (emp.employeeEmail?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (emp.employeeNumber?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+      )
+    : [];
+
+  // Pagination
+  const totalPages = Math.ceil(searchFilteredEmployees.length / EMPLOYEES_PER_PAGE);
+  const paginatedEmployees = searchFilteredEmployees.slice(
     currentPage * EMPLOYEES_PER_PAGE,
     (currentPage + 1) * EMPLOYEES_PER_PAGE
   );
@@ -224,12 +320,24 @@ export function EmployeeStagesReport() {
     employeeStageMap.forEach(emp => {
       emp.stageMap.forEach((_, key) => stageSet.add(key));
     });
-    // Order: those present in allStages first, then any extra
     const ordered = allStages.filter(s => stageSet.has(s));
     const extra = Array.from(stageSet).filter(s => !ordered.includes(s));
     return [...ordered, ...extra];
   })();
 
+  // Active filters check
+  const defaultLevel = levels.length > 0 ? extractLevelNumber(levels[0].name).toString() : '1';
+  const hasActiveFilters =
+    selectedLevel !== defaultLevel ||
+    showTeamOnly ||
+    dateFilter !== 'today' ||
+    (dateFilter === 'custom' && (fromDate || toDate)) ||
+    searchTerm !== '';
+
+  // Check if team mode is active (from API response)
+  const isTeamMode = data?.filters?.team === true || showTeamOnly;
+
+  // ─── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -286,7 +394,58 @@ export function EmployeeStagesReport() {
         </Button>
 
         {showFilters && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3 w-full">
+            {/* Level Buttons - matching PoolStagesReport style */}
+            {levels.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Label className="text-xs font-semibold text-slate-500 uppercase whitespace-nowrap">
+                  Level
+                </Label>
+                <div className="flex flex-wrap gap-1">
+                  {levels.map(lvl => {
+                    const num = extractLevelNumber(lvl.name);
+                    return (
+                      <button
+                        key={lvl._id}
+                        onClick={() => {
+                          setSelectedLevel(num.toString());
+                        }}
+                        className={cn(
+                          "px-3 py-1 text-xs font-medium rounded-lg border transition-all",
+                          selectedLevel === num.toString()
+                            ? "bg-orange-500 text-white border-orange-500 shadow-sm"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                        )}
+                      >
+                        {lvl.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Team Checkbox */}
+            <div className="flex items-center gap-2 ml-1">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="team-filter"
+                  checked={showTeamOnly}
+                  onCheckedChange={(checked) => {
+                    setShowTeamOnly(checked === true);
+                  }}
+                  className="h-4 w-4 rounded border-slate-300 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                />
+                <Label
+                  htmlFor="team-filter"
+                  className="text-xs font-medium text-slate-600 cursor-pointer"
+                >
+                  Team
+                </Label>
+              </div>
+            </div>
+
+            {/* Date filter */}
             <div className="w-[130px]">
               <Select value={dateFilter} onValueChange={setDateFilter}>
                 <SelectTrigger className="h-8 text-xs rounded-xl">
@@ -301,6 +460,8 @@ export function EmployeeStagesReport() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Custom Date Range */}
             {dateFilter === 'custom' && (
               <>
                 <div className="relative w-[130px]">
@@ -321,18 +482,76 @@ export function EmployeeStagesReport() {
                 </div>
               </>
             )}
+
+            {/* Search - client-side */}
             <div className="relative w-48">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
               <Input
                 placeholder="Search employee..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(0);
+                }}
                 className="pl-7 h-8 text-xs rounded-xl border-slate-200"
               />
             </div>
           </div>
         )}
       </div>
+
+      {/* Filter Summary */}
+      {!loading && data && data.employees.length > 0 && (
+        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
+          <span>
+            Level:{' '}
+            <span className="font-medium text-slate-700">
+              {levels.find(l => extractLevelNumber(l.name).toString() === selectedLevel)?.name || `Level ${selectedLevel}`}
+            </span>
+          </span>
+          <span className="w-1 h-1 rounded-full bg-slate-300" />
+          <span>
+            Team:{' '}
+            <span className="font-medium text-slate-700">
+              {isTeamMode ? (
+                <span className="flex items-center gap-1 text-orange-600">
+                  <UserCog className="w-3 h-3" />
+                  Enabled
+                </span>
+              ) : (
+                'All'
+              )}
+            </span>
+          </span>
+          <span className="w-1 h-1 rounded-full bg-slate-300" />
+          <span>
+            Date:{' '}
+            <span className="font-medium text-slate-700">
+              {dateFilterOptions.find(o => o.value === dateFilter)?.label || dateFilter}
+            </span>
+          </span>
+          {dateFilter === 'custom' && fromDate && toDate && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Range:{' '}
+                <span className="font-medium text-slate-700">
+                  {fromDate} to {toDate}
+                </span>
+              </span>
+            </>
+          )}
+          {searchTerm && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Search:{' '}
+                <span className="font-medium text-slate-700">"{searchTerm}"</span>
+              </span>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Content */}
       {loading ? (
@@ -348,18 +567,37 @@ export function EmployeeStagesReport() {
             Try adjusting filters or search term
           </p>
         </div>
+      ) : searchFilteredEmployees.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Search className="w-12 h-12 text-slate-300 mb-3" />
+          <p className="text-sm font-medium text-slate-600">No matching employees</p>
+          <p className="text-xs text-slate-400 mt-1">
+            Try adjusting your search term
+          </p>
+        </div>
       ) : (
         <div className="space-y-4">
           {/* Summary badge */}
           <div className="flex items-center gap-4 text-sm text-slate-500">
             <span className="font-medium text-slate-700">
-              {filteredEmployees.length} employees
+              {searchFilteredEmployees.length} employees
             </span>
             <span className="w-1 h-1 rounded-full bg-slate-300" />
             <span>
               Total leads:{' '}
-              <span className="font-semibold text-slate-800">{data.totalLeads}</span>
+              <span className="font-semibold text-slate-800">
+                {searchFilteredEmployees.reduce((sum, emp) => sum + emp.totalLead, 0)}
+              </span>
             </span>
+            {isTeamMode && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                <span className="flex items-center gap-1 text-orange-600">
+                  <UserCog className="w-3.5 h-3.5" />
+                  <span className="font-medium">Team View</span>
+                </span>
+              </>
+            )}
           </div>
 
           {/* Table */}
@@ -385,6 +623,16 @@ export function EmployeeStagesReport() {
                         <div className="text-[10px] font-normal text-slate-400 mt-0.5">
                           Total: {emp.totalLead}
                         </div>
+                        {emp.employeeLevel && (
+                          <div className="text-[9px] font-normal text-slate-400 mt-0.5">
+                            L{emp.employeeLevel}
+                          </div>
+                        )}
+                        {emp.teamSize && emp.teamSize > 1 && (
+                          <div className="text-[9px] font-normal text-orange-500 mt-0.5">
+                            Team: {emp.teamSize}
+                          </div>
+                        )}
                       </TableHead>
                     ))}
                   </TableRow>
@@ -406,13 +654,14 @@ export function EmployeeStagesReport() {
                   </TableRow>
 
                   {/* Stage rows */}
-                  {relevantStages.map(stageName => {
-                    // check if any employee has this stage to avoid all-zero rows (still show them optionally)
-                    const hasAny = employeeStageMap.some(
-                      emp => (emp.stageMap.get(stageName) || 0) > 0
-                    );
-                    // We'll still show rows even if zero, as they might want to see zeros.
-                    return (
+                  {relevantStages.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={employeeStageMap.length + 1} className="text-center py-8 text-sm text-slate-500">
+                        No stage data for the selected filters.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    relevantStages.map(stageName => (
                       <TableRow
                         key={stageName}
                         className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors"
@@ -450,8 +699,8 @@ export function EmployeeStagesReport() {
                           );
                         })}
                       </TableRow>
-                    );
-                  })}
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>

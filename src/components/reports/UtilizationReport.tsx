@@ -1,7 +1,8 @@
-// UtilizationReport.tsx - Updated with DD/MM/YY date format
+// UtilizationReport.tsx - Updated with Proper Date Filters
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -40,6 +41,8 @@ import {
   Clock,
   Calendar,
   UserCheck,
+  UserCog,
+  CalendarClock,
 } from 'lucide-react';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
@@ -145,6 +148,7 @@ function LeadDetailsModal({
                       <TableHead className="text-xs font-semibold text-slate-500 uppercase">Source</TableHead>
                       <TableHead className="text-xs font-semibold text-slate-500 uppercase">Stage</TableHead>
                       <TableHead className="text-xs font-semibold text-slate-500 uppercase">Assigned Date</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-500 uppercase">Created Date</TableHead>
                       <TableHead className="text-xs font-semibold text-slate-500 uppercase">Assigned To</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -157,6 +161,7 @@ function LeadDetailsModal({
                         <TableCell className="text-sm capitalize text-slate-600">{lead.source || '-'}</TableCell>
                         <TableCell className="text-sm capitalize text-slate-600">{lead.stageName || lead.stage || '-'}</TableCell>
                         <TableCell className="text-sm text-slate-600">{formatDate(lead.assignedDate)}</TableCell>
+                        <TableCell className="text-sm text-slate-600">{formatDate(lead.createdAt || lead.createdDate)}</TableCell>
                         <TableCell className="text-sm text-slate-600">{lead.employeeName || '-'}</TableCell>
                       </TableRow>
                     ))}
@@ -263,7 +268,6 @@ const dateFilterOptions = [
   { value: 'today', label: 'Today' },
   { value: 'week', label: 'This Week' },
   { value: 'month', label: 'This Month' },
-  { value: 'year', label: 'This Year' },
   { value: 'custom', label: 'Custom Range' },
 ];
 
@@ -278,10 +282,18 @@ export function UtilizationReport() {
   const [levels, setLevels] = useState<any[]>([]);
   const [selectedLevel, setSelectedLevel] = useState('1');
 
-  // Date filter
-  const [dateFilter, setDateFilter] = useState('today');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  // Team filter (checkbox)
+  const [showTeamOnly, setShowTeamOnly] = useState<boolean>(false);
+
+  // Date filters - Assigned Date (default: empty = none)
+  const [assignedDateFilter, setAssignedDateFilter] = useState<string>('');
+  const [assignedFromDate, setAssignedFromDate] = useState('');
+  const [assignedToDate, setAssignedToDate] = useState('');
+
+  // Date filters - Created Date (default: empty = none)
+  const [createdDateFilter, setCreatedDateFilter] = useState<string>('');
+  const [createdFromDate, setCreatedFromDate] = useState('');
+  const [createdToDate, setCreatedToDate] = useState('');
 
   // User filter
   const [users, setUsers] = useState<any[]>([]);
@@ -335,6 +347,18 @@ export function UtilizationReport() {
     return match ? parseInt(match[0], 10) : 1;
   };
 
+  // ─── Validate date range (max 31 days) ───
+  const validateDateRange = (from: string, to: string): boolean => {
+    if (!from || !to) return false;
+    const diffTime = Math.abs(new Date(to).getTime() - new Date(from).getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays > 31) {
+      toast({ title: 'Date range too large', description: 'Max 31 days allowed', variant: 'destructive' });
+      return false;
+    }
+    return true;
+  };
+
   // ─── Fetch report data ───
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -342,22 +366,46 @@ export function UtilizationReport() {
       const params: any = {
         level: parseInt(selectedLevel) || 1,
       };
-      if (dateFilter === 'custom') {
-        if (!fromDate || !toDate) {
-          setLoading(false);
-          return;
+
+      // Team filter - send as boolean when checked
+      if (showTeamOnly) {
+        params.team = true;
+      }
+
+      // Assigned Date Filter - only send if not empty
+      if (assignedDateFilter && assignedDateFilter !== '') {
+        if (assignedDateFilter === 'custom') {
+          if (!assignedFromDate || !assignedToDate) {
+            setLoading(false);
+            return;
+          }
+          if (!validateDateRange(assignedFromDate, assignedToDate)) {
+            setLoading(false);
+            return;
+          }
+          params.assignedDateFrom = assignedFromDate;
+          params.assignedDateTo = assignedToDate;
+        } else  if (assignedDateFilter !== 'none') {
+        params.assignedDateFilter = assignedDateFilter;
+      }
         }
-        const diffTime = Math.abs(new Date(toDate).getTime() - new Date(fromDate).getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        if (diffDays > 31) {
-          toast({ title: 'Date range too large', description: 'Max 31 days', variant: 'destructive' });
-          setLoading(false);
-          return;
+
+      // Created Date Filter - only send if not empty
+      if (createdDateFilter && createdDateFilter !== '') {
+        if (createdDateFilter === 'custom') {
+          if (!createdFromDate || !createdToDate) {
+            setLoading(false);
+            return;
+          }
+          if (!validateDateRange(createdFromDate, createdToDate)) {
+            setLoading(false);
+            return;
+          }
+          params.createdDateFrom = createdFromDate;
+          params.createdDateTo = createdToDate;
+        } else if (createdDateFilter !== 'none')  {
+          params.createdDateFilter = createdDateFilter;
         }
-        params.fromDate = fromDate;
-        params.toDate = toDate;
-      } else {
-        params.dateFilter = dateFilter;
       }
 
       if (selectedUserId && selectedUserId !== 'all') {
@@ -378,11 +426,16 @@ export function UtilizationReport() {
       setLoading(false);
       setCurrentPage(0);
     }
-  }, [selectedLevel, dateFilter, fromDate, toDate, selectedUserId]);
+  }, [selectedLevel, showTeamOnly, assignedDateFilter, assignedFromDate, assignedToDate, createdDateFilter, createdFromDate, createdToDate, selectedUserId]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // ─── Reset pagination when filters change ───
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [selectedLevel, showTeamOnly, assignedDateFilter, assignedFromDate, assignedToDate, createdDateFilter, createdFromDate, createdToDate, selectedUserId, searchTerm]);
 
   // ─── Export CSV ───
   const handleExport = () => {
@@ -393,7 +446,7 @@ export function UtilizationReport() {
     const headers = [
       'Employee', 'Designation', 'Vintage', 'Leads', 'New Leads',
       'Total Dials', 'Uniq Dials', 'Answered', 'Talk Time',
-      'PCAT S.', 'PCAT D.', 'Reg.', 'Ad.'
+      'PCAT S.', 'PCAT D.', 'Reg.', 'Ad.', 'Team Size'
     ];
     const rows = data.employees.map((emp: any) => [
       emp.employeeName,
@@ -409,6 +462,7 @@ export function UtilizationReport() {
       emp.pcatDone || 0,
       emp.registrationDone || 0,
       emp.admissionDone || 0,
+      emp.teamSize || '',
     ]);
     const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -438,13 +492,43 @@ export function UtilizationReport() {
         page: pageNum + 1,
         limit: 10,
       };
-      if (data.startDate) params.startDate = data.startDate;
-      if (data.endDate) params.endDate = data.endDate;
-      // fallback if not in data
-      if (!params.startDate && dateFilter === 'custom') {
-        params.startDate = fromDate;
-        params.endDate = toDate;
+
+      // Add team filter if active
+      if (showTeamOnly) {
+        params.team = true;
       }
+
+      // ─── Assigned Date Parameters ───
+      // If assigned date filter is 'custom' and has valid dates, send assignedStartDate & assignedEndDate
+      if (assignedDateFilter === 'custom' && assignedFromDate && assignedToDate) {
+        params.assignedStartDate = assignedFromDate;
+        params.assignedEndDate = assignedToDate;
+      } 
+      // If assigned date filter is a preset (today, week, month), send assignedDateFilter
+      else if (assignedDateFilter && assignedDateFilter !== 'none' && assignedDateFilter !== 'custom') {
+        params.assignedDateFilter = assignedDateFilter;
+      }
+
+      // ─── Created Date Parameters ───
+      // If created date filter is 'custom' and has valid dates, send createdStartDate & createdEndDate
+      if (createdDateFilter === 'custom' && createdFromDate && createdToDate) {
+        params.createdStartDate = createdFromDate;
+        params.createdEndDate = createdToDate;
+      } 
+      // If created date filter is a preset (today, week, month), send createdDateFilter
+      else if (createdDateFilter && createdDateFilter !== 'none' && createdDateFilter !== 'custom') {
+        params.createdDateFilter = createdDateFilter;
+      }
+
+      // ─── Fallback: If no date filters are set, use the data's date range ───
+      if (!assignedDateFilter && !createdDateFilter) {
+        if (data?.startDate && data?.endDate) {
+          // If data has startDate/endDate, use them as assigned dates (backward compatibility)
+          params.assignedStartDate = data.startDate;
+          params.assignedEndDate = data.endDate;
+        }
+      }
+
       const response = await getDataHandlerWithToken(ApiConfig.employeeStageleads, params, null, true);
       const result = response?.data || response;
       let leadsArray = result?.data || [];
@@ -497,10 +581,16 @@ export function UtilizationReport() {
     { leadAssigned: 0, newLead: 0, totalDial: 0, uniqDial: 0, answeredCall: 0, answeredTalkTime: 0, pcatScheduled: 0, pcatDone: 0, registrationDone: 0, admissionDone: 0 }
   );
 
+  // Check if team mode is active
+  const isTeamMode = data?.filters?.team === true || showTeamOnly;
+
   const hasActiveFilters =
     selectedLevel !== '1' ||
-    dateFilter !== 'today' ||
-    (dateFilter === 'custom' && (fromDate || toDate)) ||
+    showTeamOnly ||
+    (assignedDateFilter && assignedDateFilter !== '') ||
+    (assignedDateFilter === 'custom' && (assignedFromDate || assignedToDate)) ||
+    (createdDateFilter && createdDateFilter !== '') ||
+    (createdDateFilter === 'custom' && (createdFromDate || createdToDate)) ||
     selectedUserId !== 'all' ||
     searchTerm !== '';
 
@@ -508,6 +598,12 @@ export function UtilizationReport() {
   const formatDateRange = (startDate: string, endDate: string) => {
     if (!startDate || !endDate) return '';
     return `${formatDate(startDate)} – ${formatDate(endDate)}`;
+  };
+
+  // Get display label for date filter
+  const getDateFilterLabel = (filterValue: string) => {
+    const option = dateFilterOptions.find(o => o.value === filterValue);
+    return option?.label || filterValue;
   };
 
   return (
@@ -569,37 +665,108 @@ export function UtilizationReport() {
               </div>
             )}
 
-            {/* Date Filter */}
-            <div className="w-[130px]">
-              <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="h-8 text-xs rounded-xl">
-                  <SelectValue placeholder="Select date" />
-                </SelectTrigger>
-                <SelectContent>
-                  {dateFilterOptions.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Team Checkbox */}
+            <div className="flex items-center gap-2 ml-1">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="team-filter-utilization"
+                  checked={showTeamOnly}
+                  onCheckedChange={(checked) => {
+                    setShowTeamOnly(checked === true);
+                  }}
+                  className="h-4 w-4 rounded border-slate-300 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                />
+                <Label
+                  htmlFor="team-filter-utilization"
+                  className="text-xs font-medium text-slate-600 cursor-pointer"
+                >
+                  Team
+                </Label>
+              </div>
             </div>
 
-            {dateFilter === 'custom' && (
+            {/* Assigned Date Filter */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <CalendarClock className="w-3.5 h-3.5 text-slate-400" />
+                <Label className="text-[10px] font-medium text-slate-500 uppercase whitespace-nowrap">Assigned</Label>
+              </div>
+              <div className="w-[110px]">
+                <Select value={assignedDateFilter} onValueChange={setAssignedDateFilter}>
+                  <SelectTrigger className="h-8 text-xs rounded-xl">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" className="text-xs">None</SelectItem>
+                    {dateFilterOptions.map(opt => (
+                      <SelectItem key={`assigned-${opt.value}`} value={opt.value} className="text-xs">
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {assignedDateFilter === 'custom' && (
               <>
-                <div className="relative w-[130px]">
+                <div className="relative w-[120px]">
                   <input
                     type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
+                    value={assignedFromDate}
+                    onChange={(e) => setAssignedFromDate(e.target.value)}
                     className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                   />
                 </div>
-                <div className="relative w-[130px]">
+                <div className="relative w-[120px]">
                   <input
                     type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
+                    value={assignedToDate}
+                    onChange={(e) => setAssignedToDate(e.target.value)}
+                    className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Created Date Filter */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                <Label className="text-[10px] font-medium text-slate-500 uppercase whitespace-nowrap">Created</Label>
+              </div>
+              <div className="w-[110px]">
+                <Select value={createdDateFilter} onValueChange={setCreatedDateFilter}>
+                  <SelectTrigger className="h-8 text-xs rounded-xl">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" className="text-xs">None</SelectItem>
+                    {dateFilterOptions.map(opt => (
+                      <SelectItem key={`created-${opt.value}`} value={opt.value} className="text-xs">
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {createdDateFilter === 'custom' && (
+              <>
+                <div className="relative w-[120px]">
+                  <input
+                    type="date"
+                    value={createdFromDate}
+                    onChange={(e) => setCreatedFromDate(e.target.value)}
+                    className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                  />
+                </div>
+                <div className="relative w-[120px]">
+                  <input
+                    type="date"
+                    value={createdToDate}
+                    onChange={(e) => setCreatedToDate(e.target.value)}
                     className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                   />
                 </div>
@@ -621,6 +788,78 @@ export function UtilizationReport() {
         )}
       </div>
 
+      {/* Filter Summary */}
+      {!loading && data && data.employees?.length > 0 && (
+        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
+          <span>
+            Level:{' '}
+            <span className="font-medium text-slate-700">
+              {levels.find(l => extractLevelNumber(l.name).toString() === selectedLevel)?.name || `Level ${selectedLevel}`}
+            </span>
+          </span>
+          <span className="w-1 h-1 rounded-full bg-slate-300" />
+          <span>
+            Team:{' '}
+            <span className="font-medium text-slate-700">
+              {isTeamMode ? (
+                <span className="flex items-center gap-1 text-orange-600">
+                  <UserCog className="w-3 h-3" />
+                  Enabled
+                </span>
+              ) : (
+                'All'
+              )}
+            </span>
+          </span>
+          {assignedDateFilter && assignedDateFilter !== '' && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Assigned:{' '}
+                <span className="font-medium text-slate-700">
+                  {assignedDateFilter === 'custom' 
+                    ? `${formatDate(assignedFromDate)} – ${formatDate(assignedToDate)}`
+                    : getDateFilterLabel(assignedDateFilter)}
+                </span>
+              </span>
+            </>
+          )}
+          {createdDateFilter && createdDateFilter !== '' && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Created:{' '}
+                <span className="font-medium text-slate-700">
+                  {createdDateFilter === 'custom' 
+                    ? `${formatDate(createdFromDate)} – ${formatDate(createdToDate)}`
+                    : getDateFilterLabel(createdDateFilter)}
+                </span>
+              </span>
+            </>
+          )}
+          {selectedUserId !== 'all' && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                User:{' '}
+                <span className="font-medium text-slate-700">
+                  {users.find(u => (u._id || u.id) === selectedUserId)?.name || selectedUserId}
+                </span>
+              </span>
+            </>
+          )}
+          {searchTerm && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Search:{' '}
+                <span className="font-medium text-slate-700">"{searchTerm}"</span>
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
@@ -635,7 +874,7 @@ export function UtilizationReport() {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Summary row - updated with DD/MM/YY format */}
+          {/* Summary row */}
           <div className="flex items-center gap-4 text-sm text-slate-500">
             <span className="font-medium text-slate-700">{filteredEmployees.length} employees</span>
             {data.startDate && data.endDate && (
@@ -643,6 +882,15 @@ export function UtilizationReport() {
                 <span className="w-1 h-1 rounded-full bg-slate-300" />
                 <span>
                   {formatDateRange(data.startDate, data.endDate)}
+                </span>
+              </>
+            )}
+            {isTeamMode && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                <span className="flex items-center gap-1 text-orange-600">
+                  <UserCog className="w-3.5 h-3.5" />
+                  <span className="font-medium">Team View</span>
                 </span>
               </>
             )}
@@ -678,6 +926,9 @@ export function UtilizationReport() {
                     <TableCell className="text-xs sticky left-0 bg-white border-r z-10 py-3">
                       <div className="font-medium text-slate-800">{emp.employeeName}</div>
                       <div className="text-[10px] text-slate-400">{emp.employeeEmail}</div>
+                      {emp.teamSize && emp.teamSize > 1 && (
+                        <div className="text-[9px] text-orange-500 mt-0.5">Team: {emp.teamSize}</div>
+                      )}
                     </TableCell>
                     <TableCell className="text-xs text-center py-3 text-slate-600">{emp.designation || '-'}</TableCell>
                     <TableCell className="text-xs text-center py-3 text-slate-600">{emp.vintage || '-'}</TableCell>
@@ -730,7 +981,7 @@ export function UtilizationReport() {
         </div>
       )}
 
-      {/* Modals (kept from original) */}
+      {/* Modals */}
       {selectedEmployee && (
         <StageModal
           isOpen={isModalOpen}

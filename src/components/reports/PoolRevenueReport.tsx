@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -41,6 +42,7 @@ import {
   Calendar as CalendarIcon,
   Tag,
   FileText,
+  UserCog,
 } from 'lucide-react';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
@@ -78,6 +80,8 @@ interface PoolWithOrders {
   poolName: string;
   revenueByMonth: RevenueByMonth[];
   orders: Order[];
+  team?: boolean;
+  teamSize?: number;
 }
 
 interface EmployeeRevenue {
@@ -86,7 +90,10 @@ interface EmployeeRevenue {
   employeeEmail: string;
   employeeNumber?: string;
   employeeEmployeeId?: string;
+  employeeLevel?: number | string | null;
   pools: PoolWithOrders[];
+  team?: boolean;
+  teamSize?: number;
 }
 
 interface ReportData {
@@ -98,6 +105,13 @@ interface ReportData {
   months: string[];
   startDate?: Date;
   endDate?: Date;
+  filters?: {
+    level?: string | number | null;
+    team?: boolean | null;
+    dateFilter?: string | null;
+    fromDate?: string | null;
+    toDate?: string | null;
+  };
 }
 
 interface LevelType {
@@ -152,6 +166,7 @@ export function PoolRevenueReport() {
 
   // Filter states
   const [selectedLevel, setSelectedLevel] = useState<string>('');
+  const [showTeamOnly, setShowTeamOnly] = useState<boolean>(false);
   const [dateRange, setDateRange] = useState<'month' | 'custom'>('month');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -211,6 +226,11 @@ export function PoolRevenueReport() {
         level: parseInt(selectedLevel) || 1,
       };
 
+      // Team filter - send as boolean when checked
+      if (showTeamOnly) {
+        params.team = true;
+      }
+
       if (dateRange === 'custom') {
         if (!validateDateRange(fromDate, toDate)) {
           setLoading(false);
@@ -236,6 +256,7 @@ export function PoolRevenueReport() {
           months: response.months || [],
           startDate: response.startDate,
           endDate: response.endDate,
+          filters: response.filters || {},
         });
       } else {
         setData(null);
@@ -247,13 +268,18 @@ export function PoolRevenueReport() {
       setLoading(false);
       setCurrentPage(0);
     }
-  }, [selectedLevel, dateRange, fromDate, toDate]);
+  }, [selectedLevel, showTeamOnly, dateRange, fromDate, toDate]);
 
   useEffect(() => {
     if (selectedLevel) {
       fetchData();
     }
   }, [fetchData, selectedLevel]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [selectedLevel, showTeamOnly, dateRange, fromDate, toDate, employeeSearch, poolSearch]);
 
   // Export CSV
   const handleExport = () => {
@@ -272,12 +298,14 @@ export function PoolRevenueReport() {
       return {
         employee: emp.employeeName,
         email: emp.employeeEmail,
+        level: emp.employeeLevel || '',
         ...Object.fromEntries(pools.map(p => [p.poolName, poolMap.get(p.poolName) || 0])),
         total: Array.from(poolMap.values()).reduce((a, b) => a + b, 0),
+        teamSize: emp.teamSize || '',
       };
     });
 
-    const headers = ['Employee', 'Email', ...pools.map(p => p.poolName), 'Total'];
+    const headers = ['Employee', 'Email', 'Level', ...pools.map(p => p.poolName), 'Total', 'Team Size'];
     const csvContent = [
       headers.join(','),
       ...rows.map(row => headers.map(h => String(row[h] || '').replace(/,/g, ' ')).join(',')),
@@ -331,8 +359,12 @@ export function PoolRevenueReport() {
   const activeEmployees = filteredEmployees.length;
   const totalPages = Math.ceil(filteredEmployees.length / EMPLOYEES_PER_PAGE);
 
+  // Check if team mode is active
+  const isTeamMode = data?.filters?.team === true || showTeamOnly;
+
   const hasActiveFilters = 
     selectedLevel !== '' ||
+    showTeamOnly ||
     dateRange !== 'month' ||
     (dateRange === 'custom' && (fromDate || toDate)) ||
     employeeSearch !== '' ||
@@ -394,6 +426,28 @@ export function PoolRevenueReport() {
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="w-px h-7 bg-slate-200" />
+
+          {/* Team Checkbox */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="team-filter-revenue"
+                checked={showTeamOnly}
+                onCheckedChange={(checked) => {
+                  setShowTeamOnly(checked === true);
+                }}
+                className="h-4 w-4 rounded border-slate-300 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+              />
+              <Label
+                htmlFor="team-filter-revenue"
+                className="text-xs font-medium text-slate-600 cursor-pointer"
+              >
+                Team
+              </Label>
             </div>
           </div>
 
@@ -465,6 +519,68 @@ export function PoolRevenueReport() {
         </div>
       </div>
 
+      {/* Filter Summary */}
+      {!loading && data && data.employees.length > 0 && (
+        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
+          <span>
+            Level:{' '}
+            <span className="font-medium text-slate-700">
+              {levels.find(l => extractLevelNumber(l.name).toString() === selectedLevel)?.name || `Level ${selectedLevel}`}
+            </span>
+          </span>
+          <span className="w-1 h-1 rounded-full bg-slate-300" />
+          <span>
+            Team:{' '}
+            <span className="font-medium text-slate-700">
+              {isTeamMode ? (
+                <span className="flex items-center gap-1 text-orange-600">
+                  <UserCog className="w-3 h-3" />
+                  Enabled
+                </span>
+              ) : (
+                'All'
+              )}
+            </span>
+          </span>
+          <span className="w-1 h-1 rounded-full bg-slate-300" />
+          <span>
+            Date:{' '}
+            <span className="font-medium text-slate-700">
+              {dateRange === 'month' ? 'This Month' : 'Custom Range'}
+            </span>
+          </span>
+          {dateRange === 'custom' && fromDate && toDate && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Range:{' '}
+                <span className="font-medium text-slate-700">
+                  {fromDate} to {toDate}
+                </span>
+              </span>
+            </>
+          )}
+          {employeeSearch && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Employee:{' '}
+                <span className="font-medium text-slate-700">"{employeeSearch}"</span>
+              </span>
+            </>
+          )}
+          {poolSearch && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Pool:{' '}
+                <span className="font-medium text-slate-700">"{poolSearch}"</span>
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Content */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-slate-200">
@@ -482,7 +598,7 @@ export function PoolRevenueReport() {
       ) : (
         <div className="space-y-5">
           {/* Analytics Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             <Card className="p-5 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between">
                 <div>
@@ -518,6 +634,20 @@ export function PoolRevenueReport() {
                 </div>
               </div>
             </Card>
+
+            {isTeamMode && (
+              <Card className="p-5 bg-orange-50 border border-orange-200 shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-orange-600 uppercase tracking-wider">Team Mode</p>
+                    <p className="text-sm font-semibold text-orange-700 mt-1.5">Active</p>
+                  </div>
+                  <div className="w-11 h-11 rounded-xl bg-orange-100 flex items-center justify-center">
+                    <UserCog className="w-5 h-5 text-orange-600" />
+                  </div>
+                </div>
+              </Card>
+            )}
           </div>
 
           {/* Table */}
@@ -567,6 +697,12 @@ export function PoolRevenueReport() {
                             <span className="text-xs text-slate-400">{emp.employeeEmail}</span>
                             {emp.employeeEmployeeId && (
                               <span className="text-[10px] text-slate-400 mt-0.5">ID: {emp.employeeEmployeeId}</span>
+                            )}
+                            {emp.employeeLevel && (
+                              <span className="text-[10px] text-orange-500 mt-0.5">Level: L{emp.employeeLevel}</span>
+                            )}
+                            {emp.teamSize && emp.teamSize > 1 && (
+                              <span className="text-[10px] text-orange-500 mt-0.5">Team: {emp.teamSize}</span>
                             )}
                           </div>
                         </TableCell>

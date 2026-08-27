@@ -68,11 +68,6 @@ export function RevenueTargetReport() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [showFilters, setShowFilters] = useState(false);
-
-  // Level filter
-  const [levels, setLevels] = useState<any[]>([]);
-  const [selectedLevel, setSelectedLevel] = useState('1');
-
   // Month filter (multi-select)
   const monthOptions = useMemo(() => buildMonthOptions(36), []);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([getCurrentMonthKey()]);
@@ -82,22 +77,6 @@ export function RevenueTargetReport() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(0);
-
-  // ─── Fetch levels ───
-  useEffect(() => {
-    const fetchLevels = async () => {
-      try {
-        const res = await getDataHandlerWithToken('getAllLevels', null, null);
-        if (res) {
-          setLevels(res);
-          if (res.length) setSelectedLevel(extractLevelNumber(res[0].name).toString());
-        }
-      } catch (error) {
-        toast({ title: 'Error', description: 'Failed to load levels', variant: 'destructive' });
-      }
-    };
-    fetchLevels();
-  }, []);
 
   const extractLevelNumber = (name: string): number => {
     const match = name.match(/\d+/);
@@ -109,7 +88,6 @@ export function RevenueTargetReport() {
     setLoading(true);
     try {
       const params: any = {
-        level: parseInt(selectedLevel) || 1,
         months: selectedMonths.length ? selectedMonths.join(',') : getCurrentMonthKey(),
       };
 
@@ -127,7 +105,7 @@ export function RevenueTargetReport() {
       setLoading(false);
       setCurrentPage(0);
     }
-  }, [selectedLevel, selectedMonths]);
+  }, [selectedMonths]);
 
   useEffect(() => {
     fetchData();
@@ -162,7 +140,6 @@ export function RevenueTargetReport() {
     summary.totalPercentage ?? (combinedTarget > 0 ? Math.min(100, Math.round((combinedAchieved / combinedTarget) * 100)) : 0);
 
   const hasActiveFilters =
-    selectedLevel !== '1' ||
     selectedMonths.join(',') !== getCurrentMonthKey() ||
     searchTerm !== '';
 
@@ -234,29 +211,6 @@ export function RevenueTargetReport() {
 
         {showFilters && (
           <div className="flex flex-wrap items-center gap-3 w-full">
-            {/* Level Radio Buttons */}
-            {levels.length > 0 && (
-              <div className="flex items-center gap-2">
-                <Label className="text-xs font-semibold text-slate-500 uppercase">Level</Label>
-                <div className="flex flex-wrap gap-1">
-                  {levels.map(lvl => (
-                    <button
-                      key={lvl._id}
-                      onClick={() => setSelectedLevel(extractLevelNumber(lvl.name).toString())}
-                      className={cn(
-                        "px-3 py-1 text-xs font-medium rounded-lg border transition-all",
-                        selectedLevel === extractLevelNumber(lvl.name).toString()
-                          ? "bg-orange-500 text-white border-orange-500 shadow-sm"
-                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                      )}
-                    >
-                      {lvl.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Month Multi-Select */}
             <div className="w-[280px]">
               <MultiSelect

@@ -1,8 +1,9 @@
-// SourceCampaignRevenueReport.tsx - Updated with professional design and order details modal
+// SourceCampaignRevenueReport.tsx - Updated with Lead Created & Order Created Date Filters
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -51,6 +52,8 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
+  CalendarClock,
+  UserCog,
 } from 'lucide-react';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
@@ -109,6 +112,11 @@ const getStatusColor = (status: string) => {
     default:
       return 'bg-slate-100 text-slate-700 border-slate-200';
   }
+};
+
+// Helper to check if date filter is active
+const isDateFilterActive = (filterValue: string) => {
+  return filterValue && filterValue !== 'none' && filterValue !== '';
 };
 
 /* -------------------------------------------------------------------------- */
@@ -229,10 +237,17 @@ export function SourceCampaignRevenueReport() {
   const [levels, setLevels] = useState<any[]>([]);
   const [selectedLevel, setSelectedLevel] = useState('1');
 
-  // Date filter
-  const [dateFilter, setDateFilter] = useState('today');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  // Team filter (checkbox)
+  const [showTeamOnly, setShowTeamOnly] = useState<boolean>(false);
+
+  // Date filters - all default to 'none'
+  const [leadCreatedDateFilter, setLeadCreatedDateFilter] = useState<string>('none');
+  const [leadCreatedFromDate, setLeadCreatedFromDate] = useState('');
+  const [leadCreatedToDate, setLeadCreatedToDate] = useState('');
+
+  const [orderCreatedDateFilter, setOrderCreatedDateFilter] = useState<string>('none');
+  const [orderCreatedFromDate, setOrderCreatedFromDate] = useState('');
+  const [orderCreatedToDate, setOrderCreatedToDate] = useState('');
 
   // Client‑side filters
   const [sourceFilter, setSourceFilter] = useState('all');
@@ -265,6 +280,18 @@ export function SourceCampaignRevenueReport() {
     return match ? parseInt(match[0], 10) : 1;
   };
 
+  // ─── Validate date range (max 31 days) ───
+  const validateDateRange = (from: string, to: string): boolean => {
+    if (!from || !to) return false;
+    const diffTime = Math.abs(new Date(to).getTime() - new Date(from).getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays > 31) {
+      toast({ title: 'Date range too large', description: 'Max 31 days allowed', variant: 'destructive' });
+      return false;
+    }
+    return true;
+  };
+
   // ─── Fetch report data ───
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -273,22 +300,45 @@ export function SourceCampaignRevenueReport() {
         level: parseInt(selectedLevel) || 1,
       };
 
-      if (dateFilter === 'custom') {
-        if (!fromDate || !toDate) {
-          setLoading(false);
-          return;
+      // Team filter
+      if (showTeamOnly) {
+        params.team = true;
+      }
+
+      // Lead Created Date Filter - only if not 'none'
+      if (isDateFilterActive(leadCreatedDateFilter)) {
+        if (leadCreatedDateFilter === 'custom') {
+          if (!leadCreatedFromDate || !leadCreatedToDate) {
+            setLoading(false);
+            return;
+          }
+          if (!validateDateRange(leadCreatedFromDate, leadCreatedToDate)) {
+            setLoading(false);
+            return;
+          }
+          params.leadCreatedDateFrom = leadCreatedFromDate;
+          params.leadCreatedDateTo = leadCreatedToDate;
+        } else {
+          params.leadCreatedDateFilter = leadCreatedDateFilter;
         }
-        const diffTime = Math.abs(new Date(toDate).getTime() - new Date(fromDate).getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        if (diffDays > 31) {
-          toast({ title: 'Date range too large', description: 'Max 31 days', variant: 'destructive' });
-          setLoading(false);
-          return;
+      }
+
+      // Order Created Date Filter - only if not 'none'
+      if (isDateFilterActive(orderCreatedDateFilter)) {
+        if (orderCreatedDateFilter === 'custom') {
+          if (!orderCreatedFromDate || !orderCreatedToDate) {
+            setLoading(false);
+            return;
+          }
+          if (!validateDateRange(orderCreatedFromDate, orderCreatedToDate)) {
+            setLoading(false);
+            return;
+          }
+          params.orderCreatedDateFrom = orderCreatedFromDate;
+          params.orderCreatedDateTo = orderCreatedToDate;
+        } else {
+          params.orderCreatedDateFilter = orderCreatedDateFilter;
         }
-        params.fromDate = fromDate;
-        params.toDate = toDate;
-      } else {
-        params.dateFilter = dateFilter;
       }
 
       const response = await getDataHandlerWithToken(
@@ -304,7 +354,16 @@ export function SourceCampaignRevenueReport() {
     } finally {
       setLoading(false);
     }
-  }, [selectedLevel, dateFilter, fromDate, toDate]);
+  }, [
+    selectedLevel,
+    showTeamOnly,
+    leadCreatedDateFilter,
+    leadCreatedFromDate,
+    leadCreatedToDate,
+    orderCreatedDateFilter,
+    orderCreatedFromDate,
+    orderCreatedToDate,
+  ]);
 
   useEffect(() => {
     fetchData();
@@ -375,10 +434,16 @@ export function SourceCampaignRevenueReport() {
     return totals;
   }, [filteredRows, campaigns, filteredTotals]);
 
+  // Check if team mode is active
+  const isTeamMode = showTeamOnly;
+
   const hasActiveFilters =
     selectedLevel !== '1' ||
-    dateFilter !== 'today' ||
-    (dateFilter === 'custom' && (fromDate || toDate)) ||
+    showTeamOnly ||
+    isDateFilterActive(leadCreatedDateFilter) ||
+    (leadCreatedDateFilter === 'custom' && (leadCreatedFromDate || leadCreatedToDate)) ||
+    isDateFilterActive(orderCreatedDateFilter) ||
+    (orderCreatedDateFilter === 'custom' && (orderCreatedFromDate || orderCreatedToDate)) ||
     sourceFilter !== 'all';
 
   // ─── Handle click on revenue/lead numbers ───
@@ -422,18 +487,20 @@ export function SourceCampaignRevenueReport() {
       toast({ title: 'No data to export' });
       return;
     }
-    const headers = ['Source', ...campaigns.flatMap(c => [`${c}_leads`, `${c}_revenue`]), 'Total Leads', 'Total Revenue'];
+    const headers = ['Source', ...campaigns.flatMap(c => [`${c}_leads`, `${c}_revenue`]), 'Total Leads', 'Total Revenue', 'Team Size'];
     const csvRows = filteredRows.map((item: any) => [
       item.source,
       ...campaigns.flatMap(c => [item[`${c}_lead`] || 0, item[`${c}_revenue`] || 0]),
       item.totalLead || 0,
       item.totalRevenue || 0,
+      item.teamSize || '',
     ]);
     csvRows.push([
       'Total',
       ...campaigns.flatMap(c => [columnTotals[c]?.lead || 0, columnTotals[c]?.revenue || 0]),
       filteredTotals.totalLead,
       filteredTotals.totalRevenue,
+      '',
     ]);
     const csvContent = [headers, ...csvRows].map(row => row.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -452,6 +519,13 @@ export function SourceCampaignRevenueReport() {
       return `${formatDate(startDate)} – ${formatDate(endDate)}`;
     }
     return '';
+  };
+
+  // Get display label for date filter
+  const getDateFilterLabel = (filterValue: string) => {
+    if (filterValue === 'none' || !filterValue) return 'None';
+    const option = dateFilterOptions.find(o => o.value === filterValue);
+    return option?.label || filterValue;
   };
 
   return (
@@ -536,42 +610,117 @@ export function SourceCampaignRevenueReport() {
 
             <div className="w-px h-6 bg-slate-200" />
 
-            {/* Date Filter */}
+            {/* Team Checkbox */}
             <div className="flex items-center gap-2">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="h-8 w-32 text-xs rounded-xl border-slate-200">
-                  <SelectValue placeholder="Select date" />
-                </SelectTrigger>
-                <SelectContent>
-                  {dateFilterOptions.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="team-filter-source-campaign"
+                  checked={showTeamOnly}
+                  onCheckedChange={(checked) => {
+                    setShowTeamOnly(checked === true);
+                  }}
+                  className="h-4 w-4 rounded border-slate-300 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                />
+                <Label
+                  htmlFor="team-filter-source-campaign"
+                  className="text-xs font-medium text-slate-600 cursor-pointer"
+                >
+                  Team
+                </Label>
+              </div>
             </div>
 
-            {dateFilter === 'custom' && (
-              <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-xl border border-slate-200">
-                <input
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="h-7 px-2 text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400 rounded"
-                />
-                <span className="text-xs text-slate-400">→</span>
-                <input
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="h-7 px-2 text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400 rounded"
-                />
-                <span className="text-[10px] text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200">
-                  Max 31 days
-                </span>
+            <div className="w-px h-6 bg-slate-200" />
+
+            {/* Lead Created Date Filter */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <CalendarClock className="w-3.5 h-3.5 text-slate-400" />
+                <Label className="text-[10px] font-medium text-slate-500 uppercase whitespace-nowrap">Lead Created</Label>
               </div>
+              <div className="w-[110px]">
+                <Select value={leadCreatedDateFilter} onValueChange={setLeadCreatedDateFilter}>
+                  <SelectTrigger className="h-8 text-xs rounded-xl border-slate-200">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" className="text-xs">None</SelectItem>
+                    {dateFilterOptions.map(opt => (
+                      <SelectItem key={`lead-created-${opt.value}`} value={opt.value} className="text-xs">
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {leadCreatedDateFilter === 'custom' && (
+              <>
+                <div className="relative w-[120px]">
+                  <input
+                    type="date"
+                    value={leadCreatedFromDate}
+                    onChange={(e) => setLeadCreatedFromDate(e.target.value)}
+                    className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                  />
+                </div>
+                <div className="relative w-[120px]">
+                  <input
+                    type="date"
+                    value={leadCreatedToDate}
+                    onChange={(e) => setLeadCreatedToDate(e.target.value)}
+                    className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="w-px h-6 bg-slate-200" />
+
+            {/* Order Created Date Filter */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                <Label className="text-[10px] font-medium text-slate-500 uppercase whitespace-nowrap">Order Created</Label>
+              </div>
+              <div className="w-[110px]">
+                <Select value={orderCreatedDateFilter} onValueChange={setOrderCreatedDateFilter}>
+                  <SelectTrigger className="h-8 text-xs rounded-xl border-slate-200">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" className="text-xs">None</SelectItem>
+                    {dateFilterOptions.map(opt => (
+                      <SelectItem key={`order-created-${opt.value}`} value={opt.value} className="text-xs">
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {orderCreatedDateFilter === 'custom' && (
+              <>
+                <div className="relative w-[120px]">
+                  <input
+                    type="date"
+                    value={orderCreatedFromDate}
+                    onChange={(e) => setOrderCreatedFromDate(e.target.value)}
+                    className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                  />
+                </div>
+                <div className="relative w-[120px]">
+                  <input
+                    type="date"
+                    value={orderCreatedToDate}
+                    onChange={(e) => setOrderCreatedToDate(e.target.value)}
+                    className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400">Max 31 days</span>
+              </>
             )}
 
             <div className="w-px h-6 bg-slate-200" />
@@ -596,6 +745,77 @@ export function SourceCampaignRevenueReport() {
         )}
       </div>
 
+      {/* Filter Summary */}
+      {!loading && report && rows.length > 0 && (
+        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
+          <span>
+            Level:{' '}
+            <span className="font-medium text-slate-700">
+              {levels.find(l => extractLevelNumber(l.name).toString() === selectedLevel)?.name || `Level ${selectedLevel}`}
+            </span>
+          </span>
+          <span className="w-1 h-1 rounded-full bg-slate-300" />
+          <span>
+            Team:{' '}
+            <span className="font-medium text-slate-700">
+              {isTeamMode ? (
+                <span className="flex items-center gap-1 text-orange-600">
+                  <UserCog className="w-3 h-3" />
+                  Enabled
+                </span>
+              ) : (
+                'All'
+              )}
+            </span>
+          </span>
+          {isDateFilterActive(leadCreatedDateFilter) && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Lead Created:{' '}
+                <span className="font-medium text-slate-700">
+                  {leadCreatedDateFilter === 'custom' 
+                    ? `${formatDate(leadCreatedFromDate)} – ${formatDate(leadCreatedToDate)}`
+                    : getDateFilterLabel(leadCreatedDateFilter)}
+                </span>
+              </span>
+            </>
+          )}
+          {isDateFilterActive(orderCreatedDateFilter) && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Order Created:{' '}
+                <span className="font-medium text-slate-700">
+                  {orderCreatedDateFilter === 'custom' 
+                    ? `${formatDate(orderCreatedFromDate)} – ${formatDate(orderCreatedToDate)}`
+                    : getDateFilterLabel(orderCreatedDateFilter)}
+                </span>
+              </span>
+            </>
+          )}
+          {sourceFilter !== 'all' && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Source:{' '}
+                <span className="font-medium text-slate-700">{sourceFilter}</span>
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Team Mode Banner */}
+      {isTeamMode && !loading && report && rows.length > 0 && (
+        <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-4 py-2">
+          <UserCog className="w-4 h-4 text-orange-600" />
+          <span className="text-sm text-orange-800">
+            <span className="font-semibold">Team Report:</span> Showing combined team data from the backend
+          </span>
+        </div>
+      )}
+
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-20 bg-white rounded-xl border border-slate-200">
@@ -611,7 +831,7 @@ export function SourceCampaignRevenueReport() {
       ) : (
         <div className="space-y-5">
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="p-5 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between">
                 <div>
@@ -652,7 +872,20 @@ export function SourceCampaignRevenueReport() {
                 </div>
               </div>
             </Card>
-          </div>
+            {isTeamMode && (
+              <Card className="p-5 bg-orange-50 border border-orange-200 shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-orange-600 uppercase tracking-wider">Team Mode</p>
+                    <p className="text-sm font-semibold text-orange-700 mt-1">Active</p>
+                  </div>
+                  <div className="w-11 h-11 rounded-xl bg-orange-100 flex items-center justify-center">
+                    <UserCog className="w-5 h-5 text-orange-600" />
+                  </div>
+                </div>
+              </Card>
+            )}
+          </div> */}
 
           {/* Main Table */}
           <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
@@ -697,6 +930,11 @@ export function SourceCampaignRevenueReport() {
                           <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-500">
                             {item.totalLead || 0} leads
                           </Badge>
+                          {item.teamSize && item.teamSize > 1 && (
+                            <Badge className="text-[10px] bg-orange-50 text-orange-600 border-orange-200">
+                              Team: {item.teamSize}
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       {campaigns.map(campaign => {

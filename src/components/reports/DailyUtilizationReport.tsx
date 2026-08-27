@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -29,6 +30,7 @@ import {
   ChevronDown,
   Layers,
   Users,
+  UserCog,
 } from 'lucide-react';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
@@ -56,6 +58,9 @@ export function DailyUtilizationReport() {
   // Level filter
   const [levels, setLevels] = useState<any[]>([]);
   const [selectedLevel, setSelectedLevel] = useState('1');
+
+  // Team filter (checkbox)
+  const [showTeamOnly, setShowTeamOnly] = useState<boolean>(false);
 
   // Date filter
   const [dateFilter, setDateFilter] = useState('today');
@@ -107,6 +112,11 @@ export function DailyUtilizationReport() {
         level: parseInt(selectedLevel) || 1,
       };
 
+      // Team filter - send as boolean when checked
+      if (showTeamOnly) {
+        params.team = true;
+      }
+
       // Date filter
       if (dateFilter === 'custom') {
         if (!fromDate || !toDate) {
@@ -148,7 +158,7 @@ export function DailyUtilizationReport() {
     } finally {
       setLoading(false);
     }
-  }, [selectedLevel, dateFilter, fromDate, toDate, selectedPoolId]);
+  }, [selectedLevel, showTeamOnly, dateFilter, fromDate, toDate, selectedPoolId]);
 
   useEffect(() => {
     fetchData();
@@ -161,13 +171,14 @@ export function DailyUtilizationReport() {
       return;
     }
     const dates = data.dateStrings;
-    const headers = ['Employee', ...dates.flatMap(d => [`${formatDateShort(d)} Dials`, `${formatDateShort(d)} Answered`])];
+    const headers = ['Employee', ...dates.flatMap(d => [`${formatDateShort(d)} Dials`, `${formatDateShort(d)} Answered`]), 'Team Size'];
     const rows = data.employees.map((emp: any) => {
       const row: any[] = [emp.employeeName];
       dates.forEach(date => {
         const metric = emp.dailyMetrics?.find((m: any) => m.date === date);
         row.push(metric?.dial || 0, metric?.answered || 0);
       });
+      row.push(emp.teamSize || '');
       return row;
     });
     const csvContent = [headers, ...rows].map(r => r.join(',')).join('\n');
@@ -188,8 +199,12 @@ export function DailyUtilizationReport() {
 
   const dates = data?.dateStrings || [];
 
+  // Check if team mode is active
+  const isTeamMode = data?.filters?.team === true || showTeamOnly;
+
   const hasActiveFilters =
     selectedLevel !== '1' ||
+    showTeamOnly ||
     dateFilter !== 'today' ||
     (dateFilter === 'custom' && (fromDate || toDate)) ||
     (selectedPoolId && selectedPoolId !== 'all') ||
@@ -254,6 +269,26 @@ export function DailyUtilizationReport() {
               </div>
             )}
 
+            {/* Team Checkbox */}
+            <div className="flex items-center gap-2 ml-1">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="team-filter-daily"
+                  checked={showTeamOnly}
+                  onCheckedChange={(checked) => {
+                    setShowTeamOnly(checked === true);
+                  }}
+                  className="h-4 w-4 rounded border-slate-300 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                />
+                <Label
+                  htmlFor="team-filter-daily"
+                  className="text-xs font-medium text-slate-600 cursor-pointer"
+                >
+                  Team
+                </Label>
+              </div>
+            </div>
+
             {/* Date Filter */}
             <div className="w-[130px]">
               <Select value={dateFilter} onValueChange={setDateFilter}>
@@ -293,7 +328,7 @@ export function DailyUtilizationReport() {
             )}
 
             {/* Pool Filter */}
-            {/* <div className="w-[180px]">
+            <div className="w-[180px]">
               <Select value={selectedPoolId} onValueChange={setSelectedPoolId}>
                 <SelectTrigger className="h-8 text-xs rounded-xl">
                   <SelectValue placeholder="All Pools" />
@@ -307,7 +342,7 @@ export function DailyUtilizationReport() {
                   ))}
                 </SelectContent>
               </Select>
-            </div> */}
+            </div>
 
             {/* Employee Search */}
             <div className="relative w-48">
@@ -323,6 +358,70 @@ export function DailyUtilizationReport() {
         )}
       </div>
 
+      {/* Filter Summary */}
+      {!loading && data && data.employees?.length > 0 && (
+        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
+          <span>
+            Level:{' '}
+            <span className="font-medium text-slate-700">
+              {levels.find(l => extractLevelNumber(l.name).toString() === selectedLevel)?.name || `Level ${selectedLevel}`}
+            </span>
+          </span>
+          <span className="w-1 h-1 rounded-full bg-slate-300" />
+          <span>
+            Team:{' '}
+            <span className="font-medium text-slate-700">
+              {isTeamMode ? (
+                <span className="flex items-center gap-1 text-orange-600">
+                  <UserCog className="w-3 h-3" />
+                  Enabled
+                </span>
+              ) : (
+                'All'
+              )}
+            </span>
+          </span>
+          <span className="w-1 h-1 rounded-full bg-slate-300" />
+          <span>
+            Date:{' '}
+            <span className="font-medium text-slate-700">
+              {dateFilter === 'today' ? 'Today' : 'Custom Range'}
+            </span>
+          </span>
+          {dateFilter === 'custom' && fromDate && toDate && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Range:{' '}
+                <span className="font-medium text-slate-700">
+                  {fromDate} to {toDate}
+                </span>
+              </span>
+            </>
+          )}
+          {selectedPoolId !== 'all' && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Pool:{' '}
+                <span className="font-medium text-slate-700">
+                  {pools.find(p => p._id === selectedPoolId)?.name || selectedPoolId}
+                </span>
+              </span>
+            </>
+          )}
+          {searchTerm && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Search:{' '}
+                <span className="font-medium text-slate-700">"{searchTerm}"</span>
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
@@ -336,55 +435,84 @@ export function DailyUtilizationReport() {
           <p className="text-xs text-slate-400 mt-1">Try adjusting filters or level</p>
         </div>
       ) : (
-        <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
-          <Table className="min-w-[600px]">
-            <TableHeader>
-              <TableRow className="bg-slate-50 hover:bg-slate-50 border-b border-slate-100">
-                <TableHead className="text-xs font-semibold text-slate-500 uppercase sticky left-0 bg-slate-50 z-10 min-w-[140px]">
-                  Employee
-                </TableHead>
-                {dates.map((date: string) => (
-                  <TableHead key={date} className="text-xs text-center min-w-[100px] py-3">
-                    <div className="font-semibold text-slate-800">{formatDateShort(date)}</div>
+        <div className="space-y-4">
+          {/* Summary row */}
+          <div className="flex items-center gap-4 text-sm text-slate-500">
+            <span className="font-medium text-slate-700">{filteredEmployees.length} employees</span>
+            {dates.length > 0 && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                <span>
+                  Showing {dates.length} day{dates.length > 1 ? 's' : ''}
+                </span>
+              </>
+            )}
+            {isTeamMode && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                <span className="flex items-center gap-1 text-orange-600">
+                  <UserCog className="w-3.5 h-3.5" />
+                  <span className="font-medium">Team View</span>
+                </span>
+              </>
+            )}
+          </div>
+
+          <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
+            <Table className="min-w-[600px]">
+              <TableHeader>
+                <TableRow className="bg-slate-50 hover:bg-slate-50 border-b border-slate-100">
+                  <TableHead className="text-xs font-semibold text-slate-500 uppercase sticky left-0 bg-slate-50 z-10 min-w-[140px]">
+                    Employee
                   </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredEmployees.map((emp: any, idx: number) => (
-                <TableRow key={emp.employeeId || idx} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
-                  <TableCell className="text-xs font-medium text-slate-800 sticky left-0 bg-white border-r z-10 py-3">
-                    {emp.employeeName}
-                  </TableCell>
-                  {dates.map((date: string) => {
-                    const metric = emp.dailyMetrics?.find((m: any) => m.date === date);
-                    const hasData = metric?.dial > 0;
-                    return (
-                      <TableCell key={date} className="text-center py-3">
-                        {hasData ? (
-                          <div className="inline-flex flex-col items-center px-2 py-1 rounded-lg bg-orange-50/70">
-                            <span className="text-sm font-medium text-slate-800">{metric.dial}</span>
-                            {metric.answered > 0 && (
-                              <span className="text-[10px] text-orange-600 mt-0.5">
-                                {metric.answered} ans
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-sm text-slate-300">-</span>
-                        )}
-                      </TableCell>
-                    );
-                  })}
+                  {dates.map((date: string) => (
+                    <TableHead key={date} className="text-xs text-center min-w-[100px] py-3">
+                      <div className="font-semibold text-slate-800">{formatDateShort(date)}</div>
+                    </TableHead>
+                  ))}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {filteredEmployees.length === 0 && searchTerm && (
-            <div className="text-center py-8 text-sm text-slate-400">
-              No employees match "{searchTerm}"
-            </div>
-          )}
+              </TableHeader>
+              <TableBody>
+                {filteredEmployees.map((emp: any, idx: number) => (
+                  <TableRow key={emp.employeeId || idx} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
+                    <TableCell className="text-xs font-medium text-slate-800 sticky left-0 bg-white border-r z-10 py-3">
+                      <div className="flex flex-col">
+                        <span>{emp.employeeName}</span>
+                        {emp.teamSize && emp.teamSize > 1 && (
+                          <span className="text-[9px] text-orange-500 mt-0.5">Team: {emp.teamSize}</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    {dates.map((date: string) => {
+                      const metric = emp.dailyMetrics?.find((m: any) => m.date === date);
+                      const hasData = metric?.dial > 0;
+                      return (
+                        <TableCell key={date} className="text-center py-3">
+                          {hasData ? (
+                            <div className="inline-flex flex-col items-center px-2 py-1 rounded-lg bg-orange-50/70">
+                              <span className="text-sm font-medium text-slate-800">{metric.dial}</span>
+                              {metric.answered > 0 && (
+                                <span className="text-[10px] text-orange-600 mt-0.5">
+                                  {metric.answered} ans
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-slate-300">-</span>
+                          )}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {filteredEmployees.length === 0 && searchTerm && (
+              <div className="text-center py-8 text-sm text-slate-400">
+                No employees match "{searchTerm}"
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

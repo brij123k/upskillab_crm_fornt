@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -30,6 +31,7 @@ import {
   ChevronUp,
   ChevronDown,
   Layers,
+  Users,
 } from 'lucide-react';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
@@ -46,12 +48,21 @@ interface PoolData {
   poolName: string;
   totalLead: number;
   stages: StageItem[];
+  team?: boolean;
+  teamSize?: number;
 }
 
 interface ReportData {
   poolWiseData: PoolData[];
   totalLeads: number;
   totalPools: number;
+  filters?: {
+    level?: string | number | null;
+    team?: boolean | null;
+    dateFilter?: string | null;
+    fromDate?: string | null;
+    toDate?: string | null;
+  };
 }
 
 interface LevelType {
@@ -80,8 +91,11 @@ export function PoolStagesReport() {
 
   // Level filter
   const [levels, setLevels] = useState<LevelType[]>([]);
-  const [selectedLevel, setSelectedLevel] = useState<string>('1'); // default level "1" as value from fetched levels? We'll store level name or ID? The API probably expects level number (like 1,2,3). We'll use level name extracted from levels list (e.g., "L1" -> 1). We'll let user select a level by name, then extract numeric part.
-  const [levelInput, setLevelInput] = useState<string>('1'); // For manual level number input? No, we'll use radio buttons.
+  const [selectedLevel, setSelectedLevel] = useState<string>('1');
+  const [levelInput, setLevelInput] = useState<string>('1');
+
+  // Team filter (checkbox)
+  const [showTeamOnly, setShowTeamOnly] = useState<boolean>(false);
 
   // Date filter
   const [dateFilter, setDateFilter] = useState('today');
@@ -101,7 +115,6 @@ export function PoolStagesReport() {
         const response = await getDataHandlerWithToken('getAllLevels', null, null);
         if (response) {
           setLevels(response);
-          // If we have levels, set default selected to the first one's numeric part
           if (response.length > 0) {
             const firstLevelNumeric = extractLevelNumber(response[0].name);
             setSelectedLevel(firstLevelNumeric.toString());
@@ -147,13 +160,18 @@ export function PoolStagesReport() {
     setLoading(true);
     try {
       const params: any = {};
+      
       // Level parameter – send as integer
       params.level = parseInt(levelInput) || 1;
+
+      // Team filter - send as boolean when checked
+      if (showTeamOnly) {
+        params.team = true;
+      }
 
       // Date filter
       if (dateFilter === 'custom') {
         if (!fromDate || !toDate) {
-          // toast({ title: 'Missing Dates', description: 'Please select both start and end dates.', variant: 'destructive' });
           setLoading(false);
           return;
         }
@@ -174,6 +192,7 @@ export function PoolStagesReport() {
           poolWiseData: response.data?.poolWiseData || response.poolWiseData || [],
           totalLeads: response.data?.totalLeads ?? response.totalLeads ?? 0,
           totalPools: response.data?.totalPools ?? response.totalPools ?? 0,
+          filters: response.data?.filters || response.filters || {},
         });
       } else {
         setData(null);
@@ -185,11 +204,16 @@ export function PoolStagesReport() {
       setLoading(false);
       setCurrentPage(0);
     }
-  }, [levelInput, dateFilter, fromDate, toDate]);
+  }, [levelInput, showTeamOnly, dateFilter, fromDate, toDate]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [levelInput, showTeamOnly, dateFilter, fromDate, toDate, poolSearch]);
 
   // Export CSV
   const handleExport = () => {
@@ -201,10 +225,15 @@ export function PoolStagesReport() {
     const stageSet = new Set<string>();
     pools.forEach(p => p.stages.forEach(s => stageSet.add(s.stage)));
     const stageList = Array.from(stageSet);
-    const headers = ['Pool Name', 'Total Lead', ...stageList];
+    const headers = ['Pool Name', 'Total Lead', ...stageList, 'Team Size'];
     const rows = pools.map(pool => {
       const stageMap = new Map(pool.stages.map(s => [s.stage, s.count]));
-      return [pool.poolName, pool.totalLead, ...stageList.map(s => stageMap.get(s) || 0)];
+      return [
+        pool.poolName, 
+        pool.totalLead, 
+        ...stageList.map(s => stageMap.get(s) || 0),
+        pool.teamSize || ''
+      ];
     });
     const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -247,8 +276,14 @@ export function PoolStagesReport() {
     return [...ordered, ...extra];
   })();
 
+  // Check if team mode is active
+  const isTeamMode = data?.filters?.team === true || showTeamOnly;
+
+  // Active filters check
+  const defaultLevel = levels.length > 0 ? extractLevelNumber(levels[0].name).toString() : '1';
   const hasActiveFilters =
-    levelInput !== '1' ||
+    levelInput !== defaultLevel ||
+    showTeamOnly ||
     dateFilter !== 'today' ||
     (dateFilter === 'custom' && (fromDate || toDate)) ||
     poolSearch !== '';
@@ -337,6 +372,26 @@ export function PoolStagesReport() {
               </div>
             )}
 
+            {/* Team Checkbox */}
+            <div className="flex items-center gap-2 ml-1">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="team-filter-pool"
+                  checked={showTeamOnly}
+                  onCheckedChange={(checked) => {
+                    setShowTeamOnly(checked === true);
+                  }}
+                  className="h-4 w-4 rounded border-slate-300 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                />
+                <Label
+                  htmlFor="team-filter-pool"
+                  className="text-xs font-medium text-slate-600 cursor-pointer"
+                >
+                  Team
+                </Label>
+              </div>
+            </div>
+
             {/* Date filter */}
             <div className="w-[130px]">
               <Select value={dateFilter} onValueChange={setDateFilter}>
@@ -391,6 +446,59 @@ export function PoolStagesReport() {
         )}
       </div>
 
+      {/* Filter Summary */}
+      {!loading && data && data.poolWiseData.length > 0 && (
+        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
+          <span>
+            Level:{' '}
+            <span className="font-medium text-slate-700">
+              {levels.find(l => extractLevelNumber(l.name).toString() === selectedLevel)?.name || `Level ${selectedLevel}`}
+            </span>
+          </span>
+          <span className="w-1 h-1 rounded-full bg-slate-300" />
+          <span>
+            Team:{' '}
+            <span className="font-medium text-slate-700">
+              {isTeamMode ? (
+                <span className="flex items-center gap-1 text-orange-600">
+                  <Users className="w-3 h-3" />
+                  Enabled
+                </span>
+              ) : (
+                'All'
+              )}
+            </span>
+          </span>
+          <span className="w-1 h-1 rounded-full bg-slate-300" />
+          <span>
+            Date:{' '}
+            <span className="font-medium text-slate-700">
+              {dateFilterOptions.find(o => o.value === dateFilter)?.label || dateFilter}
+            </span>
+          </span>
+          {dateFilter === 'custom' && fromDate && toDate && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Range:{' '}
+                <span className="font-medium text-slate-700">
+                  {fromDate} to {toDate}
+                </span>
+              </span>
+            </>
+          )}
+          {poolSearch && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Search:{' '}
+                <span className="font-medium text-slate-700">"{poolSearch}"</span>
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
@@ -402,6 +510,12 @@ export function PoolStagesReport() {
           <Building2 className="w-12 h-12 text-slate-300 mb-3" />
           <p className="text-sm font-medium text-slate-600">No pool data found</p>
           <p className="text-xs text-slate-400 mt-1">Adjust level or filters</p>
+        </div>
+      ) : filteredPools.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Search className="w-12 h-12 text-slate-300 mb-3" />
+          <p className="text-sm font-medium text-slate-600">No matching pools</p>
+          <p className="text-xs text-slate-400 mt-1">Try adjusting your search term</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -417,6 +531,15 @@ export function PoolStagesReport() {
                 {filteredPools.reduce((sum, p) => sum + p.totalLead, 0)}
               </span>
             </span>
+            {isTeamMode && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                <span className="flex items-center gap-1 text-orange-600">
+                  <Users className="w-3.5 h-3.5" />
+                  <span className="font-medium">Team View</span>
+                </span>
+              </>
+            )}
           </div>
 
           {/* Table */}
@@ -439,6 +562,11 @@ export function PoolStagesReport() {
                         <div className="text-[10px] font-normal text-slate-400 mt-0.5">
                           Total: {pool.totalLead}
                         </div>
+                        {pool.teamSize && pool.teamSize > 1 && (
+                          <div className="text-[9px] font-normal text-orange-500 mt-0.5">
+                            Team: {pool.teamSize}
+                          </div>
+                        )}
                       </TableHead>
                     ))}
                   </TableRow>
