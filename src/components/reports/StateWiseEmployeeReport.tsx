@@ -16,9 +16,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import {
   Loader2,
   RefreshCw,
@@ -29,6 +34,7 @@ import {
   Users,
   ChevronUp,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   BarChart3,
   IndianRupee,
@@ -36,6 +42,11 @@ import {
   UserCheck,
   TrendingUp,
   Building2,
+  X,
+  Plus,
+  Minus,
+  UserPlus,
+  UserCog,
 } from 'lucide-react';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
@@ -58,6 +69,7 @@ interface StateDetail {
   admissionDone: number;
   revenue: number;
   stages: StageCounts;
+  registrationConversionPercentage: number;
   conversionPercentage: number;
 }
 
@@ -65,16 +77,60 @@ interface EmployeeData {
   employeeId: string;
   employeeName: string;
   employeeEmail: string;
-  employeeCode: number;
+  employeeNumber?: string;
+  employeeCode: string;
   totalLeads: number;
+  totalRegistrationDone: number;
   totalAdmissionDone: number;
   totalRevenue: number;
+  registrationConversionPercentage: number;
+  conversionPercentage: number;
+  team?: boolean;
+  teamSize?: number;
+  states: StateDetail[];
+  children?: EmployeeData[];
+  level?: number;
+  parentId?: string | null;
+  isTeamMember?: boolean;
+}
+
+interface ParentEmployee {
+  employeeId: string;
+  employeeName: string;
+  employeeEmail: string;
+  employeeNumber?: string;
+  employeeCode: string;
+  totalLeads: number;
+  totalRegistrationDone: number;
+  totalAdmissionDone: number;
+  totalRevenue: number;
+  registrationConversionPercentage: number;
+  conversionPercentage: number;
+  team?: boolean;
+  teamSize?: number;
   states: StateDetail[];
 }
 
 interface ApiResponse {
   startDate: string;
   endDate: string;
+  dateFilter?: string;
+  level?: number;
+  team?: boolean;
+  employeeId?: string;
+  parentEmployee?: ParentEmployee;
+  totalEmployees: number;
+  totalLeads: number;
+  totalRegistrationDone: number;
+  totalAdmissionDone: number;
+  totalRevenue: number;
+  registrationPercentage: number;
+  conversionPercentage: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
   data: EmployeeData[];
 }
 
@@ -90,8 +146,333 @@ const dateFilterOptions = [
 ];
 
 /* -------------------------------------------------------------------------- */
+/*                          Sub-component: Team Member Table                   */
+/* -------------------------------------------------------------------------- */
+
+interface TeamMemberTableProps {
+  teamMembers: EmployeeData[];
+  level: number;
+  expandedEmployees: Set<string>;
+  loadingHierarchy: Set<string>;
+  toggleExpand: (employeeId: string, hasTeam: boolean) => void;
+  onEmployeeClick: (employee: EmployeeData) => void;
+}
+
+function TeamMemberTable({
+  teamMembers,
+  level,
+  expandedEmployees,
+  loadingHierarchy,
+  toggleExpand,
+  onEmployeeClick,
+}: TeamMemberTableProps) {
+  return (
+    <div className="mt-2 mb-1">
+      <div className="flex items-center gap-2 mb-2 text-xs font-medium text-orange-600">
+        <UserPlus className="w-3.5 h-3.5" />
+        <span>Team Members ({teamMembers.length})</span>
+      </div>
+      <div className="overflow-x-auto border border-slate-200 rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-orange-50/50 hover:bg-orange-50/50 border-b border-slate-200">
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase sticky left-0 bg-orange-50/50 z-10 min-w-[160px] py-2">
+                Employee
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[80px] py-2">
+                Leads
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[80px] py-2">
+                Reg.
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[80px] py-2">
+                Adm.
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[100px] py-2">
+                Reg. %
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[100px] py-2">
+                Conv. %
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[120px] py-2 bg-orange-50/50">
+                Revenue
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {teamMembers.map((member) => {
+              const hasTeam = member.teamSize && member.teamSize > 1;
+              const isExpanded = expandedEmployees.has(member.employeeId);
+              const isLoading = loadingHierarchy.has(member.employeeId);
+
+              return (
+                <>
+                  <TableRow
+                    key={member.employeeId}
+                    className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors cursor-pointer"
+                    onClick={() => onEmployeeClick(member)}
+                  >
+                    <TableCell className="sticky left-0 bg-white border-r z-10 py-2">
+                      <div className="flex flex-col min-w-[130px]">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-medium text-slate-800 truncate max-w-[100px] hover:text-orange-600">
+                            {member.employeeName}
+                          </span>
+                          {hasTeam && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExpand(member.employeeId, true);
+                              }}
+                              disabled={isLoading}
+                              className={cn(
+                                "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
+                                "hover:bg-orange-100 text-orange-500 border border-orange-200",
+                                isExpanded && "bg-orange-100 border-orange-300",
+                                isLoading && "opacity-50 cursor-not-allowed"
+                              )}
+                            >
+                              {isLoading ? (
+                                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              ) : isExpanded ? (
+                                <Minus className="w-2.5 h-2.5" />
+                              ) : (
+                                <Plus className="w-2.5 h-2.5" />
+                              )}
+                            </button>
+                          )}
+                          {member.teamSize && member.teamSize > 1 && (
+                            <span className="text-[7px] bg-orange-100 text-orange-700 px-1 py-0.5 rounded-full whitespace-nowrap">
+                              Team: {member.teamSize}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[8px] text-slate-400 truncate max-w-[120px]">
+                          {member.employeeEmail}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-center py-2 font-medium text-slate-700">
+                      {member.totalLeads}
+                    </TableCell>
+                    <TableCell className="text-xs text-center py-2 font-medium text-purple-600">
+                      {member.totalRegistrationDone}
+                    </TableCell>
+                    <TableCell className="text-xs text-center py-2 font-medium text-emerald-600">
+                      {member.totalAdmissionDone}
+                    </TableCell>
+                    <TableCell className="text-xs text-center py-2">
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-full font-medium text-[10px]",
+                        member.registrationConversionPercentage > 20 ? "bg-purple-100 text-purple-700" :
+                        member.registrationConversionPercentage > 10 ? "bg-indigo-100 text-indigo-700" :
+                        "bg-slate-100 text-slate-600"
+                      )}>
+                        {member.registrationConversionPercentage || 0}%
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-xs text-center py-2">
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-full font-medium text-[10px]",
+                        member.conversionPercentage > 15 ? "bg-emerald-100 text-emerald-700" :
+                        member.conversionPercentage > 8 ? "bg-amber-100 text-amber-700" :
+                        "bg-slate-100 text-slate-600"
+                      )}>
+                        {member.conversionPercentage || 0}%
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-xs text-center font-semibold text-orange-600 py-2 bg-orange-50/30">
+                      ₹{member.totalRevenue.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                  {/* Nested team members */}
+                  {isExpanded && member.children && member.children.length > 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="p-0">
+                        <div className="ml-6 pl-4 border-l-2 border-orange-200">
+                          <TeamMemberTable
+                            teamMembers={member.children}
+                            level={level + 1}
+                            expandedEmployees={expandedEmployees}
+                            loadingHierarchy={loadingHierarchy}
+                            toggleExpand={toggleExpand}
+                            onEmployeeClick={onEmployeeClick}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                          Employee Details Modal                             */
+/* -------------------------------------------------------------------------- */
+
+interface EmployeeDetailsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  employee: EmployeeData | null;
+}
+
+function EmployeeDetailsModal({ isOpen, onClose, employee }: EmployeeDetailsModalProps) {
+  if (!isOpen || !employee) return null;
+
+  const totalStages = employee.states.reduce((acc, state) => {
+    Object.values(state.stages).forEach(count => acc += count);
+    return acc;
+  }, 0);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-5xl w-[95vw] max-h-[85vh] p-4 flex flex-col rounded-2xl">
+        <DialogHeader className="flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle className="text-xl font-bold text-slate-800">
+                Employee Details
+              </DialogTitle>
+              <div className="text-sm text-slate-500 mt-1">
+                <span className="font-medium text-slate-700">{employee.employeeName}</span>
+                <span className="mx-2">•</span>
+                <span className="text-slate-400">Code: {employee.employeeCode}</span>
+                {employee.teamSize && employee.teamSize > 1 && (
+                  <>
+                    <span className="mx-2">•</span>
+                    <span className="text-orange-600">Team: {employee.teamSize} members</span>
+                  </>
+                )}
+              </div>
+            </div>
+            
+          </div>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div className="bg-slate-50 rounded-lg p-3 text-center">
+              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Total Leads</p>
+              <p className="text-xl font-bold text-slate-800">{employee.totalLeads}</p>
+            </div>
+            <div className="bg-purple-50 rounded-lg p-3 text-center">
+              <p className="text-[10px] font-medium text-purple-600 uppercase tracking-wider">Registrations</p>
+              <p className="text-xl font-bold text-purple-700">{employee.totalRegistrationDone}</p>
+            </div>
+            <div className="bg-emerald-50 rounded-lg p-3 text-center">
+              <p className="text-[10px] font-medium text-emerald-600 uppercase tracking-wider">Admissions</p>
+              <p className="text-xl font-bold text-emerald-700">{employee.totalAdmissionDone}</p>
+            </div>
+            <div className="bg-orange-50 rounded-lg p-3 text-center">
+              <p className="text-[10px] font-medium text-orange-600 uppercase tracking-wider">Revenue</p>
+              <p className="text-xl font-bold text-orange-700">₹{employee.totalRevenue.toLocaleString()}</p>
+            </div>
+          </div>
+
+          {/* Conversion Cards */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="bg-indigo-50 rounded-lg p-3">
+              <p className="text-[10px] font-medium text-indigo-600 uppercase tracking-wider">Registration Conv. %</p>
+              <p className="text-lg font-semibold text-indigo-700">{employee.registrationConversionPercentage || 0}%</p>
+            </div>
+            <div className="bg-emerald-50 rounded-lg p-3">
+              <p className="text-[10px] font-medium text-emerald-600 uppercase tracking-wider">Conversion %</p>
+              <p className="text-lg font-semibold text-emerald-700">{employee.conversionPercentage || 0}%</p>
+            </div>
+          </div>
+
+          {/* States Table */}
+          <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex items-center justify-between">
+              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                <MapPin className="w-3.5 h-3.5" />
+                State Breakdown
+              </h4>
+              <Badge variant="outline" className="text-[10px]">
+                {employee.states.length} states
+              </Badge>
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50/50">
+                    <TableHead className="text-[10px] font-semibold text-slate-500 uppercase min-w-[120px]">State</TableHead>
+                    <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Leads</TableHead>
+                    <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">PCAT S.</TableHead>
+                    <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">PCAT D.</TableHead>
+                    <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Reg.</TableHead>
+                    <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Adm.</TableHead>
+                    <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Revenue</TableHead>
+                    <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Reg. %</TableHead>
+                    <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Conv. %</TableHead>
+                    <TableHead className="text-[10px] font-semibold text-slate-500 uppercase min-w-[150px]">Stages</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {employee.states.map((state) => {
+                    const stageEntries = Object.entries(state.stages);
+                    const totalStateStages = stageEntries.reduce((acc, [, count]) => acc + count, 0);
+                    return (
+                      <TableRow key={state.state} className="border-b border-slate-50 hover:bg-slate-50/60">
+                        <TableCell className="text-xs font-medium text-slate-800">{state.state}</TableCell>
+                        <TableCell className="text-xs text-center text-slate-600">{state.totalLeads}</TableCell>
+                        <TableCell className="text-xs text-center text-slate-600">{state.pcatScheduled}</TableCell>
+                        <TableCell className="text-xs text-center text-slate-600">{state.pcatDone}</TableCell>
+                        <TableCell className="text-xs text-center font-medium text-purple-600">{state.registrationDone}</TableCell>
+                        <TableCell className="text-xs text-center font-medium text-emerald-600">{state.admissionDone}</TableCell>
+                        <TableCell className="text-xs text-center font-medium text-orange-600">₹{state.revenue.toLocaleString()}</TableCell>
+                        <TableCell className="text-xs text-center">
+                          <span className="px-2 py-0.5 rounded-full font-medium text-[10px] bg-purple-100 text-purple-700">
+                            {state.registrationConversionPercentage || 0}%
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-xs text-center">
+                          <span className="px-2 py-0.5 rounded-full font-medium text-[10px] bg-emerald-100 text-emerald-700">
+                            {state.conversionPercentage || 0}%
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          <div className="flex flex-wrap gap-1">
+                            {stageEntries.map(([stage, count]) => {
+                              const pct = totalStateStages > 0 ? Math.round((count / totalStateStages) * 100) : 0;
+                              return (
+                                <Badge key={stage} variant="outline" className="text-[9px] px-1.5 py-0">
+                                  {stage}: {count} ({pct}%)
+                                </Badge>
+                              );
+                            })}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end p-4 border-t border-slate-200 bg-slate-50/50 flex-shrink-0">
+          <Button onClick={onClose} className="rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700">
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /*                               Main Component                                */
 /* -------------------------------------------------------------------------- */
+
 export function StateWiseEmployeeReport() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ApiResponse | null>(null);
@@ -102,26 +483,75 @@ export function StateWiseEmployeeReport() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
+  // Level filter
+  const [levels, setLevels] = useState<any[]>([]);
+  const [selectedLevel, setSelectedLevel] = useState('1');
+
+  // Team filter (checkbox)
+  const [showTeamOnly, setShowTeamOnly] = useState<boolean>(false);
+
   // Client-side search
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [stateSearch, setStateSearch] = useState('');
 
-  // Expanded employees
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // ─── Hierarchical State ──────────────────────────────────────────────────
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
+  const [hierarchicalData, setHierarchicalData] = useState<EmployeeData[]>([]);
+  const [loadingHierarchy, setLoadingHierarchy] = useState<Set<string>>(new Set());
+
+  // ─── Employee Details Modal ─────────────────────────────────────────────
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeData | null>(null);
+
+  // ─── Fetch levels ───
+  useEffect(() => {
+    const fetchLevels = async () => {
+      try {
+        const res = await getDataHandlerWithToken('getAllLevels', null, null);
+        if (res) {
+          setLevels(res);
+          if (res.length) setSelectedLevel(extractLevelNumber(res[0].name).toString());
+        }
+      } catch (error) {
+        toast({ title: 'Error', description: 'Failed to load levels', variant: 'destructive' });
+      }
+    };
+    fetchLevels();
+  }, []);
+
+  const extractLevelNumber = (name: string): number => {
+    const match = name.match(/\d+/);
+    return match ? parseInt(match[0], 10) : 1;
+  };
+
+  // ─── Build Hierarchy ──────────────────────────────────────────────────────
+  const buildHierarchy = useCallback((employees: EmployeeData[]): EmployeeData[] => {
+    return employees.map(emp => ({
+      ...emp,
+      children: [],
+      level: 0,
+    }));
+  }, []);
 
   // ─── Fetch data ───
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (page: number = 1) => {
     setLoading(true);
     try {
-      const params: any = {};
+      const params: any = {
+        level: parseInt(selectedLevel) || 1,
+        page: page,
+        limit: 10,
+      };
+
+      if (showTeamOnly) {
+        params.team = true;
+      }
 
       if (dateFilter === 'custom') {
         if (!fromDate || !toDate) {
-          // toast({
-          //   title: 'Missing Dates',
-          //   description: 'Select start and end dates.',
-          //   variant: 'destructive',
-          // });
           setLoading(false);
           return;
         }
@@ -152,21 +582,18 @@ export function StateWiseEmployeeReport() {
         true
       );
 
-      let report: ApiResponse | null = null;
-
-      if (response?.startDate && Array.isArray(response.data)) {
-        report = response as ApiResponse;
-      } else if (response?.data && response.data.startDate && Array.isArray(response.data.data)) {
-        report = response.data as ApiResponse;
-      } else if (Array.isArray(response?.data)) {
-        report = {
-          startDate: '',
-          endDate: '',
-          data: response.data as EmployeeData[],
-        };
+      if (response) {
+        const reportData = response as ApiResponse;
+        setData(reportData);
+        
+        const employees = reportData.data || [];
+        const hierarchy = buildHierarchy(employees);
+        setHierarchicalData(hierarchy);
+        setExpandedEmployees(new Set());
+      } else {
+        setData(null);
+        setHierarchicalData([]);
       }
-
-      setData(report);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -174,14 +601,149 @@ export function StateWiseEmployeeReport() {
         variant: 'destructive',
       });
       setData(null);
+      setHierarchicalData([]);
     } finally {
       setLoading(false);
     }
-  }, [dateFilter, fromDate, toDate, employeeSearch, stateSearch]);
+  }, [selectedLevel, showTeamOnly, dateFilter, fromDate, toDate, employeeSearch, stateSearch, buildHierarchy]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchData(currentPage);
+  }, [fetchData, currentPage]);
+
+  // ─── Fetch Team Hierarchy ──────────────────────────────────────────────
+  const fetchTeamHierarchy = useCallback(async (employeeId: string) => {
+    if (loadingHierarchy.has(employeeId)) return;
+
+    setLoadingHierarchy(prev => new Set(prev).add(employeeId));
+    
+    try {
+      const params: any = {
+        employeeId: employeeId,
+        level: parseInt(selectedLevel) || 1,
+        page: 1,
+        limit: 10,
+      };
+
+      if (showTeamOnly) {
+        params.team = true;
+      }
+
+      if (dateFilter === 'custom') {
+        if (fromDate && toDate) {
+          params.fromDate = fromDate;
+          params.toDate = toDate;
+        }
+      } else {
+        params.dateFilter = dateFilter;
+      }
+
+      const response = await getDataHandlerWithToken(
+        ApiConfig.stateWiseEmployeeReportTeam,
+        params,
+        null,
+        true
+      );
+
+      const result = response as ApiResponse;
+      const teamData = result?.data || [];
+
+      if (teamData.length > 0) {
+        const updateHierarchy = (nodes: EmployeeData[]): EmployeeData[] => {
+          return nodes.map((node: EmployeeData) => {
+            if (node.employeeId === employeeId) {
+              const teamMembers = teamData.map((member: any) => ({
+                ...member,
+                level: (node.level || 0) + 1,
+                parentId: employeeId,
+                isTeamMember: true,
+                children: [],
+              }));
+              return {
+                ...node,
+                children: teamMembers,
+              };
+            }
+            if (node.children && node.children.length > 0) {
+              return {
+                ...node,
+                children: updateHierarchy(node.children),
+              };
+            }
+            return node;
+          });
+        };
+
+        setHierarchicalData(prev => updateHierarchy(prev));
+        setExpandedEmployees(prev => new Set(prev).add(employeeId));
+      } else {
+        const updateHierarchy = (nodes: EmployeeData[]): EmployeeData[] => {
+          return nodes.map((node: EmployeeData) => {
+            if (node.employeeId === employeeId) {
+              return { ...node, children: [] };
+            }
+            if (node.children && node.children.length > 0) {
+              return { ...node, children: updateHierarchy(node.children) };
+            }
+            return node;
+          });
+        };
+        setHierarchicalData(prev => updateHierarchy(prev));
+        setExpandedEmployees(prev => new Set(prev).add(employeeId));
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to load team hierarchy',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingHierarchy(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(employeeId);
+        return newSet;
+      });
+    }
+  }, [selectedLevel, showTeamOnly, dateFilter, fromDate, toDate, loadingHierarchy]);
+
+  // ─── Toggle Expand ──────────────────────────────────────────────────────
+  const toggleExpand = useCallback(async (employeeId: string, hasTeam: boolean) => {
+    if (expandedEmployees.has(employeeId)) {
+      setExpandedEmployees(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(employeeId);
+        return newSet;
+      });
+      
+      const removeChildren = (nodes: EmployeeData[]): EmployeeData[] => {
+        return nodes.map((node: EmployeeData) => {
+          if (node.employeeId === employeeId) {
+            return { ...node, children: [] };
+          }
+          if (node.children && node.children.length > 0) {
+            return { ...node, children: removeChildren(node.children) };
+          }
+          return node;
+        });
+      };
+      setHierarchicalData(prev => removeChildren(prev));
+    } else if (hasTeam) {
+      await fetchTeamHierarchy(employeeId);
+    }
+  }, [expandedEmployees, fetchTeamHierarchy]);
+
+  // ─── Handle page change ───
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || (data && newPage > data.totalPages)) return;
+    setCurrentPage(newPage);
+    setExpandedEmployees(new Set());
+  };
+
+  // ─── Handle employee click for details ───
+  const handleEmployeeClick = (employee: EmployeeData) => {
+    setSelectedEmployee(employee);
+    setDetailsModalOpen(true);
+  };
 
   // ─── Export CSV ───
   const handleExport = () => {
@@ -193,41 +755,29 @@ export function StateWiseEmployeeReport() {
       'Employee Name',
       'Employee Code',
       'Total Leads',
-      'Total Admissions',
-      'Total Revenue',
-      'State',
-      'State Leads',
-      'PCAT S.',
-      'PCAT D.',
-      'Reg. D.',
-      'Adm. D.',
-      'State Revenue',
+      'Registrations',
+      'Admissions',
+      'Revenue',
+      'Reg. Conv. %',
       'Conv. %',
-      'Stages',
+      'Team Size',
+      'States',
     ];
     const rows: any[] = [];
     data.data.forEach(employee => {
-      employee.states.forEach(state => {
-        const stagesStr = Object.entries(state.stages)
-          .map(([k, v]) => `${k}:${v}`)
-          .join('; ');
-        rows.push([
-          employee.employeeName,
-          employee.employeeCode,
-          employee.totalLeads,
-          employee.totalAdmissionDone,
-          employee.totalRevenue,
-          state.state,
-          state.totalLeads,
-          state.pcatScheduled,
-          state.pcatDone,
-          state.registrationDone,
-          state.admissionDone,
-          state.revenue,
-          state.conversionPercentage,
-          stagesStr,
-        ]);
-      });
+      const statesStr = employee.states.map(s => `${s.state}:${s.totalLeads}`).join('; ');
+      rows.push([
+        employee.employeeName,
+        employee.employeeCode,
+        employee.totalLeads,
+        employee.totalRegistrationDone,
+        employee.totalAdmissionDone,
+        employee.totalRevenue,
+        employee.registrationConversionPercentage || 0,
+        employee.conversionPercentage || 0,
+        employee.teamSize || '',
+        statesStr,
+      ]);
     });
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -240,31 +790,47 @@ export function StateWiseEmployeeReport() {
     toast({ title: 'Exported Successfully!' });
   };
 
-  // ─── Helpers ───
-  const toggleEmployee = (employeeId: string) => {
-    const newSet = new Set(expandedEmployees);
-    if (newSet.has(employeeId)) newSet.delete(employeeId);
-    else newSet.add(employeeId);
-    setExpandedEmployees(newSet);
-  };
+  // ─── Flatten hierarchy for search ───
+  const flattenHierarchy = useCallback((nodes: EmployeeData[]): EmployeeData[] => {
+    let result: EmployeeData[] = [];
+    nodes.forEach((node: EmployeeData) => {
+      result.push({ ...node, level: node.level || 0 });
+      if (node.children && node.children.length > 0) {
+        result = result.concat(flattenHierarchy(node.children));
+      }
+    });
+    return result;
+  }, []);
+
+  // ─── Filtered employees ───
+  const flattenedData = flattenHierarchy(hierarchicalData);
+  
+  const filteredEmployees = flattenedData.filter((emp: EmployeeData) =>
+    employeeSearch ? emp.employeeName?.toLowerCase().includes(employeeSearch.toLowerCase()) : true
+  );
+
+  // For display, use top-level only
+  const topLevelEmployees = hierarchicalData;
 
   const hasActiveFilters =
     dateFilter !== 'today' ||
     (dateFilter === 'custom' && (fromDate || toDate)) ||
+    selectedLevel !== '1' ||
+    showTeamOnly ||
     employeeSearch !== '' ||
     stateSearch !== '';
 
-  // Grand totals
-  const totalEmployees = data?.data?.length || 0;
-  const totalLeads = data?.data?.reduce((sum, emp) => sum + emp.totalLeads, 0) || 0;
-  const totalAdmissions = data?.data?.reduce((sum, emp) => sum + emp.totalAdmissionDone, 0) || 0;
-  const totalRevenue = data?.data?.reduce((sum, emp) => sum + emp.totalRevenue, 0) || 0;
+  // Check if team mode is active
+  const isTeamMode = showTeamOnly;
 
-  // Get unique states across all employees
-  const uniqueStates = new Set<string>();
-  data?.data?.forEach(employee => {
-    employee.states.forEach(state => uniqueStates.add(state.state));
-  });
+  // Get unique states
+  const getUniqueStates = () => {
+    const states = new Set<string>();
+    flattenedData.forEach(emp => {
+      emp.states.forEach(state => states.add(state.state));
+    });
+    return states.size;
+  };
 
   return (
     <div className="space-y-6">
@@ -273,14 +839,19 @@ export function StateWiseEmployeeReport() {
         <div>
           <h3 className="text-base font-semibold text-slate-800">Employee State Report</h3>
           <p className="text-sm text-slate-500">Employee performance across different states</p>
+          {data?.startDate && data?.endDate && (
+            <p className="text-xs text-slate-400 mt-0.5">
+              {new Date(data.startDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} – {new Date(data.endDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={fetchData}
+            onClick={() => fetchData(currentPage)}
             disabled={loading}
-            className="rounded-xl border-slate-200 hover:border-orange-200 hover:bg-orange-50"
+            className="rounded-xl border-slate-200"
           >
             {loading ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
@@ -293,7 +864,7 @@ export function StateWiseEmployeeReport() {
             size="sm"
             onClick={handleExport}
             disabled={!data || loading}
-            className="rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
+            className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white"
           >
             <Download className="w-3.5 h-3.5 mr-1" />
             Export
@@ -318,6 +889,49 @@ export function StateWiseEmployeeReport() {
 
           {showFilters && (
             <div className="flex flex-wrap items-center gap-3 w-full mt-2 pt-2 border-t border-slate-100">
+              {/* Level Radio Buttons */}
+              {levels.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs font-semibold text-slate-500 uppercase">Level</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {levels.map(lvl => (
+                      <button
+                        key={lvl._id}
+                        onClick={() => setSelectedLevel(extractLevelNumber(lvl.name).toString())}
+                        className={cn(
+                          "px-3 py-1 text-xs font-medium rounded-lg border transition-all",
+                          selectedLevel === extractLevelNumber(lvl.name).toString()
+                            ? "bg-orange-500 text-white border-orange-500 shadow-sm"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                        )}
+                      >
+                        {lvl.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Team Checkbox */}
+              <div className="flex items-center gap-2 ml-1">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="team-filter-employee"
+                    checked={showTeamOnly}
+                    onCheckedChange={(checked) => {
+                      setShowTeamOnly(checked === true);
+                    }}
+                    className="h-4 w-4 rounded border-slate-300 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                  />
+                  <Label
+                    htmlFor="team-filter-employee"
+                    className="text-xs font-medium text-slate-600 cursor-pointer"
+                  >
+                    Team
+                  </Label>
+                </div>
+              </div>
+
               {/* Date Filter */}
               <div className="w-[130px]">
                 <Select value={dateFilter} onValueChange={setDateFilter}>
@@ -357,15 +971,15 @@ export function StateWiseEmployeeReport() {
               )}
 
               {/* Employee Search */}
-              {/* <div className="relative w-48">
-                <Users className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+              <div className="relative w-44">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                 <Input
                   placeholder="Search employee..."
                   value={employeeSearch}
                   onChange={(e) => setEmployeeSearch(e.target.value)}
                   className="pl-7 h-8 text-xs rounded-xl border-slate-200"
                 />
-              </div> */}
+              </div>
 
               {/* State Search */}
               <div className="relative w-44">
@@ -382,6 +996,68 @@ export function StateWiseEmployeeReport() {
         </div>
       </div>
 
+      {/* Filter Summary */}
+      {!loading && data && data.data?.length > 0 && (
+        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
+          <span>
+            Level:{' '}
+            <span className="font-medium text-slate-700">
+              {levels.find(l => extractLevelNumber(l.name).toString() === selectedLevel)?.name || `Level ${selectedLevel}`}
+            </span>
+          </span>
+          <span className="w-1 h-1 rounded-full bg-slate-300" />
+          <span>
+            Team:{' '}
+            <span className="font-medium text-slate-700">
+              {isTeamMode ? (
+                <span className="flex items-center gap-1 text-orange-600">
+                  <UserCog className="w-3 h-3" />
+                  Enabled
+                </span>
+              ) : (
+                'All'
+              )}
+            </span>
+          </span>
+          <span className="w-1 h-1 rounded-full bg-slate-300" />
+          <span>
+            Date:{' '}
+            <span className="font-medium text-slate-700">
+              {dateFilter === 'today' ? 'Today' : dateFilter === 'custom' ? 'Custom Range' : dateFilter}
+            </span>
+          </span>
+          {dateFilter === 'custom' && fromDate && toDate && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Range:{' '}
+                <span className="font-medium text-slate-700">
+                  {fromDate} to {toDate}
+                </span>
+              </span>
+            </>
+          )}
+          {employeeSearch && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Employee:{' '}
+                <span className="font-medium text-slate-700">"{employeeSearch}"</span>
+              </span>
+            </>
+          )}
+          {stateSearch && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                State:{' '}
+                <span className="font-medium text-slate-700">"{stateSearch}"</span>
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
@@ -397,244 +1073,265 @@ export function StateWiseEmployeeReport() {
           <p className="text-xs text-slate-400 mt-1">Try adjusting filters or date range</p>
         </div>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-4">
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <Card className="p-4 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Employees</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{totalEmployees}</p>
-                </div>
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl flex items-center justify-center">
-                  <Users className="w-5 h-5 text-blue-600" />
-                </div>
-              </div>
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+            <Card className="p-4 bg-white border-0 shadow-sm">
+              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Employees</p>
+              <p className="text-2xl font-bold text-slate-800 mt-1">{data.totalEmployees}</p>
             </Card>
-            <Card className="p-4 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">States</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{uniqueStates.size}</p>
-                </div>
-                <div className="w-10 h-10 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl flex items-center justify-center">
-                  <MapPin className="w-5 h-5 text-emerald-600" />
-                </div>
-              </div>
+            <Card className="p-4 bg-white border-0 shadow-sm">
+              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">States</p>
+              <p className="text-2xl font-bold text-slate-800 mt-1">{getUniqueStates()}</p>
             </Card>
-            <Card className="p-4 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Total Leads</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{totalLeads.toLocaleString()}</p>
-                </div>
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-orange-600" />
-                </div>
-              </div>
+            <Card className="p-4 bg-white border-0 shadow-sm">
+              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Total Leads</p>
+              <p className="text-2xl font-bold text-slate-800 mt-1">{data.totalLeads.toLocaleString()}</p>
             </Card>
-            <Card className="p-4 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Admissions</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{totalAdmissions.toLocaleString()}</p>
-                </div>
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl flex items-center justify-center">
-                  <Layers className="w-5 h-5 text-purple-600" />
-                </div>
-              </div>
+            <Card className="p-4 bg-white border-0 shadow-sm">
+              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Registrations</p>
+              <p className="text-2xl font-bold text-purple-600 mt-1">{data.totalRegistrationDone.toLocaleString()}</p>
             </Card>
-            <Card className="p-4 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Revenue</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">₹{totalRevenue.toLocaleString()}</p>
-                </div>
-                <div className="w-10 h-10 bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl flex items-center justify-center">
-                  <IndianRupee className="w-5 h-5 text-amber-600" />
-                </div>
-              </div>
+            <Card className="p-4 bg-white border-0 shadow-sm">
+              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Admissions</p>
+              <p className="text-2xl font-bold text-emerald-600 mt-1">{data.totalAdmissionDone.toLocaleString()}</p>
+            </Card>
+            <Card className="p-4 bg-white border-0 shadow-sm">
+              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Revenue</p>
+              <p className="text-2xl font-bold text-orange-600 mt-1">₹{data.totalRevenue.toLocaleString()}</p>
             </Card>
           </div>
 
-          {/* Employee List - New card-based design */}
-          <div className="space-y-3">
-            {data.data.map((employee, index) => {
-              const isExpanded = expandedEmployees.has(employee.employeeId);
-              const topStates = employee.states.slice(0, 3);
-              const remainingStates = employee.states.length - 3;
-
-              return (
-                <Card
-                  key={employee.employeeId}
-                  className={cn(
-                    "border border-slate-200 bg-white overflow-hidden transition-all duration-200",
-                    isExpanded ? "shadow-md" : "shadow-sm hover:shadow-md"
-                  )}
-                >
-                  {/* Employee Header */}
-                  <div
-                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50/60 transition-colors"
-                    onClick={() => toggleEmployee(employee.employeeId)}
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className={cn(
-                        "w-6 h-6 rounded-lg flex items-center justify-center text-xs font-semibold text-white shrink-0",
-                        isExpanded ? "bg-orange-500" : "bg-slate-400"
-                      )}>
-                        {index + 1}
+          {/* Main Table */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50/80 border-b border-slate-200">
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50/80 z-10 min-w-[180px] py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-3.5 h-3.5" />
+                        Employee
                       </div>
-                      <ChevronRight
-                        className={cn(
-                          "w-4 h-4 text-slate-400 transition-transform shrink-0",
-                          isExpanded && "rotate-90"
-                        )}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-semibold text-slate-800 truncate">
-                            {employee.employeeName}
-                          </h4>
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-slate-50 border-slate-200 text-slate-500 shrink-0">
-                            #{employee.employeeCode}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5 flex-wrap">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {employee.states.length} states
-                          </span>
-                          <span className="w-1 h-1 rounded-full bg-slate-300" />
-                          <span>{employee.totalLeads} leads</span>
-                          <span className="w-1 h-1 rounded-full bg-slate-300" />
-                          <span>{employee.totalAdmissionDone} admissions</span>
-                          <span className="w-1 h-1 rounded-full bg-slate-300" />
-                          <span className="font-medium text-emerald-600">₹{employee.totalRevenue.toLocaleString()}</span>
-                        </div>
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[80px] py-3 px-4">
+                      Leads
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[80px] py-3 px-4">
+                      Reg.
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[80px] py-3 px-4">
+                      Adm.
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[100px] py-3 px-4">
+                      Reg. %
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[100px] py-3 px-4">
+                      Conv. %
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[130px] py-3 px-4 bg-orange-50/50">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <IndianRupee className="w-3.5 h-3.5 text-orange-500" />
+                        <span className="text-orange-700">Revenue</span>
                       </div>
-                    </div>
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[80px] py-3 px-4">
+                      States
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {topLevelEmployees.map((employee) => {
+                    const hasTeam = employee.teamSize && employee.teamSize > 1;
+                    const isExpanded = expandedEmployees.has(employee.employeeId);
+                    const isLoading = loadingHierarchy.has(employee.employeeId);
 
-                    {/* Quick stats chips */}
-                    <div className="hidden sm:flex items-center gap-2 ml-4">
-                      {topStates.map(state => (
-                        <Badge
-                          key={state.state}
-                          variant="outline"
-                          className="text-[10px] px-2 py-0 bg-slate-50 border-slate-200 text-slate-600"
+                    return (
+                      <>
+                        <TableRow
+                          key={employee.employeeId}
+                          className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors cursor-pointer"
+                          onClick={() => handleEmployeeClick(employee)}
                         >
-                          {state.state}: {state.totalLeads}
-                        </Badge>
-                      ))}
-                      {remainingStates > 0 && (
-                        <Badge variant="outline" className="text-[10px] px-2 py-0 bg-slate-50 border-slate-200">
-                          +{remainingStates} more
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* States Table (expanded) */}
-                  {isExpanded && (
-                    <div className="border-t border-slate-100 overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-gradient-to-r from-slate-50 to-slate-100/50 hover:bg-slate-50">
-                            <TableHead className="text-xs font-semibold text-slate-500 uppercase min-w-[140px]">
-                              State
-                            </TableHead>
-                            <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">
-                              Leads
-                            </TableHead>
-                            <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">
-                              PCAT S.
-                            </TableHead>
-                            <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">
-                              PCAT D.
-                            </TableHead>
-                            <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">
-                              Reg. D.
-                            </TableHead>
-                            <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">
-                              Adm. D.
-                            </TableHead>
-                            <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">
-                              Revenue
-                            </TableHead>
-                            <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">
-                              Conv. %
-                            </TableHead>
-                            <TableHead className="text-xs font-semibold text-slate-500 uppercase min-w-[180px]">
-                              Stage Distribution
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {employee.states.map(state => {
-                            const totalStages = Object.values(state.stages).reduce((a, b) => a + b, 0);
-                            return (
-                              <TableRow
-                                key={state.state}
-                                className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors"
-                              >
-                                <TableCell className="text-xs font-medium text-slate-800">
-                                  {state.state}
-                                </TableCell>
-                                <TableCell className="text-xs text-center text-slate-600">
-                                  {state.totalLeads}
-                                </TableCell>
-                                <TableCell className="text-xs text-center text-slate-600">
-                                  {state.pcatScheduled}
-                                </TableCell>
-                                <TableCell className="text-xs text-center text-slate-600">
-                                  {state.pcatDone}
-                                </TableCell>
-                                <TableCell className="text-xs text-center text-slate-600">
-                                  {state.registrationDone}
-                                </TableCell>
-                                <TableCell className="text-xs text-center text-slate-600">
-                                  {state.admissionDone}
-                                </TableCell>
-                                <TableCell className="text-xs text-center font-medium text-emerald-600">
-                                  ₹{state.revenue.toLocaleString()}
-                                </TableCell>
-                                <TableCell className="text-xs text-center">
-                                  <span className={cn(
-                                    "px-2 py-0.5 rounded-full font-medium",
-                                    state.conversionPercentage > 50 ? "bg-emerald-100 text-emerald-700" :
-                                    state.conversionPercentage > 25 ? "bg-amber-100 text-amber-700" :
-                                    "bg-slate-100 text-slate-600"
-                                  )}>
-                                    {state.conversionPercentage}%
+                          <TableCell className="text-sm sticky left-0 bg-white border-r border-slate-100 z-10 py-3 px-4">
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-medium text-slate-800 hover:text-orange-600">
+                                  {employee.employeeName}
+                                </span>
+                                {hasTeam && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleExpand(employee.employeeId, true);
+                                    }}
+                                    disabled={isLoading}
+                                    className={cn(
+                                      "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
+                                      "hover:bg-orange-100 text-orange-500 border border-orange-200",
+                                      isExpanded && "bg-orange-100 border-orange-300",
+                                      isLoading && "opacity-50 cursor-not-allowed"
+                                    )}
+                                  >
+                                    {isLoading ? (
+                                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                    ) : isExpanded ? (
+                                      <Minus className="w-2.5 h-2.5" />
+                                    ) : (
+                                      <Plus className="w-2.5 h-2.5" />
+                                    )}
+                                  </button>
+                                )}
+                                {employee.teamSize && employee.teamSize > 1 && (
+                                  <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                    Team: {employee.teamSize}
                                   </span>
-                                </TableCell>
-                                <TableCell className="text-xs">
-                                  <div className="flex flex-wrap gap-1 max-w-[220px]">
-                                    {Object.entries(state.stages).map(([stage, count]) => {
-                                      const percentage = totalStages > 0 ? Math.round((count / totalStages) * 100) : 0;
-                                      return (
-                                        <Badge
-                                          key={stage}
-                                          variant="outline"
-                                          className="text-[10px] px-1.5 py-0 bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                                        >
-                                          {stage}: {count}
-                                          <span className="text-[8px] text-slate-400 ml-0.5">({percentage}%)</span>
-                                        </Badge>
-                                      );
-                                    })}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </Card>
-              );
-            })}
+                                )}
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-slate-50">
+                                  {employee.employeeCode}
+                                </Badge>
+                              </div>
+                              <span className="text-xs text-slate-400 truncate max-w-[160px]">
+                                {employee.employeeEmail}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-center py-3 px-4 font-medium text-slate-700">
+                            {employee.totalLeads}
+                          </TableCell>
+                          <TableCell className="text-sm text-center py-3 px-4 font-medium text-purple-600">
+                            {employee.totalRegistrationDone}
+                          </TableCell>
+                          <TableCell className="text-sm text-center py-3 px-4 font-medium text-emerald-600">
+                            {employee.totalAdmissionDone}
+                          </TableCell>
+                          <TableCell className="text-sm text-center py-3 px-4">
+                            <span className={cn(
+                              "px-2 py-1 rounded-full font-medium text-[11px]",
+                              employee.registrationConversionPercentage > 20 ? "bg-purple-100 text-purple-700" :
+                              employee.registrationConversionPercentage > 10 ? "bg-indigo-100 text-indigo-700" :
+                              "bg-slate-100 text-slate-600"
+                            )}>
+                              {employee.registrationConversionPercentage || 0}%
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm text-center py-3 px-4">
+                            <span className={cn(
+                              "px-2 py-1 rounded-full font-medium text-[11px]",
+                              employee.conversionPercentage > 15 ? "bg-emerald-100 text-emerald-700" :
+                              employee.conversionPercentage > 8 ? "bg-amber-100 text-amber-700" :
+                              "bg-slate-100 text-slate-600"
+                            )}>
+                              {employee.conversionPercentage || 0}%
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm text-center py-3 px-4 bg-orange-50/30 font-semibold text-orange-600">
+                            ₹{employee.totalRevenue.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-sm text-center py-3 px-4">
+                            <span className="text-sm text-slate-500">{employee.states.length}</span>
+                          </TableCell>
+                        </TableRow>
+
+                        {/* Nested Team Members */}
+                        {isExpanded && employee.children && employee.children.length > 0 && (
+                          <TableRow>
+                            <TableCell colSpan={8} className="p-0 bg-slate-50/30">
+                              <div className="px-4 py-2">
+                                <TeamMemberTable
+                                  teamMembers={employee.children}
+                                  level={1}
+                                  expandedEmployees={expandedEmployees}
+                                  loadingHierarchy={loadingHierarchy}
+                                  toggleExpand={toggleExpand}
+                                  onEmployeeClick={handleEmployeeClick}
+                                />
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+
+                        {/* Show message if expanded but no team members */}
+                        {isExpanded && (!employee.children || employee.children.length === 0) && (
+                          <TableRow>
+                            <TableCell colSpan={8} className="p-0">
+                              <div className="px-4 py-2">
+                                <div className="text-xs text-slate-400 py-2 px-4 bg-slate-50 rounded-lg border border-slate-200">
+                                  No team members found
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           </div>
+
+          {/* Pagination */}
+          {data && data.totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <div className="text-sm text-slate-500">
+                Page {data.page || currentPage} of {data.totalPages}
+                <span className="ml-3">
+                  Total: <span className="font-medium text-slate-700">{data.totalEmployees}</span> employees
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={!data.hasPreviousPage || loading}
+                  className="h-8 w-8 p-0 rounded-lg border-slate-200"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <div className="flex items-center gap-1.5">
+                  {Array.from({ length: Math.min(5, data.totalPages) }, (_, i) => {
+                    let pageNum;
+                    const totalPages = data.totalPages;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage < 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage > totalPages - 3) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    const isActive = pageNum === currentPage;
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                        className={cn(
+                          "w-8 h-8 text-sm font-medium rounded-lg transition-colors",
+                          isActive
+                            ? "bg-orange-500 text-white shadow-sm"
+                            : "text-slate-600 hover:bg-slate-100"
+                        )}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={!data.hasNextPage || loading}
+                  className="h-8 w-8 p-0 rounded-lg border-slate-200"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-100">
@@ -643,6 +1340,17 @@ export function StateWiseEmployeeReport() {
           </div>
         </div>
       )}
+
+      {/* Employee Details Modal */}
+      <EmployeeDetailsModal
+        isOpen={detailsModalOpen}
+        onClose={() => setDetailsModalOpen(false)}
+        employee={selectedEmployee}
+      />
     </div>
   );
 }
+
+// ─── Missing imports ───
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';

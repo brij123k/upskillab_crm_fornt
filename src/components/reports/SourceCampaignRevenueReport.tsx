@@ -581,57 +581,6 @@ export function SourceCampaignRevenueReport() {
 
         {showFilters && (
           <div className="flex flex-wrap items-center gap-3 w-full pt-2">
-            {/* Level Selection */}
-            {levels.length > 0 && (
-              <div className="flex items-center gap-2">
-                <Label className="text-xs font-semibold text-slate-500 uppercase">Level</Label>
-                <div className="flex flex-wrap gap-1">
-                  {levels.map(lvl => {
-                    const num = extractLevelNumber(lvl.name);
-                    const isActive = selectedLevel === num.toString();
-                    return (
-                      <button
-                        key={lvl._id}
-                        onClick={() => setSelectedLevel(num.toString())}
-                        className={cn(
-                          "px-3 py-1 text-xs font-medium rounded-lg border transition-all",
-                          isActive
-                            ? "bg-orange-500 text-white border-orange-500 shadow-sm"
-                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                        )}
-                      >
-                        {lvl.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="w-px h-6 bg-slate-200" />
-
-            {/* Team Checkbox */}
-            <div className="flex items-center gap-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="team-filter-source-campaign"
-                  checked={showTeamOnly}
-                  onCheckedChange={(checked) => {
-                    setShowTeamOnly(checked === true);
-                  }}
-                  className="h-4 w-4 rounded border-slate-300 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
-                />
-                <Label
-                  htmlFor="team-filter-source-campaign"
-                  className="text-xs font-medium text-slate-600 cursor-pointer"
-                >
-                  Team
-                </Label>
-              </div>
-            </div>
-
-            <div className="w-px h-6 bg-slate-200" />
-
             {/* Lead Created Date Filter */}
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5">

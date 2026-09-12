@@ -1,4 +1,4 @@
-// UtilizationReport.tsx - Updated with Proper Date Filters
+// UtilizationReport.tsx - with Hierarchical Team Expansion
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +43,12 @@ import {
   UserCheck,
   UserCog,
   CalendarClock,
+  Plus,
+  Minus,
+  ChevronRight as ChevronRightIcon,
+  ChevronDown as ChevronDownIcon,
+  User,
+  UserPlus,
 } from 'lucide-react';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
@@ -262,6 +268,149 @@ function StageModal({
 }
 
 /* -------------------------------------------------------------------------- */
+/*                          Sub-component: Team Member Table                   */
+/* -------------------------------------------------------------------------- */
+
+interface TeamMemberTableProps {
+  teamMembers: any[];
+  level: number;
+  expandedEmployees: Set<string>;
+  loadingHierarchy: Set<string>;
+  toggleExpand: (employeeId: string, hasTeam: boolean) => void;
+  onEmployeeClick: (emp: any) => void;
+  formatTime: (seconds: number) => string;
+}
+
+function TeamMemberTable({
+  teamMembers,
+  level,
+  expandedEmployees,
+  loadingHierarchy,
+  toggleExpand,
+  onEmployeeClick,
+  formatTime,
+}: TeamMemberTableProps) {
+  return (
+    <div className="mt-2 mb-1">
+      <div className="flex items-center gap-2 mb-2 text-xs font-medium text-orange-600">
+        <UserPlus className="w-3.5 h-3.5" />
+        <span>Team Members ({teamMembers.length})</span>
+      </div>
+      <div className="overflow-x-auto border border-slate-200 rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-orange-50/50 hover:bg-orange-50/50 border-b border-slate-200">
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase sticky left-0 bg-orange-50/50 z-10 min-w-[120px]">
+                Employee
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Desig.</TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Vintage</TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Leads</TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">New</TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Dials</TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Uniq</TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Ans.</TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Talk</TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">PCAT S.</TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">PCAT D.</TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Reg.</TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Ad.</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {teamMembers.map((member: any) => {
+              const hasTeam = member.teamSize && member.teamSize > 1;
+              const isExpanded = expandedEmployees.has(member.employeeId);
+              const isLoading = loadingHierarchy.has(member.employeeId);
+
+              return (
+                <>
+                  <TableRow
+                    key={member.employeeId}
+                    className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
+                  >
+                    <TableCell className="sticky left-0 bg-white border-r z-10 py-2">
+                      <div className="flex flex-col min-w-[110px]">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span 
+                            className="text-xs font-medium text-slate-800 truncate max-w-[80px] cursor-pointer hover:text-orange-600"
+                            onClick={() => onEmployeeClick(member)}
+                          >
+                            {member.employeeName}
+                          </span>
+                          {hasTeam ? (
+                            <button
+                              onClick={() => toggleExpand(member.employeeId, true)}
+                              disabled={isLoading}
+                              className={cn(
+                                "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
+                                "hover:bg-orange-100 text-orange-500 border border-orange-200",
+                                isExpanded && "bg-orange-100 border-orange-300",
+                                isLoading && "opacity-50 cursor-not-allowed"
+                              )}
+                            >
+                              {isLoading ? (
+                                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              ) : isExpanded ? (
+                                <Minus className="w-2.5 h-2.5" />
+                              ) : (
+                                <Plus className="w-2.5 h-2.5" />
+                              )}
+                            </button>
+                          ):(<></>)}
+                          {member.teamSize && member.teamSize > 1? (
+                            <span className="text-[7px] bg-orange-100 text-orange-700 px-1 py-0.5 rounded-full whitespace-nowrap">
+                              Team: {member.teamSize}
+                            </span>
+                          ):(<></>)}
+                        </div>
+                        <span className="text-[8px] text-slate-400 truncate max-w-[90px]">
+                          {member.employeeEmail}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.designation || '-'}</TableCell>
+                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.vintage || '-'}</TableCell>
+                    <TableCell className="text-[10px] text-center font-medium py-2 text-slate-800">{member.leadAssigned || 0}</TableCell>
+                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.newLead || 0}</TableCell>
+                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.totalDial || 0}</TableCell>
+                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.uniqDial || 0}</TableCell>
+                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.answeredCall || 0}</TableCell>
+                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{formatTime(member.answeredTalkTime)}</TableCell>
+                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.pcatScheduled || 0}</TableCell>
+                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.pcatDone || 0}</TableCell>
+                    <TableCell className="text-[10px] text-center font-medium py-2 text-slate-800">{member.registrationDone || 0}</TableCell>
+                    <TableCell className="text-[10px] text-center font-medium py-2 text-slate-800">{member.admissionDone || 0}</TableCell>
+                  </TableRow>
+                  {/* Nested team members */}
+                  {isExpanded && member.children && member.children.length > 0 && (
+                    <TableRow>
+                      <TableCell colSpan={13} className="p-0">
+                        <div className="ml-6 pl-4 border-l-2 border-orange-200">
+                          <TeamMemberTable
+                            teamMembers={member.children}
+                            level={level + 1}
+                            expandedEmployees={expandedEmployees}
+                            loadingHierarchy={loadingHierarchy}
+                            toggleExpand={toggleExpand}
+                            onEmployeeClick={onEmployeeClick}
+                            formatTime={formatTime}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /*                            Main Report Component                           */
 /* -------------------------------------------------------------------------- */
 const dateFilterOptions = [
@@ -304,6 +453,11 @@ export function UtilizationReport() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(0);
+
+  // ─── Hierarchical State ──────────────────────────────────────────────────
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
+  const [hierarchicalData, setHierarchicalData] = useState<any[]>([]);
+  const [loadingHierarchy, setLoadingHierarchy] = useState<Set<string>>(new Set());
 
   // Modals
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
@@ -359,6 +513,15 @@ export function UtilizationReport() {
     return true;
   };
 
+  // ─── Build Hierarchy ──────────────────────────────────────────────────────
+  const buildHierarchy = useCallback((employees: any[]): any[] => {
+    return employees.map((emp: any) => ({
+      ...emp,
+      children: [],
+      level: 0,
+    }));
+  }, []);
+
   // ─── Fetch report data ───
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -385,10 +548,10 @@ export function UtilizationReport() {
           }
           params.assignedDateFrom = assignedFromDate;
           params.assignedDateTo = assignedToDate;
-        } else  if (assignedDateFilter !== 'none') {
-        params.assignedDateFilter = assignedDateFilter;
-      }
+        } else if (assignedDateFilter !== 'none') {
+          params.assignedDateFilter = assignedDateFilter;
         }
+      }
 
       // Created Date Filter - only send if not empty
       if (createdDateFilter && createdDateFilter !== '') {
@@ -403,7 +566,7 @@ export function UtilizationReport() {
           }
           params.createdDateFrom = createdFromDate;
           params.createdDateTo = createdToDate;
-        } else if (createdDateFilter !== 'none')  {
+        } else if (createdDateFilter !== 'none') {
           params.createdDateFilter = createdDateFilter;
         }
       }
@@ -418,19 +581,164 @@ export function UtilizationReport() {
         null,
         true
       );
-      setData(response?.data || response || null);
+      const result = response?.data || response || null;
+      setData(result);
+      
+      const employees = result?.employees || [];
+      const hierarchy = buildHierarchy(employees);
+      setHierarchicalData(hierarchy);
+      setExpandedEmployees(new Set());
     } catch (error: any) {
       toast({ title: 'Error', description: error?.message || 'Failed to load utilization', variant: 'destructive' });
       setData(null);
+      setHierarchicalData([]);
     } finally {
       setLoading(false);
       setCurrentPage(0);
     }
-  }, [selectedLevel, showTeamOnly, assignedDateFilter, assignedFromDate, assignedToDate, createdDateFilter, createdFromDate, createdToDate, selectedUserId]);
+  }, [selectedLevel, showTeamOnly, assignedDateFilter, assignedFromDate, assignedToDate, createdDateFilter, createdFromDate, createdToDate, selectedUserId, buildHierarchy]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // ─── Fetch Team Hierarchy ──────────────────────────────────────────────
+  const fetchTeamHierarchy = useCallback(async (employeeId: string) => {
+    if (loadingHierarchy.has(employeeId)) return;
+
+    setLoadingHierarchy(prev => new Set(prev).add(employeeId));
+    
+    try {
+      const params: any = {
+        employeeId: employeeId,
+        level: parseInt(selectedLevel) || 1,
+      };
+
+      if (showTeamOnly) {
+        params.team = true;
+      }
+
+      // Assigned Date Filter
+      if (assignedDateFilter && assignedDateFilter !== '') {
+        if (assignedDateFilter === 'custom') {
+          if (assignedFromDate && assignedToDate) {
+            params.assignedDateFrom = assignedFromDate;
+            params.assignedDateTo = assignedToDate;
+          }
+        } else if (assignedDateFilter !== 'none') {
+          params.assignedDateFilter = assignedDateFilter;
+        }
+      }
+
+      // Created Date Filter
+      if (createdDateFilter && createdDateFilter !== '') {
+        if (createdDateFilter === 'custom') {
+          if (createdFromDate && createdToDate) {
+            params.createdDateFrom = createdFromDate;
+            params.createdDateTo = createdToDate;
+          }
+        } else if (createdDateFilter !== 'none') {
+          params.createdDateFilter = createdDateFilter;
+        }
+      }
+
+      if (selectedUserId && selectedUserId !== 'all') {
+        params.userId = selectedUserId;
+      }
+
+      const response = await getDataHandlerWithToken(
+        ApiConfig.employeePoolUtilizationReportTeam,
+        params,
+        null,
+        true
+      );
+
+      const result = response?.data || response;
+      const teamData = result?.employees || [];
+
+      if (teamData.length > 0) {
+        const updateHierarchy = (nodes: any[]): any[] => {
+          return nodes.map((node: any) => {
+            if (node.employeeId === employeeId) {
+              const teamMembers = teamData.map((member: any) => ({
+                ...member,
+                level: (node.level || 0) + 1,
+                parentId: employeeId,
+                isTeamMember: true,
+                children: [],
+              }));
+              return {
+                ...node,
+                children: teamMembers,
+              };
+            }
+            if (node.children && node.children.length > 0) {
+              return {
+                ...node,
+                children: updateHierarchy(node.children),
+              };
+            }
+            return node;
+          });
+        };
+
+        setHierarchicalData(prev => updateHierarchy(prev));
+        setExpandedEmployees(prev => new Set(prev).add(employeeId));
+      } else {
+        const updateHierarchy = (nodes: any[]): any[] => {
+          return nodes.map((node: any) => {
+            if (node.employeeId === employeeId) {
+              return { ...node, children: [] };
+            }
+            if (node.children && node.children.length > 0) {
+              return { ...node, children: updateHierarchy(node.children) };
+            }
+            return node;
+          });
+        };
+        setHierarchicalData(prev => updateHierarchy(prev));
+        setExpandedEmployees(prev => new Set(prev).add(employeeId));
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to load team hierarchy',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingHierarchy(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(employeeId);
+        return newSet;
+      });
+    }
+  }, [selectedLevel, showTeamOnly, assignedDateFilter, assignedFromDate, assignedToDate, createdDateFilter, createdFromDate, createdToDate, selectedUserId, loadingHierarchy]);
+
+  // ─── Toggle Expand ──────────────────────────────────────────────────────
+  const toggleExpand = useCallback(async (employeeId: string, hasTeam: boolean) => {
+    if (expandedEmployees.has(employeeId)) {
+      setExpandedEmployees(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(employeeId);
+        return newSet;
+      });
+      
+      const removeChildren = (nodes: any[]): any[] => {
+        return nodes.map((node: any) => {
+          if (node.employeeId === employeeId) {
+            return { ...node, children: [] };
+          }
+          if (node.children && node.children.length > 0) {
+            return { ...node, children: removeChildren(node.children) };
+          }
+          return node;
+        });
+      };
+      setHierarchicalData(prev => removeChildren(prev));
+    } else if (hasTeam) {
+      await fetchTeamHierarchy(employeeId);
+    }
+  }, [expandedEmployees, fetchTeamHierarchy]);
 
   // ─── Reset pagination when filters change ───
   useEffect(() => {
@@ -499,31 +807,24 @@ export function UtilizationReport() {
       }
 
       // ─── Assigned Date Parameters ───
-      // If assigned date filter is 'custom' and has valid dates, send assignedStartDate & assignedEndDate
       if (assignedDateFilter === 'custom' && assignedFromDate && assignedToDate) {
         params.assignedStartDate = assignedFromDate;
         params.assignedEndDate = assignedToDate;
-      } 
-      // If assigned date filter is a preset (today, week, month), send assignedDateFilter
-      else if (assignedDateFilter && assignedDateFilter !== 'none' && assignedDateFilter !== 'custom') {
+      } else if (assignedDateFilter && assignedDateFilter !== 'none' && assignedDateFilter !== 'custom') {
         params.assignedDateFilter = assignedDateFilter;
       }
 
       // ─── Created Date Parameters ───
-      // If created date filter is 'custom' and has valid dates, send createdStartDate & createdEndDate
       if (createdDateFilter === 'custom' && createdFromDate && createdToDate) {
         params.createdStartDate = createdFromDate;
         params.createdEndDate = createdToDate;
-      } 
-      // If created date filter is a preset (today, week, month), send createdDateFilter
-      else if (createdDateFilter && createdDateFilter !== 'none' && createdDateFilter !== 'custom') {
+      } else if (createdDateFilter && createdDateFilter !== 'none' && createdDateFilter !== 'custom') {
         params.createdDateFilter = createdDateFilter;
       }
 
       // ─── Fallback: If no date filters are set, use the data's date range ───
       if (!assignedDateFilter && !createdDateFilter) {
         if (data?.startDate && data?.endDate) {
-          // If data has startDate/endDate, use them as assigned dates (backward compatibility)
           params.assignedStartDate = data.startDate;
           params.assignedEndDate = data.endDate;
         }
@@ -554,17 +855,44 @@ export function UtilizationReport() {
     if (selectedStageId) fetchLeadsForStage(selectedStageId, selectedStage, newPage);
   };
 
-  // ─── Derived data & pagination ───
-  const filteredEmployees = data?.employees?.filter((emp: any) =>
-    searchTerm ? emp.employeeName?.toLowerCase().includes(searchTerm.toLowerCase()) : true
-  ) || [];
+  // ─── Handle Employee Click ───
+  const handleEmployeeClick = (emp: any) => {
+    setSelectedEmployee(emp);
+    setIsModalOpen(true);
+  };
 
-  const totalPages = Math.ceil(filteredEmployees.length / EMPLOYEES_PER_PAGE);
-  const paginatedEmployees = filteredEmployees.slice(
+  // ─── Flatten hierarchy for filtering ───
+  const flattenHierarchy = useCallback((nodes: any[]): any[] => {
+    let result: any[] = [];
+    nodes.forEach((node: any) => {
+      result.push({ ...node, level: node.level || 0 });
+      if (node.children && node.children.length > 0) {
+        result = result.concat(flattenHierarchy(node.children));
+      }
+    });
+    return result;
+  }, []);
+
+  // ─── Derived data & pagination ───
+  const flattenedData = flattenHierarchy(hierarchicalData);
+  
+  const filteredEmployees = flattenedData.filter((emp: any) =>
+    searchTerm ? emp.employeeName?.toLowerCase().includes(searchTerm.toLowerCase()) : true
+  );
+
+  // For pagination, use top-level employees only
+  const topLevelEmployees = hierarchicalData;
+  const filteredTopLevel = topLevelEmployees.filter((emp: any) =>
+    searchTerm ? emp.employeeName?.toLowerCase().includes(searchTerm.toLowerCase()) : true
+  );
+
+  const totalPages = Math.ceil(filteredTopLevel.length / EMPLOYEES_PER_PAGE);
+  const paginatedTopLevel = filteredTopLevel.slice(
     currentPage * EMPLOYEES_PER_PAGE,
     (currentPage + 1) * EMPLOYEES_PER_PAGE
   );
 
+  // Calculate totals from flattened data
   const totals = filteredEmployees.reduce(
     (acc: any, e: any) => ({
       leadAssigned: acc.leadAssigned + (e.leadAssigned || 0),
@@ -611,7 +939,7 @@ export function UtilizationReport() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-base font-semibold text-slate-800">Utilization</h3>
+          <h3 className="text-base font-semibold text-slate-800">Employee Efforts</h3>
           <p className="text-sm text-slate-500">Employee call & activity metrics</p>
         </div>
         <div className="flex gap-2">
@@ -876,7 +1204,7 @@ export function UtilizationReport() {
         <div className="space-y-4">
           {/* Summary row */}
           <div className="flex items-center gap-4 text-sm text-slate-500">
-            <span className="font-medium text-slate-700">{filteredEmployees.length} employees</span>
+            <span className="font-medium text-slate-700">{filteredTopLevel.length} employees</span>
             {data.startDate && data.endDate && (
               <>
                 <span className="w-1 h-1 rounded-full bg-slate-300" />
@@ -917,33 +1245,105 @@ export function UtilizationReport() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedEmployees.map((emp: any, idx: number) => (
-                  <TableRow
-                    key={emp.employeeId || idx}
-                    className="hover:bg-slate-50/60 cursor-pointer transition-colors border-b border-slate-50"
-                    onClick={() => { setSelectedEmployee(emp); setIsModalOpen(true); }}
-                  >
-                    <TableCell className="text-xs sticky left-0 bg-white border-r z-10 py-3">
-                      <div className="font-medium text-slate-800">{emp.employeeName}</div>
-                      <div className="text-[10px] text-slate-400">{emp.employeeEmail}</div>
-                      {emp.teamSize && emp.teamSize > 1 && (
-                        <div className="text-[9px] text-orange-500 mt-0.5">Team: {emp.teamSize}</div>
+                {paginatedTopLevel.map((emp: any, idx: number) => {
+                  const isExpanded = expandedEmployees.has(emp.employeeId);
+                  const hasTeam = emp.teamSize && emp.teamSize > 1;
+                  const isLoading = loadingHierarchy.has(emp.employeeId);
+
+                  return (
+                    <>
+                      <TableRow
+                        key={emp.employeeId || idx}
+                        className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors"
+                      >
+                        <TableCell className="text-xs sticky left-0 bg-white border-r z-10 py-3">
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span 
+                                className="font-medium text-slate-800 cursor-pointer hover:text-orange-600"
+                                onClick={() => handleEmployeeClick(emp)}
+                              >
+                                {emp.employeeName}
+                              </span>
+                              {hasTeam && (
+                                <button
+                                  onClick={() => toggleExpand(emp.employeeId, true)}
+                                  disabled={isLoading}
+                                  className={cn(
+                                    "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
+                                    "hover:bg-orange-100 text-orange-500 border border-orange-200",
+                                    isExpanded && "bg-orange-100 border-orange-300",
+                                    isLoading && "opacity-50 cursor-not-allowed"
+                                  )}
+                                >
+                                  {isLoading ? (
+                                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                  ) : isExpanded ? (
+                                    <Minus className="w-2.5 h-2.5" />
+                                  ) : (
+                                    <Plus className="w-2.5 h-2.5" />
+                                  )}
+                                </button>
+                              )}
+                              {emp.teamSize && emp.teamSize > 1 && (
+                                <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                  Team: {emp.teamSize}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-400 truncate max-w-[110px]">
+                              {emp.employeeEmail}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-center py-3 text-slate-600">{emp.designation || '-'}</TableCell>
+                        <TableCell className="text-xs text-center py-3 text-slate-600">{emp.vintage || '-'}</TableCell>
+                        <TableCell className="text-xs text-center font-medium py-3 text-slate-800">{emp.leadAssigned || 0}</TableCell>
+                        <TableCell className="text-xs text-center py-3 text-slate-600">{emp.newLead || 0}</TableCell>
+                        <TableCell className="text-xs text-center py-3 text-slate-600">{emp.totalDial || 0}</TableCell>
+                        <TableCell className="text-xs text-center py-3 text-slate-600">{emp.uniqDial || 0}</TableCell>
+                        <TableCell className="text-xs text-center py-3 text-slate-600">{emp.answeredCall || 0}</TableCell>
+                        <TableCell className="text-xs text-center py-3 text-slate-600">{formatTime(emp.answeredTalkTime)}</TableCell>
+                        <TableCell className="text-xs text-center py-3 text-slate-600">{emp.pcatScheduled || 0}</TableCell>
+                        <TableCell className="text-xs text-center py-3 text-slate-600">{emp.pcatDone || 0}</TableCell>
+                        <TableCell className="text-xs text-center font-medium py-3 text-slate-800">{emp.registrationDone || 0}</TableCell>
+                        <TableCell className="text-xs text-center font-medium py-3 text-slate-800">{emp.admissionDone || 0}</TableCell>
+                      </TableRow>
+
+                      {/* Nested Team Members */}
+                      {isExpanded && emp.children && emp.children.length > 0 && (
+                        <TableRow>
+                          <TableCell colSpan={13} className="p-0 bg-slate-50/30">
+                            <div className="px-4 py-2">
+                              <TeamMemberTable
+                                teamMembers={emp.children}
+                                level={1}
+                                expandedEmployees={expandedEmployees}
+                                loadingHierarchy={loadingHierarchy}
+                                toggleExpand={toggleExpand}
+                                onEmployeeClick={handleEmployeeClick}
+                                formatTime={formatTime}
+                              />
+                            </div>
+                          </TableCell>
+                        </TableRow>
                       )}
-                    </TableCell>
-                    <TableCell className="text-xs text-center py-3 text-slate-600">{emp.designation || '-'}</TableCell>
-                    <TableCell className="text-xs text-center py-3 text-slate-600">{emp.vintage || '-'}</TableCell>
-                    <TableCell className="text-xs text-center font-medium py-3 text-slate-800">{emp.leadAssigned || 0}</TableCell>
-                    <TableCell className="text-xs text-center py-3 text-slate-600">{emp.newLead || 0}</TableCell>
-                    <TableCell className="text-xs text-center py-3 text-slate-600">{emp.totalDial || 0}</TableCell>
-                    <TableCell className="text-xs text-center py-3 text-slate-600">{emp.uniqDial || 0}</TableCell>
-                    <TableCell className="text-xs text-center py-3 text-slate-600">{emp.answeredCall || 0}</TableCell>
-                    <TableCell className="text-xs text-center py-3 text-slate-600">{formatTime(emp.answeredTalkTime)}</TableCell>
-                    <TableCell className="text-xs text-center py-3 text-slate-600">{emp.pcatScheduled || 0}</TableCell>
-                    <TableCell className="text-xs text-center py-3 text-slate-600">{emp.pcatDone || 0}</TableCell>
-                    <TableCell className="text-xs text-center font-medium py-3 text-slate-800">{emp.registrationDone || 0}</TableCell>
-                    <TableCell className="text-xs text-center font-medium py-3 text-slate-800">{emp.admissionDone || 0}</TableCell>
-                  </TableRow>
-                ))}
+
+                      {/* Show message if expanded but no team members */}
+                      {isExpanded && (!emp.children || emp.children.length === 0) && (
+                        <TableRow>
+                          <TableCell colSpan={13} className="p-0">
+                            <div className="px-4 py-2">
+                              <div className="text-xs text-slate-400 py-2 px-4 bg-slate-50 rounded-lg border border-slate-200">
+                                No team members found
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
+                  );
+                })}
 
                 {/* Totals Row */}
                 <TableRow className="bg-slate-50 font-semibold border-t-2 border-slate-200">

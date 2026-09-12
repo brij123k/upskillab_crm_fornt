@@ -42,6 +42,9 @@ import {
   ChevronRight,
   CalendarClock,
   UserCog,
+  Plus,
+  Minus,
+  UserPlus,
 } from 'lucide-react';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
@@ -94,6 +97,12 @@ interface ConsultantPerformance {
   admDone: number;
   bookedRevenue: number;
   realisedRevenue: number;
+  teamSize?: number;
+  team?: boolean;
+  children?: ConsultantPerformance[];
+  level?: number;
+  parentId?: string | null;
+  isTeamMember?: boolean;
   [key: string]: any;
 }
 
@@ -157,6 +166,173 @@ const dateFilterOptions = [
 ];
 
 /* -------------------------------------------------------------------------- */
+/*                          Sub-component: Team Member Table                   */
+/* -------------------------------------------------------------------------- */
+
+interface TeamMemberTableProps {
+  teamMembers: ConsultantPerformance[];
+  level: number;
+  expandedEmployees: Set<string>;
+  loadingHierarchy: Set<string>;
+  toggleExpand: (consultantId: string, hasTeam: boolean) => void;
+  onMetricClick: (consultant: ConsultantPerformance, type: string) => void;
+}
+
+function TeamMemberTable({
+  teamMembers,
+  level,
+  expandedEmployees,
+  loadingHierarchy,
+  toggleExpand,
+  onMetricClick,
+}: TeamMemberTableProps) {
+  return (
+    <div className="mt-2 mb-1">
+      <div className="flex items-center gap-2 mb-2 text-xs font-medium text-orange-600">
+        <UserPlus className="w-3.5 h-3.5" />
+        <span>Team Members ({teamMembers.length})</span>
+      </div>
+      <div className="overflow-x-auto border border-slate-200 rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-orange-50/50 hover:bg-orange-50/50 border-b border-slate-200">
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase sticky left-0 bg-orange-50/50 z-10 min-w-[180px] py-2">
+                Employee
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[100px] py-2">
+                Leads Assigned
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[100px] py-2">
+                Admissions
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[120px] py-2 bg-orange-50/50">
+                Realised Revenue
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {teamMembers.map((member) => {
+              const hasTeam = member.teamSize && member.teamSize > 1;
+              const isExpanded = expandedEmployees.has(member._id || member.consultantId || '');
+              const isLoading = loadingHierarchy.has(member._id || member.consultantId || '');
+              const consultantId = member._id || member.consultantId || '';
+
+              return (
+                <>
+                  <TableRow
+                    key={consultantId}
+                    className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
+                  >
+                    <TableCell className="sticky left-0 bg-white border-r z-10 py-2">
+                      <div className="flex flex-col min-w-[150px]">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-medium text-slate-800 truncate max-w-[120px]">
+                            {member.consultantName}
+                          </span>
+                          {hasTeam? (
+                            <button
+                              onClick={() => toggleExpand(consultantId, true)}
+                              disabled={isLoading}
+                              className={cn(
+                                "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
+                                "hover:bg-orange-100 text-orange-500 border border-orange-200",
+                                isExpanded && "bg-orange-100 border-orange-300",
+                                isLoading && "opacity-50 cursor-not-allowed"
+                              )}
+                            >
+                              {isLoading ? (
+                                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              ) : isExpanded ? (
+                                <Minus className="w-2.5 h-2.5" />
+                              ) : (
+                                <Plus className="w-2.5 h-2.5" />
+                              )}
+                            </button>
+                          ):(<></>)}
+                          {member.teamSize && member.teamSize > 1? (
+                            <span className="text-[7px] bg-orange-100 text-orange-700 px-1 py-0.5 rounded-full whitespace-nowrap">
+                              Team: {member.teamSize}
+                            </span>
+                          ):(<></>)}
+                        </div>
+                        {member.consultantEmail && (
+                          <span className="text-[8px] text-slate-400 truncate max-w-[130px]">
+                            {member.consultantEmail}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center py-2">
+                      <button
+                        onClick={() => onMetricClick(member, 'assigned-leads')}
+                        disabled={!member.totalLeadAssigned}
+                        className={cn(
+                          "text-xs font-medium transition-all hover:scale-105 px-2 py-1 rounded-lg",
+                          member.totalLeadAssigned > 0
+                            ? "text-blue-600 hover:bg-blue-50 cursor-pointer"
+                            : "text-slate-400 cursor-not-allowed"
+                        )}
+                      >
+                        {member.totalLeadAssigned || 0}
+                      </button>
+                    </TableCell>
+                    <TableCell className="text-center py-2">
+                      <button
+                        onClick={() => onMetricClick(member, 'admission-leads')}
+                        disabled={!member.admDone}
+                        className={cn(
+                          "text-xs font-medium transition-all hover:scale-105 px-2 py-1 rounded-lg",
+                          member.admDone > 0
+                            ? "text-emerald-600 hover:bg-emerald-50 cursor-pointer"
+                            : "text-slate-400 cursor-not-allowed"
+                        )}
+                      >
+                        {member.admDone || 0}
+                      </button>
+                    </TableCell>
+                    <TableCell className="text-center py-2 bg-orange-50/30">
+                      <button
+                        onClick={() => onMetricClick(member, 'orders')}
+                        disabled={!member.realisedRevenue}
+                        className={cn(
+                          "text-xs font-medium transition-all hover:scale-105 px-2 py-1 rounded-lg",
+                          member.realisedRevenue > 0
+                            ? "text-orange-600 hover:bg-orange-50 cursor-pointer"
+                            : "text-slate-400 cursor-not-allowed"
+                        )}
+                      >
+                        {formatCurrency(member.realisedRevenue || 0)}
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                  {/* Nested team members */}
+                  {isExpanded && member.children && member.children.length > 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="p-0">
+                        <div className="ml-6 pl-4 border-l-2 border-orange-200">
+                          <TeamMemberTable
+                            teamMembers={member.children}
+                            level={level + 1}
+                            expandedEmployees={expandedEmployees}
+                            loadingHierarchy={loadingHierarchy}
+                            toggleExpand={toggleExpand}
+                            onMetricClick={onMetricClick}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /*                             Main Report Component                          */
 /* -------------------------------------------------------------------------- */
 export function ConsultantPerformanceReport() {
@@ -190,6 +366,11 @@ export function ConsultantPerformanceReport() {
 
   // Search (consultant name)
   const [searchTerm, setSearchTerm] = useState('');
+
+  // ─── Hierarchical State ──────────────────────────────────────────────────
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
+  const [hierarchicalData, setHierarchicalData] = useState<ConsultantPerformance[]>([]);
+  const [loadingHierarchy, setLoadingHierarchy] = useState<Set<string>>(new Set());
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -253,6 +434,15 @@ export function ConsultantPerformanceReport() {
   const isDateFilterActive = (filterValue: string) => {
     return filterValue && filterValue !== 'none' && filterValue !== '';
   };
+
+  // ─── Build Hierarchy ──────────────────────────────────────────────────────
+  const buildHierarchy = useCallback((consultants: ConsultantPerformance[]): ConsultantPerformance[] => {
+    return consultants.map(c => ({
+      ...c,
+      children: [],
+      level: 0,
+    }));
+  }, []);
 
   // ─── Fetch consultant data ───
   const fetchData = useCallback(async () => {
@@ -332,10 +522,16 @@ export function ConsultantPerformanceReport() {
         true
       );
       const consultants = response?.data || response || [];
-      setData(Array.isArray(consultants) ? consultants : []);
+      const consultantArray = Array.isArray(consultants) ? consultants : [];
+      setData(consultantArray);
+      
+      const hierarchy = buildHierarchy(consultantArray);
+      setHierarchicalData(hierarchy);
+      setExpandedEmployees(new Set());
     } catch (error: any) {
       toast({ title: 'Error', description: error?.message || 'Failed to load consultant performance', variant: 'destructive' });
       setData(null);
+      setHierarchicalData([]);
     } finally {
       setLoading(false);
     }
@@ -352,11 +548,159 @@ export function ConsultantPerformanceReport() {
     orderCreatedFromDate,
     orderCreatedToDate,
     selectedUserId,
+    buildHierarchy,
   ]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // ─── Fetch Team Hierarchy ──────────────────────────────────────────────
+  const fetchTeamHierarchy = useCallback(async (consultantId: string) => {
+    if (loadingHierarchy.has(consultantId)) return;
+
+    setLoadingHierarchy(prev => new Set(prev).add(consultantId));
+    
+    try {
+      const params: any = {
+        employeeId: consultantId,
+        level: parseInt(selectedLevel) || 1,
+      };
+
+      if (showTeamOnly) {
+        params.team = true;
+      }
+
+      // Lead Created Date Filter
+      if (isDateFilterActive(leadCreatedDateFilter)) {
+        if (leadCreatedDateFilter === 'custom') {
+          if (leadCreatedFromDate) params.leadCreatedDateFrom = leadCreatedFromDate;
+          if (leadCreatedToDate) params.leadCreatedDateTo = leadCreatedToDate;
+        } else {
+          params.leadCreatedDateFilter = leadCreatedDateFilter;
+        }
+      }
+
+      // Lead Assigned Date Filter
+      if (isDateFilterActive(leadAssignedDateFilter)) {
+        if (leadAssignedDateFilter === 'custom') {
+          if (leadAssignedFromDate) params.leadAssignedDateFrom = leadAssignedFromDate;
+          if (leadAssignedToDate) params.leadAssignedDateTo = leadAssignedToDate;
+        } else {
+          params.leadAssignedDateFilter = leadAssignedDateFilter;
+        }
+      }
+
+      // Order Created Date Filter
+      if (isDateFilterActive(orderCreatedDateFilter)) {
+        if (orderCreatedDateFilter === 'custom') {
+          if (orderCreatedFromDate) params.orderCreatedDateFrom = orderCreatedFromDate;
+          if (orderCreatedToDate) params.orderCreatedDateTo = orderCreatedToDate;
+        } else {
+          params.orderCreatedDateFilter = orderCreatedDateFilter;
+        }
+      }
+
+      if (selectedUserId && selectedUserId !== 'all') {
+        params.counsellorId = selectedUserId;
+      }
+
+      const response = await getDataHandlerWithToken(
+        ApiConfig.consultantPerformentTeam,
+        params,
+        null,
+        true
+      );
+
+      const result = response?.data || response;
+      const teamData = result?.employees || [];
+
+      if (teamData.length > 0) {
+        const updateHierarchy = (nodes: ConsultantPerformance[]): ConsultantPerformance[] => {
+          return nodes.map((node: ConsultantPerformance) => {
+            const nodeId = node._id || node.consultantId || '';
+            if (nodeId === consultantId) {
+              const teamMembers = teamData.map((member: any) => ({
+                ...member,
+                level: (node.level || 0) + 1,
+                parentId: consultantId,
+                isTeamMember: true,
+                children: [],
+              }));
+              return {
+                ...node,
+                children: teamMembers,
+              };
+            }
+            if (node.children && node.children.length > 0) {
+              return {
+                ...node,
+                children: updateHierarchy(node.children),
+              };
+            }
+            return node;
+          });
+        };
+
+        setHierarchicalData(prev => updateHierarchy(prev));
+        setExpandedEmployees(prev => new Set(prev).add(consultantId));
+      } else {
+        const updateHierarchy = (nodes: ConsultantPerformance[]): ConsultantPerformance[] => {
+          return nodes.map((node: ConsultantPerformance) => {
+            const nodeId = node._id || node.consultantId || '';
+            if (nodeId === consultantId) {
+              return { ...node, children: [] };
+            }
+            if (node.children && node.children.length > 0) {
+              return { ...node, children: updateHierarchy(node.children) };
+            }
+            return node;
+          });
+        };
+        setHierarchicalData(prev => updateHierarchy(prev));
+        setExpandedEmployees(prev => new Set(prev).add(consultantId));
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to load team hierarchy',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingHierarchy(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(consultantId);
+        return newSet;
+      });
+    }
+  }, [selectedLevel, showTeamOnly, leadCreatedDateFilter, leadCreatedFromDate, leadCreatedToDate, leadAssignedDateFilter, leadAssignedFromDate, leadAssignedToDate, orderCreatedDateFilter, orderCreatedFromDate, orderCreatedToDate, selectedUserId, loadingHierarchy]);
+
+  // ─── Toggle Expand ──────────────────────────────────────────────────────
+  const toggleExpand = useCallback(async (consultantId: string, hasTeam: boolean) => {
+    if (expandedEmployees.has(consultantId)) {
+      setExpandedEmployees(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(consultantId);
+        return newSet;
+      });
+      
+      const removeChildren = (nodes: ConsultantPerformance[]): ConsultantPerformance[] => {
+        return nodes.map((node: ConsultantPerformance) => {
+          const nodeId = node._id || node.consultantId || '';
+          if (nodeId === consultantId) {
+            return { ...node, children: [] };
+          }
+          if (node.children && node.children.length > 0) {
+            return { ...node, children: removeChildren(node.children) };
+          }
+          return node;
+        });
+      };
+      setHierarchicalData(prev => removeChildren(prev));
+    } else if (hasTeam) {
+      await fetchTeamHierarchy(consultantId);
+    }
+  }, [expandedEmployees, fetchTeamHierarchy]);
 
   // ─── Fetch detail data for modal ───
   const fetchDetailData = async (consultantId: string, consultantName: string, type: string, title: string) => {
@@ -429,7 +773,7 @@ export function ConsultantPerformanceReport() {
   const handleMetricClick = (consultant: ConsultantPerformance, type: string) => {
     const consultantId = consultant._id || consultant.consultantId;
     if (!consultantId) {
-      toast({ title: 'Error', description: 'Consultant ID not found' });
+      toast({ title: 'Error', description: 'Employee ID not found' });
       return;
     }
 
@@ -467,7 +811,7 @@ export function ConsultantPerformanceReport() {
       toast({ title: 'No data to export' });
       return;
     }
-    const headers = ['Consultant', 'Leads Assigned', 'Admissions', 'Booked Revenue', 'Realised Revenue'];
+    const headers = ['Employee', 'Leads Assigned', 'Admissions', 'Realised Revenue'];
     const rows = data.map(c => [
       c.consultantName || '',
       c.totalLeadAssigned || 0,
@@ -486,10 +830,30 @@ export function ConsultantPerformanceReport() {
     toast({ title: 'Exported!' });
   };
 
+  // ─── Flatten hierarchy for filtering ───
+  const flattenHierarchy = useCallback((nodes: ConsultantPerformance[]): ConsultantPerformance[] => {
+    let result: ConsultantPerformance[] = [];
+    nodes.forEach((node: ConsultantPerformance) => {
+      result.push({ ...node, level: node.level || 0 });
+      if (node.children && node.children.length > 0) {
+        result = result.concat(flattenHierarchy(node.children));
+      }
+    });
+    return result;
+  }, []);
+
   // ─── Client‑side search ───
-  const filteredConsultants = data?.filter(c =>
+  const flattenedData = flattenHierarchy(hierarchicalData);
+  
+  const filteredConsultants = flattenedData.filter(c =>
     searchTerm ? c.consultantName?.toLowerCase().includes(searchTerm.toLowerCase()) : true
-  ) || [];
+  );
+
+  // For pagination, use top-level only
+  const topLevelConsultants = hierarchicalData;
+  const filteredTopLevel = topLevelConsultants.filter(c =>
+    searchTerm ? c.consultantName?.toLowerCase().includes(searchTerm.toLowerCase()) : true
+  );
 
   const totalRevenue = filteredConsultants.reduce((sum, c) => sum + (c.bookedRevenue || 0), 0);
   const totalLeads = filteredConsultants.reduce((sum, c) => sum + (c.totalLeadAssigned || 0), 0);
@@ -963,16 +1327,6 @@ export function ConsultantPerformanceReport() {
         </div>
       )}
 
-      {/* Team Mode Banner */}
-      {isTeamMode && !loading && data && data.length > 0 && (
-        <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-4 py-2">
-          <UserCog className="w-4 h-4 text-orange-600" />
-          <span className="text-sm text-orange-800">
-            <span className="font-semibold">Team Report:</span> Showing combined team data from the backend
-          </span>
-        </div>
-      )}
-
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
@@ -1037,83 +1391,173 @@ export function ConsultantPerformanceReport() {
             )}
           </div>
 
-          {/* Consultant Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredConsultants.map((consultant, idx) => {
-              const hasLeads = (consultant.totalLeadAssigned || 0) > 0;
-              const hasAdmissions = (consultant.admDone || 0) > 0;
-              const hasRevenue = (consultant.realisedRevenue || 0) > 0;
+          {/* Table View */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50/80 border-b border-slate-200">
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50/80 z-10 min-w-[200px] py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        <Award className="w-3.5 h-3.5" />
+                        Employee
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[130px] py-3 px-4">
+                      Leads Assigned
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[130px] py-3 px-4">
+                      Admissions
+                    </TableHead>
+                   
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[150px] py-3 px-4 bg-orange-50/50">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <TrendingUp className="w-3.5 h-3.5 text-orange-500" />
+                        <span className="text-orange-700">Realised Revenue</span>
+                      </div>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTopLevel.map((consultant, idx) => {
+                    const consultantId = consultant._id || consultant.consultantId || '';
+                    const isExpanded = expandedEmployees.has(consultantId);
+                    const hasTeam = consultant.teamSize && consultant.teamSize > 1;
+                    const isLoading = loadingHierarchy.has(consultantId);
 
-              return (
-                <Card key={consultant._id || idx} className="p-5 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all rounded-xl">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-800">{consultant.consultantName}</h4>
-                      {consultant.consultantEmail && (
-                        <p className="text-xs text-slate-400 mt-0.5">{consultant.consultantEmail}</p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => handleMetricClick(consultant, 'orders')}
-                      disabled={!hasRevenue}
-                      className={cn(
-                        "text-center p-2 rounded-lg transition-all",
-                        hasRevenue 
-                          ? "hover:bg-orange-50 cursor-pointer" 
-                          : "cursor-not-allowed opacity-60"
-                      )}
-                    >
-                      <p className="text-xs text-slate-400">Realised</p>
-                      <p className="text-base font-bold text-orange-600">
-                        {formatCurrency(consultant.realisedRevenue)}
-                      </p>
-                    </button>
-                  </div>
+                    return (
+                      <>
+                        <TableRow
+                          key={consultantId || idx}
+                          className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
+                        >
+                          <TableCell className="text-sm sticky left-0 bg-white border-r border-slate-100 z-10 py-3 px-4">
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-medium text-slate-800">
+                                  {consultant.consultantName}
+                                </span>
+                                {hasTeam && (
+                                  <button
+                                    onClick={() => toggleExpand(consultantId, true)}
+                                    disabled={isLoading}
+                                    className={cn(
+                                      "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
+                                      "hover:bg-orange-100 text-orange-500 border border-orange-200",
+                                      isExpanded && "bg-orange-100 border-orange-300",
+                                      isLoading && "opacity-50 cursor-not-allowed"
+                                    )}
+                                  >
+                                    {isLoading ? (
+                                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                    ) : isExpanded ? (
+                                      <Minus className="w-2.5 h-2.5" />
+                                    ) : (
+                                      <Plus className="w-2.5 h-2.5" />
+                                    )}
+                                  </button>
+                                )}
+                                {consultant.teamSize && consultant.teamSize > 1 && (
+                                  <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                    Team: {consultant.teamSize}
+                                  </span>
+                                )}
+                              </div>
+                              {consultant.consultantEmail && (
+                                <span className="text-xs text-slate-400">{consultant.consultantEmail}</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center py-3 px-4">
+                            <button
+                              onClick={() => handleMetricClick(consultant, 'assigned-leads')}
+                              disabled={!consultant.totalLeadAssigned}
+                              className={cn(
+                                "text-sm font-medium transition-all hover:scale-105 px-3 py-1 rounded-lg",
+                                consultant.totalLeadAssigned > 0
+                                  ? "text-blue-600 hover:bg-blue-50 cursor-pointer"
+                                  : "text-slate-400 cursor-not-allowed"
+                              )}
+                            >
+                              {consultant.totalLeadAssigned || 0}
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-center py-3 px-4">
+                            <button
+                              onClick={() => handleMetricClick(consultant, 'admission-leads')}
+                              disabled={!consultant.admDone}
+                              className={cn(
+                                "text-sm font-medium transition-all hover:scale-105 px-3 py-1 rounded-lg",
+                                consultant.admDone > 0
+                                  ? "text-emerald-600 hover:bg-emerald-50 cursor-pointer"
+                                  : "text-slate-400 cursor-not-allowed"
+                              )}
+                            >
+                              {consultant.admDone || 0}
+                            </button>
+                          </TableCell>
+                         
+                          <TableCell className="text-center py-3 px-4 bg-orange-50/30">
+                            <button
+                              onClick={() => handleMetricClick(consultant, 'orders')}
+                              disabled={!consultant.realisedRevenue}
+                              className={cn(
+                                "text-sm font-medium transition-all hover:scale-105 px-3 py-1 rounded-lg",
+                                consultant.realisedRevenue > 0
+                                  ? "text-orange-600 hover:bg-orange-50 cursor-pointer"
+                                  : "text-slate-400 cursor-not-allowed"
+                              )}
+                            >
+                              {formatCurrency(consultant.realisedRevenue || 0)}
+                            </button>
+                          </TableCell>
+                        </TableRow>
 
-                  {/* Metrics Row */}
-                  <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
-                    <button
-                      onClick={() => handleMetricClick(consultant, 'assigned-leads')}
-                      disabled={!hasLeads}
-                      className={cn(
-                        "text-center p-2 rounded-lg transition-all",
-                        hasLeads 
-                          ? "hover:bg-blue-50 cursor-pointer" 
-                          : "cursor-not-allowed opacity-60"
-                      )}
-                    >
-                      <p className="text-xs text-slate-400">Assigned Leads</p>
-                      <p className="text-base font-bold text-blue-600">
-                        {consultant.totalLeadAssigned || 0}
-                      </p>
-                    </button>
+                        {/* Nested Team Members */}
+                        {isExpanded && consultant.children && consultant.children.length > 0 && (
+                          <TableRow>
+                            <TableCell colSpan={5} className="p-0 bg-slate-50/30">
+                              <div className="px-4 py-2">
+                                <TeamMemberTable
+                                  teamMembers={consultant.children}
+                                  level={1}
+                                  expandedEmployees={expandedEmployees}
+                                  loadingHierarchy={loadingHierarchy}
+                                  toggleExpand={toggleExpand}
+                                  onMetricClick={handleMetricClick}
+                                />
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
 
-                    <button
-                      onClick={() => handleMetricClick(consultant, 'admission-leads')}
-                      disabled={!hasAdmissions}
-                      className={cn(
-                        "text-center p-2 rounded-lg transition-all",
-                        hasAdmissions 
-                          ? "hover:bg-emerald-50 cursor-pointer" 
-                          : "cursor-not-allowed opacity-60"
-                      )}
-                    >
-                      <p className="text-xs text-slate-400">Admissions</p>
-                      <p className="text-base font-bold text-emerald-600">
-                        {consultant.admDone || 0}
-                      </p>
-                    </button>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+                        {/* Show message if expanded but no team members */}
+                        {isExpanded && (!consultant.children || consultant.children.length === 0) && (
+                          <TableRow>
+                            <TableCell colSpan={5} className="p-0">
+                              <div className="px-4 py-2">
+                                <div className="text-xs text-slate-400 py-2 px-4 bg-slate-50 rounded-lg border border-slate-200">
+                                  No team members found
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    );
+                  })}
 
-          {filteredConsultants.length === 0 && searchTerm && (
-            <div className="text-center py-8 text-sm text-slate-400">
-              No consultants match "{searchTerm}"
+                  {filteredTopLevel.length === 0 && searchTerm && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-sm text-slate-400">
+                        No consultants match "{searchTerm}"
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </div>
-          )}
+          </div>
         </div>
       )}
 

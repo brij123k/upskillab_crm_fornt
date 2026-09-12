@@ -43,11 +43,19 @@ import {
   Tag,
   FileText,
   UserCog,
+  Plus,
+  Minus,
+  ChevronDown as ChevronDownIcon,
+  ChevronRight as ChevronRightIcon,
 } from 'lucide-react';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Types
+// ───────────────────────────────────────────────────────────────────────────────
 
 interface RevenueByMonth {
   month: string;
@@ -94,6 +102,10 @@ interface EmployeeRevenue {
   pools: PoolWithOrders[];
   team?: boolean;
   teamSize?: number;
+  children?: EmployeeRevenue[];
+  level?: number;
+  parentId?: string | null;
+  isTeamMember?: boolean;
 }
 
 interface ReportData {
@@ -126,8 +138,16 @@ interface OrderModalData {
   totalRevenue: number;
 }
 
+// ───────────────────────────────────────────────────────────────────────────────
+// Constants
+// ───────────────────────────────────────────────────────────────────────────────
+
 const EMPLOYEES_PER_PAGE = 10;
 const MAX_DAYS = 31;
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Helper Functions
+// ───────────────────────────────────────────────────────────────────────────────
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('en-IN', {
@@ -159,6 +179,186 @@ const getStatusColor = (status: string) => {
   }
 };
 
+const extractLevelNumber = (name: string): number => {
+  const match = name.match(/\d+/);
+  return match ? parseInt(match[0], 10) : 1;
+};
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Sub-component: Team Member Table
+// ───────────────────────────────────────────────────────────────────────────────
+
+interface TeamMemberTableProps {
+  teamMembers: EmployeeRevenue[];
+  pools: { poolId: string; poolName: string }[];
+  level: number;
+  expandedEmployees: Set<string>;
+  loadingHierarchy: Set<string>;
+  toggleExpand: (employeeId: string, hasTeam: boolean) => void;
+  onRevenueClick: (employee: EmployeeRevenue, poolName: string, orders: Order[]) => void;
+}
+
+function TeamMemberTable({
+  teamMembers,
+  pools,
+  level,
+  expandedEmployees,
+  loadingHierarchy,
+  toggleExpand,
+  onRevenueClick,
+}: TeamMemberTableProps) {
+  return (
+    <div className="mt-2 mb-1">
+      <div className="flex items-center gap-2 mb-2 text-xs font-medium text-orange-600">
+        <UserCog className="w-3.5 h-3.5" />
+        <span>Team Members ({teamMembers.length})</span>
+      </div>
+      <div className="overflow-x-auto border border-slate-200 rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-orange-50/50 hover:bg-orange-50/50 border-b border-slate-200">
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase sticky left-0 bg-orange-50/50 z-10 min-w-[180px]">
+                Employee
+              </TableHead>
+              {pools.map(pool => (
+                <TableHead
+                  key={pool.poolId}
+                  className="text-[10px] text-center min-w-[90px] py-1.5 font-semibold text-slate-600 whitespace-nowrap"
+                >
+                  {pool.poolName}
+                </TableHead>
+              ))}
+              <TableHead className="text-[10px] text-center min-w-[80px] py-1.5 font-semibold text-slate-600 bg-orange-50/50">
+                Total
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {teamMembers.map(member => {
+              const hasTeam = member.teamSize && member.teamSize > 1;
+              const isExpanded = expandedEmployees.has(member.employeeId);
+              const isLoading = loadingHierarchy.has(member.employeeId);
+              
+              const poolMap = new Map<string, { amount: number; orders: Order[] }>();
+              member.pools?.forEach(p => {
+                const rev = p.revenueByMonth?.[0]?.revenue || 0;
+                poolMap.set(p.poolName, { amount: rev, orders: p.orders || [] });
+              });
+              const memberTotal = Array.from(poolMap.values()).reduce((a, b) => a + b.amount, 0);
+
+              return (
+                <>
+                  <TableRow
+                    key={member.employeeId}
+                    className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
+                  >
+                    <TableCell className="sticky left-0 bg-white border-r z-10 py-2">
+                      <div className="flex items-center gap-2 min-w-[150px]">
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-medium text-slate-800 truncate max-w-[100px]">
+                              {member.employeeName}
+                            </span>
+                            {hasTeam && (
+                              <button
+                                onClick={() => toggleExpand(member.employeeId, true)}
+                                disabled={isLoading}
+                                className={cn(
+                                  "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
+                                  "hover:bg-orange-100 text-orange-500 border border-orange-200",
+                                  isExpanded && "bg-orange-100 border-orange-300",
+                                  isLoading && "opacity-50 cursor-not-allowed"
+                                )}
+                              >
+                                {isLoading ? (
+                                  <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                ) : isExpanded ? (
+                                  <Minus className="w-2.5 h-2.5" />
+                                ) : (
+                                  <Plus className="w-2.5 h-2.5" />
+                                )}
+                              </button>
+                            )}
+                            {member.teamSize && member.teamSize > 1 && (
+                              <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
+                                Team: {member.teamSize}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[9px] text-slate-400 truncate max-w-[120px]">
+                            {member.employeeEmail}
+                          </span>
+                          {member.employeeLevel && (
+                            <span className="text-[8px] text-orange-500">Level: L{member.employeeLevel}</span>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    {pools.map(pool => {
+                      const poolData = poolMap.get(pool.poolName);
+                      const amount = poolData?.amount || 0;
+                      const orders = poolData?.orders || [];
+
+                      return (
+                        <TableCell key={pool.poolId} className="text-xs text-center py-2">
+                          {amount > 0 ? (
+                            <button
+                              onClick={() => onRevenueClick(member, pool.poolName, orders)}
+                              className={cn(
+                                "font-medium cursor-pointer transition-all hover:scale-105 inline-flex items-center gap-1",
+                                "text-emerald-600 hover:text-emerald-700"
+                              )}
+                              title="Click to view orders"
+                            >
+                              {formatCurrency(amount)}
+                              <Eye className="w-2.5 h-2.5 opacity-60" />
+                            </button>
+                          ) : (
+                            <span className="text-slate-400 text-[10px]">
+                              {formatCurrency(0)}
+                            </span>
+                          )}
+                        </TableCell>
+                      );
+                    })}
+                    <TableCell className="text-xs text-center font-semibold py-2 bg-orange-50/30">
+                      <span className={memberTotal > 0 ? "text-orange-600" : "text-slate-400"}>
+                        {formatCurrency(memberTotal)}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                  {/* Nested team members */}
+                  {isExpanded && member.children && member.children.length > 0 && (
+                    <TableRow>
+                      <TableCell colSpan={pools.length + 2} className="p-0">
+                        <div className="ml-6 pl-4 border-l-2 border-orange-200">
+                          <TeamMemberTable
+                            teamMembers={member.children}
+                            pools={pools}
+                            level={level + 1}
+                            expandedEmployees={expandedEmployees}
+                            loadingHierarchy={loadingHierarchy}
+                            toggleExpand={toggleExpand}
+                            onRevenueClick={onRevenueClick}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Main Component
+// ───────────────────────────────────────────────────────────────────────────────
+
 export function PoolRevenueReport() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ReportData | null>(null);
@@ -175,6 +375,11 @@ export function PoolRevenueReport() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(0);
+
+  // ─── Hierarchical State ──────────────────────────────────────────────────
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
+  const [hierarchicalData, setHierarchicalData] = useState<EmployeeRevenue[]>([]);
+  const [loadingHierarchy, setLoadingHierarchy] = useState<Set<string>>(new Set());
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -197,11 +402,6 @@ export function PoolRevenueReport() {
     fetchLevels();
   }, []);
 
-  const extractLevelNumber = (name: string): number => {
-    const match = name.match(/\d+/);
-    return match ? parseInt(match[0], 10) : 1;
-  };
-
   // Validate date range (max 31 days)
   const validateDateRange = (from: string, to: string): boolean => {
     if (!from || !to) return false;
@@ -218,7 +418,16 @@ export function PoolRevenueReport() {
     return true;
   };
 
-  // Fetch revenue data
+  // ─── Build Hierarchy ──────────────────────────────────────────────────────
+  const buildHierarchy = useCallback((employees: EmployeeRevenue[]): EmployeeRevenue[] => {
+    return employees.map(emp => ({
+      ...emp,
+      children: [],
+      level: 0,
+    }));
+  }, []);
+
+  // ─── Fetch Report Data ──────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -226,7 +435,6 @@ export function PoolRevenueReport() {
         level: parseInt(selectedLevel) || 1,
       };
 
-      // Team filter - send as boolean when checked
       if (showTeamOnly) {
         params.team = true;
       }
@@ -250,25 +458,32 @@ export function PoolRevenueReport() {
       );
 
       if (response) {
+        const employees = response.employees || [];
         setData({
-          employees: response.employees || [],
+          employees: employees,
           pools: response.pools || [],
           months: response.months || [],
           startDate: response.startDate,
           endDate: response.endDate,
           filters: response.filters || {},
         });
+        
+        const hierarchy = buildHierarchy(employees);
+        setHierarchicalData(hierarchy);
+        setExpandedEmployees(new Set());
       } else {
         setData(null);
+        setHierarchicalData([]);
       }
     } catch (error: any) {
       toast({ title: 'Error', description: error?.message || 'Failed to load revenue', variant: 'destructive' });
       setData(null);
+      setHierarchicalData([]);
     } finally {
       setLoading(false);
       setCurrentPage(0);
     }
-  }, [selectedLevel, showTeamOnly, dateRange, fromDate, toDate]);
+  }, [selectedLevel, showTeamOnly, dateRange, fromDate, toDate, buildHierarchy]);
 
   useEffect(() => {
     if (selectedLevel) {
@@ -276,12 +491,149 @@ export function PoolRevenueReport() {
     }
   }, [fetchData, selectedLevel]);
 
+  // ─── Fetch Team Hierarchy ──────────────────────────────────────────────
+  const fetchTeamHierarchy = useCallback(async (employeeId: string) => {
+    if (loadingHierarchy.has(employeeId)) return;
+
+    setLoadingHierarchy(prev => new Set(prev).add(employeeId));
+    
+    try {
+      const params: any = {
+        employeeId: employeeId,
+        level: parseInt(selectedLevel) || 1,
+      };
+
+      if (showTeamOnly) {
+        params.team = true;
+      }
+
+      if (dateRange === 'custom') {
+        if (fromDate && toDate) {
+          params.fromDate = fromDate;
+          params.toDate = toDate;
+        }
+      } else {
+        params.dateFilter = 'month';
+      }
+
+      const response = await getDataHandlerWithToken(
+        ApiConfig.employeePoolRevenueReportteam,
+        params,
+        null,
+        true
+      );
+
+      if (response) {
+        const teamData = response.employees || [];
+        if (teamData.length > 0) {
+          const updateHierarchy = (nodes: EmployeeRevenue[]): EmployeeRevenue[] => {
+            return nodes.map(node => {
+              if (node.employeeId === employeeId) {
+                const teamMembers = teamData.map((member: any) => ({
+                  ...member,
+                  level: (node.level || 0) + 1,
+                  parentId: employeeId,
+                  isTeamMember: true,
+                  children: [],
+                }));
+                return {
+                  ...node,
+                  children: teamMembers,
+                };
+              }
+              if (node.children && node.children.length > 0) {
+                return {
+                  ...node,
+                  children: updateHierarchy(node.children),
+                };
+              }
+              return node;
+            });
+          };
+
+          setHierarchicalData(prev => updateHierarchy(prev));
+          setExpandedEmployees(prev => new Set(prev).add(employeeId));
+        } else {
+          const updateHierarchy = (nodes: EmployeeRevenue[]): EmployeeRevenue[] => {
+            return nodes.map(node => {
+              if (node.employeeId === employeeId) {
+                return {
+                  ...node,
+                  children: [],
+                };
+              }
+              if (node.children && node.children.length > 0) {
+                return {
+                  ...node,
+                  children: updateHierarchy(node.children),
+                };
+              }
+              return node;
+            });
+          };
+          setHierarchicalData(prev => updateHierarchy(prev));
+          setExpandedEmployees(prev => new Set(prev).add(employeeId));
+        }
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to load team hierarchy',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingHierarchy(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(employeeId);
+        return newSet;
+      });
+    }
+  }, [selectedLevel, showTeamOnly, dateRange, fromDate, toDate, loadingHierarchy]);
+
+  // ─── Toggle Expand ──────────────────────────────────────────────────────
+  const toggleExpand = useCallback(async (employeeId: string, hasTeam: boolean) => {
+    if (expandedEmployees.has(employeeId)) {
+      setExpandedEmployees(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(employeeId);
+        return newSet;
+      });
+      
+      const removeChildren = (nodes: EmployeeRevenue[]): EmployeeRevenue[] => {
+        return nodes.map(node => {
+          if (node.employeeId === employeeId) {
+            return { ...node, children: [] };
+          }
+          if (node.children && node.children.length > 0) {
+            return { ...node, children: removeChildren(node.children) };
+          }
+          return node;
+        });
+      };
+      setHierarchicalData(prev => removeChildren(prev));
+    } else if (hasTeam) {
+      await fetchTeamHierarchy(employeeId);
+    }
+  }, [expandedEmployees, fetchTeamHierarchy]);
+
+  // ─── Flatten hierarchy for display ──────────────────────────────────────
+  const flattenHierarchy = useCallback((nodes: EmployeeRevenue[]): EmployeeRevenue[] => {
+    let result: EmployeeRevenue[] = [];
+    nodes.forEach(node => {
+      result.push({ ...node, level: node.level || 0 });
+      if (node.children && node.children.length > 0) {
+        result = result.concat(flattenHierarchy(node.children));
+      }
+    });
+    return result;
+  }, []);
+
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(0);
   }, [selectedLevel, showTeamOnly, dateRange, fromDate, toDate, employeeSearch, poolSearch]);
 
-  // Export CSV
+  // ─── Export CSV ──────────────────────────────────────────────────────────
   const handleExport = () => {
     if (!data || !data.employees.length) {
       toast({ title: 'No data to export' });
@@ -321,7 +673,7 @@ export function PoolRevenueReport() {
     toast({ title: 'Export successful' });
   };
 
-  // Handle click on revenue amount
+  // ─── Handle revenue click ──────────────────────────────────────────────
   const handleRevenueClick = (employee: EmployeeRevenue, poolName: string, orders: Order[]) => {
     if (!orders || orders.length === 0) return;
     
@@ -335,20 +687,29 @@ export function PoolRevenueReport() {
     setIsModalOpen(true);
   };
 
-  // Client-side filtering
-  const filteredEmployees = data?.employees?.filter(emp => {
+  // ─── Client-side filtering ──────────────────────────────────────────────
+  const flattenedData = flattenHierarchy(hierarchicalData);
+  
+  const filteredEmployees = flattenedData.filter(emp => {
     if (employeeSearch && !emp.employeeName.toLowerCase().includes(employeeSearch.toLowerCase())) return false;
     return true;
-  }) || [];
+  });
+
+  // For pagination, use top-level employees only
+  const topLevelEmployees = hierarchicalData;
+  const filteredTopLevel = topLevelEmployees.filter(emp => {
+    if (employeeSearch && !emp.employeeName.toLowerCase().includes(employeeSearch.toLowerCase())) return false;
+    return true;
+  });
+
+  const paginatedTopLevel = filteredTopLevel.slice(
+    currentPage * EMPLOYEES_PER_PAGE,
+    (currentPage + 1) * EMPLOYEES_PER_PAGE
+  );
 
   const allPools = data?.pools || [];
   const filteredPools = allPools.filter(p => 
     !poolSearch || p.poolName.toLowerCase().includes(poolSearch.toLowerCase())
-  );
-
-  const paginatedEmployees = filteredEmployees.slice(
-    currentPage * EMPLOYEES_PER_PAGE,
-    (currentPage + 1) * EMPLOYEES_PER_PAGE
   );
 
   const totalRevenue = filteredEmployees.reduce((sum, emp) => {
@@ -356,10 +717,9 @@ export function PoolRevenueReport() {
     return sum + empTotal;
   }, 0);
 
-  const activeEmployees = filteredEmployees.length;
-  const totalPages = Math.ceil(filteredEmployees.length / EMPLOYEES_PER_PAGE);
+  const activeEmployees = filteredTopLevel.length;
+  const totalPages = Math.ceil(filteredTopLevel.length / EMPLOYEES_PER_PAGE);
 
-  // Check if team mode is active
   const isTeamMode = data?.filters?.team === true || showTeamOnly;
 
   const hasActiveFilters = 
@@ -370,6 +730,7 @@ export function PoolRevenueReport() {
     employeeSearch !== '' ||
     poolSearch !== '';
 
+  // ─── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
       {/* Header Section */}
@@ -656,7 +1017,7 @@ export function PoolRevenueReport() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-slate-50/80 border-b border-slate-200">
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50/80 z-10 min-w-[180px] px-5 py-3.5">
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50/80 z-10 min-w-[200px] px-5 py-3.5">
                       <div className="flex items-center gap-2">
                         <Users className="w-3.5 h-3.5" />
                         Employee
@@ -678,7 +1039,11 @@ export function PoolRevenueReport() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedEmployees.map((emp) => {
+                  {paginatedTopLevel.map((emp) => {
+                    const isExpanded = expandedEmployees.has(emp.employeeId);
+                    const hasTeam = emp.teamSize && emp.teamSize > 1;
+                    const isLoading = loadingHierarchy.has(emp.employeeId);
+                    
                     const poolMap = new Map<string, { amount: number; orders: Order[] }>();
                     emp.pools?.forEach(p => {
                       const rev = p.revenueByMonth?.[0]?.revenue || 0;
@@ -687,61 +1052,118 @@ export function PoolRevenueReport() {
                     const empTotal = Array.from(poolMap.values()).reduce((a, b) => a + b.amount, 0);
 
                     return (
-                      <TableRow 
-                        key={emp.employeeId} 
-                        className="border-b border-slate-100 transition-colors hover:bg-slate-50/50"
-                      >
-                        <TableCell className="text-sm sticky left-0 bg-white border-r border-slate-100 z-10 px-5 py-3.5">
-                          <div className="flex flex-col">
-                            <span className="font-medium text-slate-800">{emp.employeeName}</span>
-                            <span className="text-xs text-slate-400">{emp.employeeEmail}</span>
-                            {emp.employeeEmployeeId && (
-                              <span className="text-[10px] text-slate-400 mt-0.5">ID: {emp.employeeEmployeeId}</span>
-                            )}
-                            {emp.employeeLevel && (
-                              <span className="text-[10px] text-orange-500 mt-0.5">Level: L{emp.employeeLevel}</span>
-                            )}
-                            {emp.teamSize && emp.teamSize > 1 && (
-                              <span className="text-[10px] text-orange-500 mt-0.5">Team: {emp.teamSize}</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        {filteredPools.map(pool => {
-                          const poolData = poolMap.get(pool.poolName);
-                          const amount = poolData?.amount || 0;
-                          const orders = poolData?.orders || [];
-                          const hasOrders = orders.length > 0;
-
-                          return (
-                            <TableCell key={pool.poolId} className="text-sm text-center px-4 py-3.5">
-                              {amount > 0 ? (
-                                <button
-                                  onClick={() => handleRevenueClick(emp, pool.poolName, orders)}
-                                  className={cn(
-                                    "font-medium cursor-pointer transition-all hover:scale-105 inline-flex items-center gap-1.5",
-                                    "text-emerald-600 hover:text-emerald-700"
-                                  )}
-                                  title="Click to view orders"
-                                >
-                                  {formatCurrency(amount)}
-                                  <Eye className="w-3 h-3 opacity-60" />
-                                </button>
-                              ) : (
-                                <span className="text-slate-400">
-                                  {formatCurrency(amount)}
-                                </span>
+                      <>
+                        <TableRow 
+                          key={emp.employeeId} 
+                          className="border-b border-slate-100 transition-colors hover:bg-slate-50/50"
+                        >
+                          <TableCell className="text-sm sticky left-0 bg-white border-r border-slate-100 z-10 px-5 py-3.5">
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-medium text-slate-800">{emp.employeeName}</span>
+                                {hasTeam && (
+                                  <button
+                                    onClick={() => toggleExpand(emp.employeeId, true)}
+                                    disabled={isLoading}
+                                    className={cn(
+                                      "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
+                                      "hover:bg-orange-100 text-orange-500 border border-orange-200",
+                                      isExpanded && "bg-orange-100 border-orange-300",
+                                      isLoading && "opacity-50 cursor-not-allowed"
+                                    )}
+                                  >
+                                    {isLoading ? (
+                                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                    ) : isExpanded ? (
+                                      <Minus className="w-2.5 h-2.5" />
+                                    ) : (
+                                      <Plus className="w-2.5 h-2.5" />
+                                    )}
+                                  </button>
+                                )}
+                                {emp.teamSize && emp.teamSize > 1 && (
+                                  <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
+                                    Team: {emp.teamSize}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-xs text-slate-400">{emp.employeeEmail}</span>
+                              {emp.employeeEmployeeId && (
+                                <span className="text-[10px] text-slate-400 mt-0.5">ID: {emp.employeeEmployeeId}</span>
                               )}
+                              {emp.employeeLevel && (
+                                <span className="text-[10px] text-orange-500 mt-0.5">Level: L{emp.employeeLevel}</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          {filteredPools.map(pool => {
+                            const poolData = poolMap.get(pool.poolName);
+                            const amount = poolData?.amount || 0;
+                            const orders = poolData?.orders || [];
+
+                            return (
+                              <TableCell key={pool.poolId} className="text-sm text-center px-4 py-3.5">
+                                {amount > 0 ? (
+                                  <button
+                                    onClick={() => handleRevenueClick(emp, pool.poolName, orders)}
+                                    className={cn(
+                                      "font-medium cursor-pointer transition-all hover:scale-105 inline-flex items-center gap-1.5",
+                                      "text-emerald-600 hover:text-emerald-700"
+                                    )}
+                                    title="Click to view orders"
+                                  >
+                                    {formatCurrency(amount)}
+                                    <Eye className="w-3 h-3 opacity-60" />
+                                  </button>
+                                ) : (
+                                  <span className="text-slate-400">
+                                    {formatCurrency(0)}
+                                  </span>
+                                )}
+                              </TableCell>
+                            );
+                          })}
+                          <TableCell className="text-sm text-center font-semibold px-4 py-3.5 bg-orange-50/30 border-l border-slate-200">
+                            <span className={cn(
+                              empTotal > 0 ? "text-orange-600" : "text-slate-400"
+                            )}>
+                              {formatCurrency(empTotal)}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+
+                        {/* Nested Team Members */}
+                        {isExpanded && emp.children && emp.children.length > 0 && (
+                          <TableRow>
+                            <TableCell colSpan={filteredPools.length + 2} className="p-0 bg-slate-50/30">
+                              <div className="px-4 py-2">
+                                <TeamMemberTable
+                                  teamMembers={emp.children}
+                                  pools={filteredPools}
+                                  level={1}
+                                  expandedEmployees={expandedEmployees}
+                                  loadingHierarchy={loadingHierarchy}
+                                  toggleExpand={toggleExpand}
+                                  onRevenueClick={handleRevenueClick}
+                                />
+                              </div>
                             </TableCell>
-                          );
-                        })}
-                        <TableCell className="text-sm text-center font-semibold px-4 py-3.5 bg-orange-50/30 border-l border-slate-200">
-                          <span className={cn(
-                            empTotal > 0 ? "text-orange-600" : "text-slate-400"
-                          )}>
-                            {formatCurrency(empTotal)}
-                          </span>
-                        </TableCell>
-                      </TableRow>
+                          </TableRow>
+                        )}
+
+                        {/* Show message if expanded but no team members */}
+                        {isExpanded && (!emp.children || emp.children.length === 0) && (
+                          <TableRow>
+                            <TableCell colSpan={filteredPools.length + 2} className="p-0">
+                              <div className="px-4 py-2">
+                                <div className="text-xs text-slate-400 py-2 px-4 bg-slate-50 rounded-lg border border-slate-200">
+                                  No team members found
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
                     );
                   })}
                 </TableBody>
@@ -755,9 +1177,9 @@ export function PoolRevenueReport() {
               <div className="text-sm text-slate-500">
                 Showing <span className="font-medium text-slate-700">{currentPage * EMPLOYEES_PER_PAGE + 1}</span> to{' '}
                 <span className="font-medium text-slate-700">
-                  {Math.min((currentPage + 1) * EMPLOYEES_PER_PAGE, filteredEmployees.length)}
+                  {Math.min((currentPage + 1) * EMPLOYEES_PER_PAGE, filteredTopLevel.length)}
                 </span>{' '}
-                of <span className="font-medium text-slate-700">{filteredEmployees.length}</span> employees
+                of <span className="font-medium text-slate-700">{filteredTopLevel.length}</span> employees
               </div>
               <div className="flex items-center gap-2">
                 <Button

@@ -31,6 +31,22 @@ import {
   ChevronUp,
   ChevronDown,
   UserCog,
+  Plus,
+  Minus,
+  ChevronRight as ChevronRightIcon,
+  ChevronDown as ChevronDownIcon,
+  User,
+  UserPlus,
+  Users as UsersIcon,
+  X,
+  Mail,
+  Phone,
+  User as UserIcon,
+  Briefcase,
+  Calendar,
+  Tag,
+  List,
+  LayoutGrid,
 } from 'lucide-react';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
@@ -57,6 +73,10 @@ interface EmployeeData {
   stages: StageItem[];
   team?: boolean;
   teamSize?: number;
+  children?: EmployeeData[];
+  level?: number;
+  parentId?: string | null;
+  isTeamMember?: boolean;
 }
 
 interface ReportData {
@@ -78,6 +98,34 @@ interface LevelType {
   name: string;
 }
 
+interface LeadDetail {
+  leadId: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  stage?: {
+    name: string;
+  };
+  [key: string]: any;
+}
+
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  totalLeads: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+interface StageDetailResponse {
+  stageName: string;
+  team?: boolean;
+  totalLeads: number;
+  pagination: PaginationInfo;
+  leads: LeadDetail[];
+}
+
 // ───────────────────────────────────────────────────────────────────────────────
 // Constants
 // ───────────────────────────────────────────────────────────────────────────────
@@ -90,7 +138,8 @@ const dateFilterOptions = [
   { value: 'custom', label: 'Custom Range' },
 ];
 
-const EMPLOYEES_PER_PAGE = 6;
+const EMPLOYEES_PER_PAGE = 10;
+const MODAL_LEADS_PER_PAGE = 10;
 
 // ───────────────────────────────────────────────────────────────────────────────
 // Helper Functions
@@ -102,7 +151,388 @@ const extractLevelNumber = (levelName: string): number => {
 };
 
 // ───────────────────────────────────────────────────────────────────────────────
-// Component
+// Sub-component: Team Member Table
+// ───────────────────────────────────────────────────────────────────────────────
+
+interface TeamMemberTableProps {
+  teamMembers: EmployeeData[];
+  stages: string[];
+  level: number;
+  expandedEmployees: Set<string>;
+  loadingHierarchy: Set<string>;
+  toggleExpand: (employeeId: string, hasTeam: boolean) => void;
+  onStageClick: (employeeId: string, stageName: string) => void;
+  loadingStageDetail: string | null;
+}
+
+function TeamMemberTable({
+  teamMembers,
+  stages,
+  level,
+  expandedEmployees,
+  loadingHierarchy,
+  toggleExpand,
+  onStageClick,
+  loadingStageDetail,
+}: TeamMemberTableProps) {
+  return (
+    <div className="mt-3 mb-2">
+      <div className="flex items-center gap-2 mb-2 text-xs font-medium text-orange-600">
+        <UsersIcon className="w-3.5 h-3.5" />
+        <span>Team Members ({teamMembers.length})</span>
+      </div>
+      <div className="overflow-x-auto border border-slate-200 rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-orange-50/50 hover:bg-orange-50/50 border-b border-slate-200">
+              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase sticky left-0 bg-orange-50/50 z-10 min-w-[160px]">
+                Member
+              </TableHead>
+              {stages.map(stage => (
+                <TableHead
+                  key={stage}
+                  className="text-[10px] text-center min-w-[60px] py-1.5 font-semibold text-slate-600 whitespace-nowrap"
+                >
+                  {stage}
+                </TableHead>
+              ))}
+              <TableHead className="text-[10px] text-center min-w-[50px] py-1.5 font-semibold text-slate-600">
+                Total
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {teamMembers.map(member => {
+              const stageMap = new Map<string, number>();
+              member.stages.forEach(s => stageMap.set(s.leadStage, s.count));
+              const hasTeam = member.teamSize && member.teamSize > 1;
+              const isExpanded = expandedEmployees.has(member.employeeId);
+              const isLoading = loadingHierarchy.has(member.employeeId);
+
+              return (
+                <>
+                  <TableRow
+                    key={member.employeeId}
+                    className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
+                  >
+                    <TableCell className="sticky left-0 bg-white border-r z-10 py-2">
+                      <div className="flex items-center gap-2 min-w-[140px]">
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-medium text-slate-800 truncate max-w-[100px]">
+                              {member.employeeName}
+                            </span>
+                            {hasTeam ? (
+                              <button
+                                onClick={() => toggleExpand(member.employeeId, true)}
+                                disabled={isLoading}
+                                className={cn(
+                                  "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
+                                  "hover:bg-orange-100 text-orange-500 border border-orange-200",
+                                  isExpanded && "bg-orange-100 border-orange-300",
+                                  isLoading && "opacity-50 cursor-not-allowed"
+                                )}
+                              >
+                                {isLoading ? (
+                                  <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                ) : isExpanded ? (
+                                  <Minus className="w-2.5 h-2.5" />
+                                ) : (
+                                  <Plus className="w-2.5 h-2.5" />
+                                )}
+                              </button>
+                            ):(<span></span>)}
+                          </div>
+                          <div className="flex items-center gap-2 text-[9px] text-slate-400 flex-wrap">
+                            <span>ID: {member.employeeEmployeeId || member.employeeId}</span>
+                            {member.teamSize && member.teamSize > 1 ? (
+                              <span className="text-orange-500 font-medium">
+                                • Team: {member.teamSize}
+                              </span>
+                            ):(<span></span>)}
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    {stages.map(stage => {
+                      const count = stageMap.get(stage) || 0;
+                      const total = member.totalLead || 1;
+                      const pct = ((count / total) * 100).toFixed(1);
+                      const isLoadingDetail = loadingStageDetail === `${member.employeeId}-${stage}`;
+                      
+                      return (
+                        <TableCell
+                          key={stage}
+                          className="text-xs text-center py-2"
+                        >
+                          <button
+                            onClick={() => count > 0 && onStageClick(member.employeeId, stage)}
+                            disabled={count === 0 || isLoadingDetail}
+                            className={cn(
+                              "flex flex-col items-center transition-all",
+                              count > 0 && "hover:scale-110 cursor-pointer",
+                              count === 0 && "cursor-default opacity-50",
+                              isLoadingDetail && "opacity-50 cursor-wait"
+                            )}
+                            title={count > 0 ? `Click to view ${stage} leads` : 'No leads'}
+                          >
+                            {isLoadingDetail ? (
+                              <Loader2 className="w-3 h-3 animate-spin text-orange-500" />
+                            ) : (
+                              <>
+                                <span
+                                  className={cn(
+                                    'font-medium text-xs',
+                                    count > 0 ? 'text-slate-800 hover:text-orange-600' : 'text-slate-300'
+                                  )}
+                                >
+                                  {count || '-'}
+                                </span>
+                                {count > 0 && (
+                                  <span className="text-[8px] text-slate-400 mt-0.5">
+                                    {pct}%
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </button>
+                        </TableCell>
+                      );
+                    })}
+                    <TableCell className="text-xs text-center font-bold text-orange-700 py-2">
+                      {member.totalLead}
+                    </TableCell>
+                  </TableRow>
+                  {/* Nested team members for this member */}
+                  {isExpanded && member.children && member.children.length > 0 && (
+                    <TableRow>
+                      <TableCell colSpan={stages.length + 2} className="p-0">
+                        <div className="ml-6 pl-4 border-l-2 border-orange-200">
+                          <TeamMemberTable
+                            teamMembers={member.children}
+                            stages={stages}
+                            level={level + 1}
+                            expandedEmployees={expandedEmployees}
+                            loadingHierarchy={loadingHierarchy}
+                            toggleExpand={toggleExpand}
+                            onStageClick={onStageClick}
+                            loadingStageDetail={loadingStageDetail}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Sub-component: Stage Detail Modal
+// ───────────────────────────────────────────────────────────────────────────────
+
+interface StageDetailModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  data: StageDetailResponse | null;
+  loading: boolean;
+  employeeName: string;
+  stageName: string;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
+  currentPage: number;
+  pageLimit: number;
+}
+
+function StageDetailModal({
+  isOpen,
+  onClose,
+  data,
+  loading,
+  employeeName,
+  stageName,
+  onPageChange,
+  onLimitChange,
+  currentPage,
+  pageLimit,
+}: StageDetailModalProps) {
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+
+  if (!isOpen) return null;
+
+  const pagination = data?.pagination;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col m-4">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-slate-200 flex-shrink-0">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+              <Tag className="w-5 h-5 text-orange-500" />
+              {stageName} Leads
+            </h2>
+            <p className="text-sm text-slate-500 mt-1">
+              Employee: <span className="font-medium text-slate-700">{employeeName}</span>
+              {data && (
+                <span className="ml-3">
+                  Total: <span className="font-semibold text-orange-600">{data.totalLeads}</span> leads
+                </span>
+              )}
+              {data?.team && (
+                <span className="ml-3 text-orange-600">
+                  <UserCog className="w-3.5 h-3.5 inline mr-1" />
+                  Team View
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+          
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="rounded-full hover:bg-slate-100 h-8 w-8 p-0"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-orange-400" />
+              <p className="ml-3 text-sm text-slate-500">Loading leads...</p>
+            </div>
+          ) : !data || data.leads.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Users className="w-12 h-12 text-slate-300 mb-3" />
+              <p className="text-sm font-medium text-slate-600">No leads found</p>
+              <p className="text-xs text-slate-400 mt-1">
+                No leads in {stageName} stage for this employee
+              </p>
+            </div>
+          ) :  (
+            // Table View
+            <div className="overflow-x-auto border border-slate-200 rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50">
+                    <TableHead className="text-xs font-semibold text-slate-600">#</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Lead ID</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Name</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Email</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Phone</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Stage</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.leads.map((lead, index) => {
+                    const globalIndex = ((currentPage - 1) * pageLimit) + index + 1;
+                    return (
+                      <TableRow key={lead.leadId || index} className="hover:bg-slate-50/60">
+                        <TableCell className="text-xs text-slate-500">{globalIndex}</TableCell>
+                        <TableCell className="text-xs font-mono text-slate-600">
+                          {lead.leadId || '-'}
+                        </TableCell>
+                        <TableCell className="text-xs font-medium text-slate-800">
+                          {lead.name || 'Unnamed Lead'}
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-600">
+                          {lead.email || '-'}
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-600">
+                          {lead.phone || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                            {lead.stage?.name || stageName}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
+
+        {/* Footer with Pagination */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-slate-200 flex-shrink-0">
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-slate-500">
+              Showing {data?.leads.length || 0} of {data?.totalLeads || 0} leads
+            </span>
+            
+            {/* Limit selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500">Show:</span>
+              <Select
+                value={pageLimit.toString()}
+                onValueChange={(value) => onLimitChange(parseInt(value))}
+              >
+                <SelectTrigger className="h-7 w-[70px] text-xs rounded-lg">
+                  <SelectValue placeholder="10" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[10, 20, 50, 100].map(limit => (
+                    <SelectItem key={limit} value={limit.toString()} className="text-xs">
+                      {limit}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(currentPage - 1)}
+              disabled={!pagination?.hasPreviousPage || loading}
+              className="h-8 w-8 p-0 rounded-lg"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <span className="text-xs text-slate-500 min-w-[60px] text-center">
+              Page {currentPage} of {pagination?.totalPages || 1}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={!pagination?.hasNextPage || loading}
+              className="h-8 w-8 p-0 rounded-lg"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+              className="rounded-lg ml-2"
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Main Component
 // ───────────────────────────────────────────────────────────────────────────────
 
 export function EmployeeStagesReport() {
@@ -115,11 +545,11 @@ export function EmployeeStagesReport() {
   // Filter states
   const [showFilters, setShowFilters] = useState(false);
 
-  // Level filter (using buttons like PoolStagesReport)
+  // Level filter
   const [levels, setLevels] = useState<LevelType[]>([]);
   const [selectedLevel, setSelectedLevel] = useState<string>('1');
 
-  // Team filter (checkbox)
+  // Team filter
   const [showTeamOnly, setShowTeamOnly] = useState<boolean>(false);
 
   // Date filter
@@ -133,6 +563,24 @@ export function EmployeeStagesReport() {
   // Pagination
   const [currentPage, setCurrentPage] = useState(0);
 
+  // ─── Hierarchical State ──────────────────────────────────────────────────
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
+  const [hierarchicalData, setHierarchicalData] = useState<EmployeeData[]>([]);
+  const [loadingHierarchy, setLoadingHierarchy] = useState<Set<string>>(new Set());
+
+  // ─── Stage Detail Modal State ────────────────────────────────────────────
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalData, setModalData] = useState<StageDetailResponse | null>(null);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<{ id: string; name: string } | null>(null);
+  const [selectedStage, setSelectedStage] = useState<string>('');
+  const [loadingStageDetail, setLoadingStageDetail] = useState<string | null>(null);
+  
+  // Modal pagination state
+  const [modalPage, setModalPage] = useState(1);
+  const [modalLimit, setModalLimit] = useState(MODAL_LEADS_PER_PAGE);
+  const [modalEmployeeId, setModalEmployeeId] = useState<string>('');
+
   // ─── Fetch Levels ──────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchLevels = async () => {
@@ -140,7 +588,6 @@ export function EmployeeStagesReport() {
         const response = await getDataHandlerWithToken('getAllLevels', null, null);
         if (response && Array.isArray(response)) {
           setLevels(response);
-          // Set default to Level 1
           if (response.length > 0) {
             const firstLevelNumeric = extractLevelNumber(response[0].name);
             setSelectedLevel(firstLevelNumeric.toString());
@@ -183,23 +630,29 @@ export function EmployeeStagesReport() {
     fetchStages();
   }, []);
 
+  // ─── Build Hierarchy ──────────────────────────────────────────────────────
+  const buildHierarchy = useCallback((employees: EmployeeData[]): EmployeeData[] => {
+    return employees.map(emp => ({
+      ...emp,
+      children: [],
+      level: 0,
+    }));
+  }, []);
+
   // ─── Fetch Report Data ──────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const params: any = {};
 
-      // Level parameter
       if (selectedLevel) {
         params.level = parseInt(selectedLevel, 10) || 1;
       }
 
-      // Team filter - send as boolean when checked
       if (showTeamOnly) {
         params.team = true;
       }
 
-      // Date filter
       if (dateFilter === 'custom') {
         if (!fromDate || !toDate) {
           setLoading(false);
@@ -219,14 +672,20 @@ export function EmployeeStagesReport() {
       );
 
       if (response) {
+        const employees = response.data?.employees || response.employees || [];
         setData({
-          employees: response.data?.employees || response.employees || [],
+          employees: employees,
           totalLeads: response.data?.totalLeads ?? response.totalLeads ?? 0,
           totalEmployees: response.data?.totalEmployees ?? response.totalEmployees ?? 0,
           filters: response.data?.filters || response.filters || {},
         });
+        
+        const hierarchy = buildHierarchy(employees);
+        setHierarchicalData(hierarchy);
+        setExpandedEmployees(new Set());
       } else {
         setData(null);
+        setHierarchicalData([]);
       }
     } catch (error: any) {
       toast({
@@ -235,20 +694,274 @@ export function EmployeeStagesReport() {
         variant: 'destructive',
       });
       setData(null);
+      setHierarchicalData([]);
     } finally {
       setLoading(false);
       setCurrentPage(0);
     }
-  }, [selectedLevel, showTeamOnly, dateFilter, fromDate, toDate]);
+  }, [selectedLevel, showTeamOnly, dateFilter, fromDate, toDate, buildHierarchy]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // ─── Reset pagination when filters change ──────────────────────────────
-  useEffect(() => {
-    setCurrentPage(0);
-  }, [selectedLevel, showTeamOnly, dateFilter, fromDate, toDate, searchTerm]);
+  // ─── Fetch Team Hierarchy ──────────────────────────────────────────────
+  const fetchTeamHierarchy = useCallback(async (employeeId: string) => {
+    if (loadingHierarchy.has(employeeId)) return;
+
+    setLoadingHierarchy(prev => new Set(prev).add(employeeId));
+    
+    try {
+      const params: any = {};
+
+      if (selectedLevel) {
+        params.level = parseInt(selectedLevel, 10) || 1;
+      }
+
+      if (showTeamOnly) {
+        params.team = true;
+      }
+
+      if (dateFilter === 'custom') {
+        if (fromDate && toDate) {
+          params.assignedDateFrom = fromDate;
+          params.assignedDateTo = toDate;
+        }
+      } else {
+        params.assignedDateFilter = dateFilter;
+      }
+
+      const response = await getDataHandlerWithToken(
+        ApiConfig.getHarericydetailStages(employeeId),
+        params,
+        null,
+        true
+      );
+
+      if (response) {
+        const teamData = response.data?.employees || response.employees || [];
+        if (teamData.length > 0) {
+          const updateHierarchy = (nodes: EmployeeData[]): EmployeeData[] => {
+            return nodes.map(node => {
+              if (node.employeeId === employeeId) {
+                const teamMembers = teamData.map((member: any) => ({
+                  ...member,
+                  level: (node.level || 0) + 1,
+                  parentId: employeeId,
+                  isTeamMember: true,
+                  children: [],
+                }));
+                return {
+                  ...node,
+                  children: teamMembers,
+                };
+              }
+              if (node.children && node.children.length > 0) {
+                return {
+                  ...node,
+                  children: updateHierarchy(node.children),
+                };
+              }
+              return node;
+            });
+          };
+
+          setHierarchicalData(prev => updateHierarchy(prev));
+          setExpandedEmployees(prev => new Set(prev).add(employeeId));
+        } else {
+          const updateHierarchy = (nodes: EmployeeData[]): EmployeeData[] => {
+            return nodes.map(node => {
+              if (node.employeeId === employeeId) {
+                return {
+                  ...node,
+                  children: [],
+                };
+              }
+              if (node.children && node.children.length > 0) {
+                return {
+                  ...node,
+                  children: updateHierarchy(node.children),
+                };
+              }
+              return node;
+            });
+          };
+          setHierarchicalData(prev => updateHierarchy(prev));
+          setExpandedEmployees(prev => new Set(prev).add(employeeId));
+        }
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to load team hierarchy',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingHierarchy(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(employeeId);
+        return newSet;
+      });
+    }
+  }, [selectedLevel, showTeamOnly, dateFilter, fromDate, toDate, loadingHierarchy]);
+
+  // ─── Toggle Expand ──────────────────────────────────────────────────────
+  const toggleExpand = useCallback(async (employeeId: string, hasTeam: boolean) => {
+    if (expandedEmployees.has(employeeId)) {
+      setExpandedEmployees(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(employeeId);
+        return newSet;
+      });
+      
+      const removeChildren = (nodes: EmployeeData[]): EmployeeData[] => {
+        return nodes.map(node => {
+          if (node.employeeId === employeeId) {
+            return { ...node, children: [] };
+          }
+          if (node.children && node.children.length > 0) {
+            return { ...node, children: removeChildren(node.children) };
+          }
+          return node;
+        });
+      };
+      setHierarchicalData(prev => removeChildren(prev));
+    } else if (hasTeam) {
+      await fetchTeamHierarchy(employeeId);
+    }
+  }, [expandedEmployees, fetchTeamHierarchy]);
+
+  // ─── Fetch Stage Detail ──────────────────────────────────────────────────
+  const fetchStageDetail = useCallback(async (
+    employeeId: string, 
+    stageName: string, 
+    page: number = 1, 
+    limit: number = MODAL_LEADS_PER_PAGE
+  ) => {
+    const loadingKey = `${employeeId}-${stageName}-${page}-${limit}`;
+    if (loadingStageDetail === loadingKey) return;
+
+    setLoadingStageDetail(loadingKey);
+    setModalLoading(true);
+    setModalOpen(true);
+    setSelectedStage(stageName);
+    setModalEmployeeId(employeeId);
+    setModalPage(page);
+    setModalLimit(limit);
+
+    try {
+      const params: any = {};
+
+      if (selectedLevel) {
+        params.level = parseInt(selectedLevel, 10) || 1;
+      }
+
+      if (showTeamOnly) {
+        params.team = true;
+      }
+
+      if (dateFilter === 'custom') {
+        if (fromDate && toDate) {
+          params.assignedDateFrom = fromDate;
+          params.assignedDateTo = toDate;
+        }
+      } else {
+        params.assignedDateFilter = dateFilter;
+      }
+
+      params.stageName = stageName;
+      params.page = page;
+      params.limit = limit;
+
+      const response = await getDataHandlerWithToken(
+        ApiConfig.getDetailofEmpStage(employeeId),
+        params,
+        null,
+        true
+      );
+
+      if (response) {
+        const stageData = response.data || response;
+        setModalData({
+          stageName: stageData.stageName || stageName,
+          team: stageData.team || false,
+          totalLeads: stageData.totalLeads || 0,
+          pagination: stageData.pagination || {
+            page: page,
+            limit: limit,
+            totalLeads: 0,
+            totalPages: 1,
+            hasNextPage: false,
+            hasPreviousPage: false,
+          },
+          leads: stageData.leads || [],
+        });
+
+        // Find employee name
+        const findEmployee = (nodes: EmployeeData[]): string => {
+          for (const node of nodes) {
+            if (node.employeeId === employeeId) {
+              return node.employeeName;
+            }
+            if (node.children) {
+              const found = findEmployee(node.children);
+              if (found) return found;
+            }
+          }
+          return '';
+        };
+        const empName = findEmployee(hierarchicalData) || employeeId;
+        setSelectedEmployee({ id: employeeId, name: empName });
+      } else {
+        setModalData(null);
+        toast({
+          title: 'Error',
+          description: 'Failed to load stage details',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to load stage details',
+        variant: 'destructive',
+      });
+      setModalData(null);
+    } finally {
+      setModalLoading(false);
+      setLoadingStageDetail(null);
+    }
+  }, [selectedLevel, showTeamOnly, dateFilter, fromDate, toDate, hierarchicalData, loadingStageDetail]);
+
+  // ─── Handle Stage Click ──────────────────────────────────────────────────
+  const handleStageClick = useCallback((employeeId: string, stageName: string) => {
+    fetchStageDetail(employeeId, stageName, 1, modalLimit);
+  }, [fetchStageDetail, modalLimit]);
+
+  // ─── Handle Modal Page Change ────────────────────────────────────────────
+  const handleModalPageChange = useCallback((newPage: number) => {
+    if (modalEmployeeId && selectedStage) {
+      fetchStageDetail(modalEmployeeId, selectedStage, newPage, modalLimit);
+    }
+  }, [modalEmployeeId, selectedStage, modalLimit, fetchStageDetail]);
+
+  // ─── Handle Modal Limit Change ───────────────────────────────────────────
+  const handleModalLimitChange = useCallback((newLimit: number) => {
+    setModalLimit(newLimit);
+    if (modalEmployeeId && selectedStage) {
+      fetchStageDetail(modalEmployeeId, selectedStage, 1, newLimit);
+    }
+  }, [modalEmployeeId, selectedStage, fetchStageDetail]);
+
+  // ─── Close Modal ─────────────────────────────────────────────────────────
+  const closeModal = useCallback(() => {
+    setModalOpen(false);
+    setModalData(null);
+    setSelectedEmployee(null);
+    setSelectedStage('');
+    setModalLoading(false);
+    setModalPage(1);
+  }, []);
 
   // ─── Export CSV ──────────────────────────────────────────────────────────
   const handleExport = () => {
@@ -289,32 +1002,39 @@ export function EmployeeStagesReport() {
     toast({ title: 'Exported!' });
   };
 
+  // ─── Flatten hierarchy for display ──────────────────────────────────────
+  const flattenHierarchy = useCallback((nodes: EmployeeData[]): EmployeeData[] => {
+    let result: EmployeeData[] = [];
+    nodes.forEach(node => {
+      result.push({ ...node, level: node.level || 0 });
+      if (node.children && node.children.length > 0) {
+        result = result.concat(flattenHierarchy(node.children));
+      }
+    });
+    return result;
+  }, []);
+
   // ─── Client-side filtering ──────────────────────────────────────────────
+  const topLevelEmployees = hierarchicalData;
+  const filteredTopLevel = topLevelEmployees.filter(emp =>
+    emp.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (emp.employeeEmail?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (emp.employeeNumber?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+  );
 
-  // First, filter employees by search term (client-side)
-  const searchFilteredEmployees = data?.employees
-    ? data.employees.filter(emp =>
-        emp.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (emp.employeeEmail?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (emp.employeeNumber?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-      )
-    : [];
-
-  // Pagination
-  const totalPages = Math.ceil(searchFilteredEmployees.length / EMPLOYEES_PER_PAGE);
-  const paginatedEmployees = searchFilteredEmployees.slice(
+  const paginatedTopLevel = filteredTopLevel.slice(
     currentPage * EMPLOYEES_PER_PAGE,
     (currentPage + 1) * EMPLOYEES_PER_PAGE
   );
 
-  // Build a map for each employee: stage → count
-  const employeeStageMap = paginatedEmployees.map(emp => {
+  const totalPages = Math.ceil(filteredTopLevel.length / EMPLOYEES_PER_PAGE);
+
+  const employeeStageMap = paginatedTopLevel.map(emp => {
     const map = new Map<string, number>();
     emp.stages.forEach(s => map.set(s.leadStage, s.count));
     return { ...emp, stageMap: map };
   });
 
-  // Relevant stages that appear in current filtered data
   const relevantStages = (() => {
     const stageSet = new Set<string>();
     employeeStageMap.forEach(emp => {
@@ -325,7 +1045,6 @@ export function EmployeeStagesReport() {
     return [...ordered, ...extra];
   })();
 
-  // Active filters check
   const defaultLevel = levels.length > 0 ? extractLevelNumber(levels[0].name).toString() : '1';
   const hasActiveFilters =
     selectedLevel !== defaultLevel ||
@@ -334,8 +1053,11 @@ export function EmployeeStagesReport() {
     (dateFilter === 'custom' && (fromDate || toDate)) ||
     searchTerm !== '';
 
-  // Check if team mode is active (from API response)
   const isTeamMode = data?.filters?.team === true || showTeamOnly;
+
+  const hasTeam = (emp: EmployeeData) => {
+    return emp.teamSize && emp.teamSize > 1;
+  };
 
   // ─── Render ──────────────────────────────────────────────────────────────
   return (
@@ -395,7 +1117,6 @@ export function EmployeeStagesReport() {
 
         {showFilters && (
           <div className="flex flex-wrap items-center gap-3 w-full">
-            {/* Level Buttons - matching PoolStagesReport style */}
             {levels.length > 0 && (
               <div className="flex items-center gap-2">
                 <Label className="text-xs font-semibold text-slate-500 uppercase whitespace-nowrap">
@@ -425,7 +1146,6 @@ export function EmployeeStagesReport() {
               </div>
             )}
 
-            {/* Team Checkbox */}
             <div className="flex items-center gap-2 ml-1">
               <div className="flex items-center space-x-2">
                 <Checkbox
@@ -445,7 +1165,6 @@ export function EmployeeStagesReport() {
               </div>
             </div>
 
-            {/* Date filter */}
             <div className="w-[130px]">
               <Select value={dateFilter} onValueChange={setDateFilter}>
                 <SelectTrigger className="h-8 text-xs rounded-xl">
@@ -461,7 +1180,6 @@ export function EmployeeStagesReport() {
               </Select>
             </div>
 
-            {/* Custom Date Range */}
             {dateFilter === 'custom' && (
               <>
                 <div className="relative w-[130px]">
@@ -483,7 +1201,6 @@ export function EmployeeStagesReport() {
               </>
             )}
 
-            {/* Search - client-side */}
             <div className="relative w-48">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
               <Input
@@ -567,7 +1284,7 @@ export function EmployeeStagesReport() {
             Try adjusting filters or search term
           </p>
         </div>
-      ) : searchFilteredEmployees.length === 0 ? (
+      ) : paginatedTopLevel.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <Search className="w-12 h-12 text-slate-300 mb-3" />
           <p className="text-sm font-medium text-slate-600">No matching employees</p>
@@ -580,13 +1297,13 @@ export function EmployeeStagesReport() {
           {/* Summary badge */}
           <div className="flex items-center gap-4 text-sm text-slate-500">
             <span className="font-medium text-slate-700">
-              {searchFilteredEmployees.length} employees
+              {filteredTopLevel.length} employees
             </span>
             <span className="w-1 h-1 rounded-full bg-slate-300" />
             <span>
               Total leads:{' '}
               <span className="font-semibold text-slate-800">
-                {searchFilteredEmployees.reduce((sum, emp) => sum + emp.totalLead, 0)}
+                {filteredTopLevel.reduce((sum, emp) => sum + emp.totalLead, 0)}
               </span>
             </span>
             {isTeamMode && (
@@ -600,7 +1317,7 @@ export function EmployeeStagesReport() {
             )}
           </div>
 
-          {/* Table */}
+          {/* Main Table */}
           {loadingStages ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
@@ -608,99 +1325,164 @@ export function EmployeeStagesReport() {
             </div>
           ) : (
             <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
-              <Table className="min-w-[800px]">
+              <Table>
                 <TableHeader>
                   <TableRow className="bg-slate-50 hover:bg-slate-50 border-b border-slate-100">
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase sticky left-0 bg-slate-50 z-10 min-w-[140px]">
-                      Lead Stage
+                    <TableHead className="text-[10px] font-semibold text-slate-500 uppercase sticky left-0 bg-slate-50 z-10 min-w-[160px]">
+                      Employee
                     </TableHead>
-                    {employeeStageMap.map(emp => (
+                    {relevantStages.map(stage => (
                       <TableHead
-                        key={emp.employeeId}
-                        className="text-xs text-center min-w-[110px] py-3"
+                        key={stage}
+                        className="text-[10px] text-center min-w-[60px] py-2 font-semibold text-slate-600 whitespace-nowrap"
                       >
-                        <div className="font-semibold text-slate-800">{emp.employeeName}</div>
-                        <div className="text-[10px] font-normal text-slate-400 mt-0.5">
-                          Total: {emp.totalLead}
-                        </div>
-                        {emp.employeeLevel && (
-                          <div className="text-[9px] font-normal text-slate-400 mt-0.5">
-                            L{emp.employeeLevel}
-                          </div>
-                        )}
-                        {emp.teamSize && emp.teamSize > 1 && (
-                          <div className="text-[9px] font-normal text-orange-500 mt-0.5">
-                            Team: {emp.teamSize}
-                          </div>
-                        )}
+                        {stage}
                       </TableHead>
                     ))}
+                    <TableHead className="text-[10px] text-center min-w-[50px] py-2 font-semibold text-slate-600">
+                      Total
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {/* Total Lead row (summary) */}
-                  <TableRow className="bg-orange-50/30 hover:bg-orange-50/50 border-b border-slate-100">
-                    <TableCell className="text-xs font-semibold text-slate-800 sticky left-0 bg-white border-r z-10 py-3">
-                      Total Lead
-                    </TableCell>
-                    {employeeStageMap.map(emp => (
-                      <TableCell
-                        key={emp.employeeId}
-                        className="text-xs text-center font-bold text-orange-700 py-3"
-                      >
-                        {emp.totalLead}
-                      </TableCell>
-                    ))}
-                  </TableRow>
+                  {paginatedTopLevel.map(emp => {
+                    const isExpanded = expandedEmployees.has(emp.employeeId);
+                    const hasTeamMembers = hasTeam(emp);
+                    const isLoading = loadingHierarchy.has(emp.employeeId);
+                    const stageMap = new Map<string, number>();
+                    emp.stages.forEach(s => stageMap.set(s.leadStage, s.count));
 
-                  {/* Stage rows */}
-                  {relevantStages.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={employeeStageMap.length + 1} className="text-center py-8 text-sm text-slate-500">
-                        No stage data for the selected filters.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    relevantStages.map(stageName => (
-                      <TableRow
-                        key={stageName}
-                        className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors"
-                      >
-                        <TableCell className="text-xs font-medium text-slate-700 sticky left-0 bg-white border-r z-10 py-3">
-                          {stageName}
-                        </TableCell>
-                        {employeeStageMap.map(emp => {
-                          const count = emp.stageMap.get(stageName) || 0;
-                          const total = emp.totalLead || 1;
-                          const pct = ((count / total) * 100).toFixed(1);
-                          return (
-                            <TableCell
-                              key={emp.employeeId}
-                              className="text-xs text-center py-3"
-                            >
-                              <div className="flex flex-col items-center">
-                                <span
-                                  className={cn(
-                                    'font-medium',
-                                    count > 0
-                                      ? 'text-slate-800'
-                                      : 'text-slate-300'
-                                  )}
-                                >
-                                  {count || '-'}
-                                </span>
-                                {count > 0 && (
-                                  <span className="text-[10px] text-slate-400 mt-0.5">
-                                    {pct}%
+                    return (
+                      <>
+                        <TableRow
+                          key={emp.employeeId}
+                          className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
+                        >
+                          <TableCell className="sticky left-0 bg-white border-r z-10 py-2.5">
+                            <div className="flex items-center gap-2 min-w-[150px]">
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs font-medium text-slate-800 truncate max-w-[120px]">
+                                    {emp.employeeName}
                                   </span>
-                                )}
+                                  {hasTeamMembers && (
+                                    <button
+                                      onClick={() => toggleExpand(emp.employeeId, true)}
+                                      disabled={isLoading}
+                                      className={cn(
+                                        "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
+                                        "hover:bg-orange-100 text-orange-500 border border-orange-200",
+                                        isExpanded && "bg-orange-100 border-orange-300",
+                                        isLoading && "opacity-50 cursor-not-allowed"
+                                      )}
+                                    >
+                                      {isLoading ? (
+                                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                      ) : isExpanded ? (
+                                        <Minus className="w-2.5 h-2.5" />
+                                      ) : (
+                                        <Plus className="w-2.5 h-2.5" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-[9px] text-slate-400 flex-wrap">
+                                  <span>ID: {emp.employeeEmployeeId || emp.employeeId}</span>
+                                  {emp.employeeLevel && <span>• L{emp.employeeLevel}</span>}
+                                  {emp.teamSize && emp.teamSize > 1 && (
+                                    <span className="text-orange-500 font-medium">
+                                      • Team: {emp.teamSize}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          {relevantStages.map(stage => {
+                            const count = stageMap.get(stage) || 0;
+                            const total = emp.totalLead || 1;
+                            const pct = ((count / total) * 100).toFixed(1);
+                            const isLoadingDetail = loadingStageDetail === `${emp.employeeId}-${stage}`;
+                            
+                            return (
+                              <TableCell
+                                key={stage}
+                                className="text-xs text-center py-2.5"
+                              >
+                                <button
+                                  onClick={() => count > 0 && handleStageClick(emp.employeeId, stage)}
+                                  disabled={count === 0 || isLoadingDetail}
+                                  className={cn(
+                                    "flex flex-col items-center transition-all",
+                                    count > 0 && "hover:scale-110 cursor-pointer",
+                                    count === 0 && "cursor-default opacity-50",
+                                    isLoadingDetail && "opacity-50 cursor-wait"
+                                  )}
+                                  title={count > 0 ? `Click to view ${stage} leads` : 'No leads'}
+                                >
+                                  {isLoadingDetail ? (
+                                    <Loader2 className="w-3 h-3 animate-spin text-orange-500" />
+                                  ) : (
+                                    <>
+                                      <span
+                                        className={cn(
+                                          'font-medium text-xs',
+                                          count > 0 ? 'text-slate-800 hover:text-orange-600' : 'text-slate-300'
+                                        )}
+                                      >
+                                        {count || '-'}
+                                      </span>
+                                      {count > 0 && (
+                                        <span className="text-[8px] text-slate-400 mt-0.5">
+                                          {pct}%
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
+                                </button>
+                              </TableCell>
+                            );
+                          })}
+                          <TableCell className="text-xs text-center font-bold text-orange-700 py-2.5">
+                            {emp.totalLead}
+                          </TableCell>
+                        </TableRow>
+
+                        {/* Nested Team Members Table */}
+                        {isExpanded && emp.children && emp.children.length > 0 && (
+                          <TableRow>
+                            <TableCell colSpan={relevantStages.length + 2} className="p-0 bg-slate-50/30">
+                              <div className="px-4 py-2">
+                                <TeamMemberTable
+                                  teamMembers={emp.children}
+                                  stages={relevantStages}
+                                  level={1}
+                                  expandedEmployees={expandedEmployees}
+                                  loadingHierarchy={loadingHierarchy}
+                                  toggleExpand={toggleExpand}
+                                  onStageClick={handleStageClick}
+                                  loadingStageDetail={loadingStageDetail}
+                                />
                               </div>
                             </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    ))
-                  )}
+                          </TableRow>
+                        )}
+
+                        {/* Show message if expanded but no team members */}
+                        {isExpanded && (!emp.children || emp.children.length === 0) && (
+                          <TableRow>
+                            <TableCell colSpan={relevantStages.length + 2} className="p-0">
+                              <div className="px-4 py-2">
+                                <div className="text-xs text-slate-400 py-2 px-4 bg-slate-50 rounded-lg border border-slate-200">
+                                  No team members found
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -736,6 +1518,20 @@ export function EmployeeStagesReport() {
           )}
         </div>
       )}
+
+      {/* Stage Detail Modal */}
+      <StageDetailModal
+        isOpen={modalOpen}
+        onClose={closeModal}
+        data={modalData}
+        loading={modalLoading}
+        employeeName={selectedEmployee?.name || ''}
+        stageName={selectedStage}
+        onPageChange={handleModalPageChange}
+        onLimitChange={handleModalLimitChange}
+        currentPage={modalPage}
+        pageLimit={modalLimit}
+      />
     </div>
   );
 }

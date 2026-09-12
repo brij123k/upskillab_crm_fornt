@@ -32,14 +32,26 @@ import {
   ChevronDown,
   Layers,
   Users,
+  X,
+  Mail,
+  Phone,
+  User as UserIcon,
+  Tag,
+  List,
+  LayoutGrid,
+  UserCog,
 } from 'lucide-react';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
+// ───────────────────────────────────────────────────────────────────────────────
+// Types
+// ───────────────────────────────────────────────────────────────────────────────
+
 interface StageItem {
-  stage: string;    // API returns "stage" not "leadStage"
+  stage: string;
   count: number;
 }
 
@@ -70,6 +82,38 @@ interface LevelType {
   name: string;
 }
 
+interface LeadDetail {
+  leadId: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  stage?: {
+    name: string;
+  };
+  [key: string]: any;
+}
+
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  totalLeads: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+interface StageDetailResponse {
+  stageName: string;
+  team?: boolean;
+  totalLeads: number;
+  pagination: PaginationInfo;
+  leads: LeadDetail[];
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Constants
+// ───────────────────────────────────────────────────────────────────────────────
+
 const dateFilterOptions = [
   { value: 'today', label: 'Today' },
   { value: 'week', label: 'This Week' },
@@ -79,6 +123,210 @@ const dateFilterOptions = [
 ];
 
 const POOLS_PER_PAGE = 6;
+const MODAL_LEADS_PER_PAGE = 10;
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Sub-component: Stage Detail Modal
+// ───────────────────────────────────────────────────────────────────────────────
+
+interface StageDetailModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  data: StageDetailResponse | null;
+  loading: boolean;
+  poolName: string;
+  stageName: string;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
+  currentPage: number;
+  pageLimit: number;
+}
+
+function StageDetailModal({
+  isOpen,
+  onClose,
+  data,
+  loading,
+  poolName,
+  stageName,
+  onPageChange,
+  onLimitChange,
+  currentPage,
+  pageLimit,
+}: StageDetailModalProps) {
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+
+  if (!isOpen) return null;
+
+  const pagination = data?.pagination;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col m-4">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-slate-200 flex-shrink-0">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+              <Tag className="w-5 h-5 text-orange-500" />
+              {stageName} Leads
+            </h2>
+            <p className="text-sm text-slate-500 mt-1">
+              Pool: <span className="font-medium text-slate-700">{poolName}</span>
+              {data && (
+                <span className="ml-3">
+                  Total: <span className="font-semibold text-orange-600">{data.totalLeads}</span> leads
+                </span>
+              )}
+              {data?.team && (
+                <span className="ml-3 text-orange-600">
+                  <UserCog className="w-3.5 h-3.5 inline mr-1" />
+                  Team View
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+          
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="rounded-full hover:bg-slate-100 h-8 w-8 p-0"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-orange-400" />
+              <p className="ml-3 text-sm text-slate-500">Loading leads...</p>
+            </div>
+          ) : !data || data.leads.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Users className="w-12 h-12 text-slate-300 mb-3" />
+              <p className="text-sm font-medium text-slate-600">No leads found</p>
+              <p className="text-xs text-slate-400 mt-1">
+                No leads in {stageName} stage for this pool
+              </p>
+            </div>
+          ) :(
+            // Table View
+            <div className="overflow-x-auto border border-slate-200 rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50">
+                    <TableHead className="text-xs font-semibold text-slate-600">#</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Lead ID</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Name</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Email</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Phone</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Stage</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.leads.map((lead, index) => {
+                    const globalIndex = ((currentPage - 1) * pageLimit) + index + 1;
+                    return (
+                      <TableRow key={lead.leadId || index} className="hover:bg-slate-50/60">
+                        <TableCell className="text-xs text-slate-500">{globalIndex}</TableCell>
+                        <TableCell className="text-xs font-mono text-slate-600">
+                          {lead.leadId || '-'}
+                        </TableCell>
+                        <TableCell className="text-xs font-medium text-slate-800">
+                          {lead.name || 'Unnamed Lead'}
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-600">
+                          {lead.email || '-'}
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-600">
+                          {lead.phone || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                            {lead.stage?.name || stageName}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
+
+        {/* Footer with Pagination */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-slate-200 flex-shrink-0">
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-slate-500">
+              Showing {data?.leads.length || 0} of {data?.totalLeads || 0} leads
+            </span>
+            
+            {/* Limit selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500">Show:</span>
+              <Select
+                value={pageLimit.toString()}
+                onValueChange={(value) => onLimitChange(parseInt(value))}
+              >
+                <SelectTrigger className="h-7 w-[70px] text-xs rounded-lg">
+                  <SelectValue placeholder="10" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[10, 20, 50, 100].map(limit => (
+                    <SelectItem key={limit} value={limit.toString()} className="text-xs">
+                      {limit}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(currentPage - 1)}
+              disabled={!pagination?.hasPreviousPage || loading}
+              className="h-8 w-8 p-0 rounded-lg"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <span className="text-xs text-slate-500 min-w-[60px] text-center">
+              Page {currentPage} of {pagination?.totalPages || 1}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={!pagination?.hasNextPage || loading}
+              className="h-8 w-8 p-0 rounded-lg"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+              className="rounded-lg ml-2"
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Main Component
+// ───────────────────────────────────────────────────────────────────────────────
 
 export function PoolStagesReport() {
   const [loading, setLoading] = useState(true);
@@ -107,6 +355,19 @@ export function PoolStagesReport() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(0);
+
+  // ─── Stage Detail Modal State ────────────────────────────────────────────
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalData, setModalData] = useState<StageDetailResponse | null>(null);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [selectedPool, setSelectedPool] = useState<{ id: string; name: string } | null>(null);
+  const [selectedStage, setSelectedStage] = useState<string>('');
+  const [loadingStageDetail, setLoadingStageDetail] = useState<string | null>(null);
+  
+  // Modal pagination state
+  const [modalPage, setModalPage] = useState(1);
+  const [modalLimit, setModalLimit] = useState(MODAL_LEADS_PER_PAGE);
+  const [modalPoolId, setModalPoolId] = useState<string>('');
 
   // Fetch levels for radio buttons
   useEffect(() => {
@@ -214,6 +475,129 @@ export function PoolStagesReport() {
   useEffect(() => {
     setCurrentPage(0);
   }, [levelInput, showTeamOnly, dateFilter, fromDate, toDate, poolSearch]);
+
+  // ─── Fetch Stage Detail ──────────────────────────────────────────────────
+  const fetchStageDetail = useCallback(async (
+    poolId: string,
+    stageName: string,
+    page: number = 1,
+    limit: number = MODAL_LEADS_PER_PAGE
+  ) => {
+    const loadingKey = `${poolId}-${stageName}-${page}-${limit}`;
+    if (loadingStageDetail === loadingKey) return;
+
+    setLoadingStageDetail(loadingKey);
+    setModalLoading(true);
+    setModalOpen(true);
+    setSelectedStage(stageName);
+    setModalPoolId(poolId);
+    setModalPage(page);
+    setModalLimit(limit);
+
+    try {
+      const params: any = {};
+
+      // Level parameter
+      params.level = parseInt(levelInput) || 1;
+
+      // Team filter
+      if (showTeamOnly) {
+        params.team = true;
+      }
+
+      // Date filter
+      if (dateFilter === 'custom') {
+        if (fromDate && toDate) {
+          params.fromDate = fromDate;
+          params.toDate = toDate;
+        }
+      } else {
+        params.dateFilter = dateFilter;
+      }
+
+      // Stage and pagination params
+      params.stageName = stageName;
+      params.poolId = poolId;
+      params.page = page;
+      params.limit = limit;
+
+      const response = await getDataHandlerWithToken(
+        ApiConfig.poolWiseStagesleads,
+        params,
+        null,
+        true
+      );
+
+      if (response) {
+        const stageData = response.data || response;
+        setModalData({
+          stageName: stageData.stageName || stageName,
+          team: stageData.team || false,
+          totalLeads: stageData.totalLeads || 0,
+          pagination: stageData.pagination || {
+            page: page,
+            limit: limit,
+            totalLeads: 0,
+            totalPages: 1,
+            hasNextPage: false,
+            hasPreviousPage: false,
+          },
+          leads: stageData.leads || [],
+        });
+
+        // Find pool name
+        const pool = data?.poolWiseData?.find(p => p.poolId === poolId);
+        setSelectedPool({ id: poolId, name: pool?.poolName || poolId });
+      } else {
+        setModalData(null);
+        toast({
+          title: 'Error',
+          description: 'Failed to load stage details',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to load stage details',
+        variant: 'destructive',
+      });
+      setModalData(null);
+    } finally {
+      setModalLoading(false);
+      setLoadingStageDetail(null);
+    }
+  }, [levelInput, showTeamOnly, dateFilter, fromDate, toDate, data, loadingStageDetail]);
+
+  // ─── Handle Stage Click ──────────────────────────────────────────────────
+  const handleStageClick = useCallback((poolId: string, stageName: string) => {
+    fetchStageDetail(poolId, stageName, 1, modalLimit);
+  }, [fetchStageDetail, modalLimit]);
+
+  // ─── Handle Modal Page Change ────────────────────────────────────────────
+  const handleModalPageChange = useCallback((newPage: number) => {
+    if (modalPoolId && selectedStage) {
+      fetchStageDetail(modalPoolId, selectedStage, newPage, modalLimit);
+    }
+  }, [modalPoolId, selectedStage, modalLimit, fetchStageDetail]);
+
+  // ─── Handle Modal Limit Change ───────────────────────────────────────────
+  const handleModalLimitChange = useCallback((newLimit: number) => {
+    setModalLimit(newLimit);
+    if (modalPoolId && selectedStage) {
+      fetchStageDetail(modalPoolId, selectedStage, 1, newLimit);
+    }
+  }, [modalPoolId, selectedStage, fetchStageDetail]);
+
+  // ─── Close Modal ─────────────────────────────────────────────────────────
+  const closeModal = useCallback(() => {
+    setModalOpen(false);
+    setModalData(null);
+    setSelectedPool(null);
+    setSelectedStage('');
+    setModalLoading(false);
+    setModalPage(1);
+  }, []);
 
   // Export CSV
   const handleExport = () => {
@@ -557,7 +941,7 @@ export function PoolStagesReport() {
                       Lead Stage
                     </TableHead>
                     {poolStageMap.map(pool => (
-                      <TableHead key={pool.poolId} className="text-xs text-center min-w-[110px] py-3">
+                      <TableHead key={pool.poolId} className="text-xs text-left min-w-[110px] py-3">
                         <div className="font-semibold text-slate-800">{pool.poolName}</div>
                         <div className="text-[10px] font-normal text-slate-400 mt-0.5">
                           Total: {pool.totalLead}
@@ -591,21 +975,41 @@ export function PoolStagesReport() {
                           const count = pool.stageMap.get(stageName) || 0;
                           const total = pool.totalLead || 1;
                           const pct = ((count / total) * 100).toFixed(1);
+                          const isLoadingDetail = loadingStageDetail === `${pool.poolId}-${stageName}`;
+                          
                           return (
-                            <TableCell key={pool.poolId} className="text-xs text-center py-3">
-                              <div className="flex flex-col items-center">
-                                <span className={cn(
-                                  'font-medium',
-                                  count > 0 ? 'text-slate-800' : 'text-slate-300'
-                                )}>
-                                  {count || '-'}
-                                </span>
-                                {count > 0 && (
-                                  <span className="text-[10px] text-slate-400 mt-0.5">
-                                    {pct}%
-                                  </span>
+                            <TableCell key={pool.poolId} className="text-xs text-center py-3 px-auto">
+                              <button
+                                onClick={() => count > 0 && handleStageClick(pool.poolId, stageName)}
+                                disabled={count === 0 || isLoadingDetail}
+                                className={cn(
+                                  "flex flex-col items-center transition-all",
+                                  count > 0 && "hover:scale-110 cursor-pointer",
+                                  count === 0 && "cursor-default opacity-50",
+                                  isLoadingDetail && "opacity-50 cursor-wait"
                                 )}
-                              </div>
+                                title={count > 0 ? `Click to view ${stageName} leads` : 'No leads'}
+                              >
+                                {isLoadingDetail ? (
+                                  <Loader2 className="w-3 h-3 animate-spin text-orange-500" />
+                                ) : (
+                                  <>
+                                    <span
+                                      className={cn(
+                                        'font-medium',
+                                        count > 0 ? 'text-slate-800 hover:text-orange-600' : 'text-slate-300'
+                                      )}
+                                    >
+                                      {count || '-'}
+                                    </span>
+                                    {count > 0 && (
+                                      <span className="text-[10px] text-slate-400 mt-0.5">
+                                        {pct}%
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </button>
                             </TableCell>
                           );
                         })}
@@ -647,6 +1051,20 @@ export function PoolStagesReport() {
           )}
         </div>
       )}
+
+      {/* Stage Detail Modal */}
+      <StageDetailModal
+        isOpen={modalOpen}
+        onClose={closeModal}
+        data={modalData}
+        loading={modalLoading}
+        poolName={selectedPool?.name || ''}
+        stageName={selectedStage}
+        onPageChange={handleModalPageChange}
+        onLimitChange={handleModalLimitChange}
+        currentPage={modalPage}
+        pageLimit={modalLimit}
+      />
     </div>
   );
 }
