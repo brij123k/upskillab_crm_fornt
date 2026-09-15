@@ -90,10 +90,12 @@ interface PoolWithOrders {
   orders: Order[];
   team?: boolean;
   teamSize?: number;
+  totalRevenue?: number;
 }
 
 interface EmployeeRevenue {
   employeeId: string;
+  totalRevenue: number;
   employeeName: string;
   employeeEmail: string;
   employeeNumber?: string;
@@ -117,6 +119,7 @@ interface ReportData {
   months: string[];
   startDate?: Date;
   endDate?: Date;
+  totalRevenue?: number;
   filters?: {
     level?: string | number | null;
     team?: boolean | null;
@@ -241,10 +244,10 @@ function TeamMemberTable({
               
               const poolMap = new Map<string, { amount: number; orders: Order[] }>();
               member.pools?.forEach(p => {
-                const rev = p.revenueByMonth?.[0]?.revenue || 0;
+                const rev = p.totalRevenue || 0;
                 poolMap.set(p.poolName, { amount: rev, orders: p.orders || [] });
               });
-              const memberTotal = Array.from(poolMap.values()).reduce((a, b) => a + b.amount, 0);
+              const memberTotal = member.totalRevenue;
 
               return (
                 <>
@@ -461,6 +464,7 @@ export function PoolRevenueReport() {
         const employees = response.employees || [];
         setData({
           employees: employees,
+          totalRevenue: response.totalRevenue || 0,
           pools: response.pools || [],
           months: response.months || [],
           startDate: response.startDate,
@@ -712,10 +716,7 @@ export function PoolRevenueReport() {
     !poolSearch || p.poolName.toLowerCase().includes(poolSearch.toLowerCase())
   );
 
-  const totalRevenue = filteredEmployees.reduce((sum, emp) => {
-    const empTotal = emp.pools?.reduce((s, p) => s + (p.revenueByMonth?.[0]?.revenue || 0), 0) || 0;
-    return sum + empTotal;
-  }, 0);
+  const totalRevenue = data?.totalRevenue || 0;
 
   const activeEmployees = filteredTopLevel.length;
   const totalPages = Math.ceil(filteredTopLevel.length / EMPLOYEES_PER_PAGE);
@@ -1046,10 +1047,10 @@ export function PoolRevenueReport() {
                     
                     const poolMap = new Map<string, { amount: number; orders: Order[] }>();
                     emp.pools?.forEach(p => {
-                      const rev = p.revenueByMonth?.[0]?.revenue || 0;
+                      const rev = p.totalRevenue || 0;
                       poolMap.set(p.poolName, { amount: rev, orders: p.orders || [] });
                     });
-                    const empTotal = Array.from(poolMap.values()).reduce((a, b) => a + b.amount, 0);
+                    const empTotal = emp.totalRevenue || 0;
 
                     return (
                       <>
@@ -1061,7 +1062,7 @@ export function PoolRevenueReport() {
                             <div className="flex flex-col">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="font-medium text-slate-800">{emp.employeeName}</span>
-                                {hasTeam && (
+                                {hasTeam && showTeamOnly? (
                                   <button
                                     onClick={() => toggleExpand(emp.employeeId, true)}
                                     disabled={isLoading}
@@ -1080,12 +1081,12 @@ export function PoolRevenueReport() {
                                       <Plus className="w-2.5 h-2.5" />
                                     )}
                                   </button>
-                                )}
-                                {emp.teamSize && emp.teamSize > 1 && (
+                                ):(<></>)}
+                                {emp.teamSize && emp.teamSize > 1 && showTeamOnly? (
                                   <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
                                     Team: {emp.teamSize}
                                   </span>
-                                )}
+                                ):(<></>)}
                               </div>
                               <span className="text-xs text-slate-400">{emp.employeeEmail}</span>
                               {emp.employeeEmployeeId && (
