@@ -1265,7 +1265,7 @@ export function UtilizationReport() {
                               >
                                 {emp.employeeName}
                               </span>
-                              {hasTeam && (
+                              {hasTeam && showTeamOnly && (
                                 <button
                                   onClick={() => toggleExpand(emp.employeeId, true)}
                                   disabled={isLoading}
@@ -1285,7 +1285,7 @@ export function UtilizationReport() {
                                   )}
                                 </button>
                               )}
-                              {emp.teamSize && emp.teamSize > 1 && (
+                              {emp.teamSize && emp.teamSize > 1 && showTeamOnly && (
                                 <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                                   Team: {emp.teamSize}
                                 </span>

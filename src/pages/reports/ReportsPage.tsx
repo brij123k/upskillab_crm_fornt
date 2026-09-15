@@ -37,7 +37,8 @@ import {
 /* -------------------------------------------------------------------------- */
 const REPORTS = [
   { id: 'stage-summary',               name: 'Stages',              icon: PieChart,      component: StageSummaryReport },
-  { id: 'employee-stages',             name: 'Employees',           icon: Users,         component: EmployeeStagesReport,permission: { module: 'reports', action: 'employee-stages' }  },
+  // { id: 'employee-stages',             name: 'Employees',           icon: Users,         component: EmployeeStagesReport,permission: { module: 'reports', action: 'employee-stages' }  },
+  { id: 'employee-stages',             name: 'Employees',           icon: Users,         component: EmployeeStagesReport},
   { id: 'pool-stages',                 name: 'Pools',               icon: Building2,     component: PoolStagesReport },
   { id: 'pool-revenue',                name: 'Revenue',             icon: IndianRupee,   component: PoolRevenueReport },
   { id: 'revenue-target-report',       name: 'Employee Tgt vs Ach',      icon: IndianRupee,   component: RevenueTargetReport,permission: { module: 'reports', action: 'revenue-target-report' } },

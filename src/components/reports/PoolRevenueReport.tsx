@@ -259,7 +259,7 @@ function TeamMemberTable({
                             <span className="text-xs font-medium text-slate-800 truncate max-w-[100px]">
                               {member.employeeName}
                             </span>
-                            {hasTeam && (
+                            {hasTeam? (
                               <button
                                 onClick={() => toggleExpand(member.employeeId, true)}
                                 disabled={isLoading}
@@ -278,12 +278,12 @@ function TeamMemberTable({
                                   <Plus className="w-2.5 h-2.5" />
                                 )}
                               </button>
-                            )}
-                            {member.teamSize && member.teamSize > 1 && (
+                            ):(<></>)}
+                            {member.teamSize && member.teamSize > 1? (
                               <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
                                 Team: {member.teamSize}
                               </span>
-                            )}
+                            ):(<></>)}
                           </div>
                           <span className="text-[9px] text-slate-400 truncate max-w-[120px]">
                             {member.employeeEmail}
