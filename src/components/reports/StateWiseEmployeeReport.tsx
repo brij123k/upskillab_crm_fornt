@@ -1159,7 +1159,7 @@ export function StateWiseEmployeeReport() {
                                 <span className="font-medium text-slate-800 hover:text-orange-600">
                                   {employee.employeeName}
                                 </span>
-                                {hasTeam && (
+                                {hasTeam && showTeamOnly ? (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1181,12 +1181,12 @@ export function StateWiseEmployeeReport() {
                                       <Plus className="w-2.5 h-2.5" />
                                     )}
                                   </button>
-                                )}
-                                {employee.teamSize && employee.teamSize > 1 && (
+                                ):(<></>)}
+                                {employee.teamSize && employee.teamSize > 1 && showTeamOnly ? (
                                   <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                                     Team: {employee.teamSize}
                                   </span>
-                                )}
+                                ):(<></>)}
                                 <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-slate-50">
                                   {employee.employeeCode}
                                 </Badge>

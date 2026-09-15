@@ -339,6 +339,7 @@ export function ConsultantPerformanceReport() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ConsultantPerformance[] | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [totalRevenue, setTotalRevenue] = useState(0);
 
   // Level filter
   const [levels, setLevels] = useState<any[]>([]);
@@ -521,7 +522,8 @@ export function ConsultantPerformanceReport() {
         null,
         true
       );
-      const consultants = response?.data || response || [];
+      const consultants = response?.employees || response || [];
+      setTotalRevenue(response?.totalRevenue || 0);
       const consultantArray = Array.isArray(consultants) ? consultants : [];
       setData(consultantArray);
       
@@ -854,8 +856,6 @@ export function ConsultantPerformanceReport() {
   const filteredTopLevel = topLevelConsultants.filter(c =>
     searchTerm ? c.consultantName?.toLowerCase().includes(searchTerm.toLowerCase()) : true
   );
-
-  const totalRevenue = filteredConsultants.reduce((sum, c) => sum + (c.bookedRevenue || 0), 0);
   const totalLeads = filteredConsultants.reduce((sum, c) => sum + (c.totalLeadAssigned || 0), 0);
   const totalAdmissions = filteredConsultants.reduce((sum, c) => sum + (c.admDone || 0), 0);
 
@@ -1010,7 +1010,7 @@ export function ConsultantPerformanceReport() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-base font-semibold text-slate-800">Consultant Performance</h3>
+          <h3 className="text-base font-semibold text-slate-800">Employee Performance</h3>
           <p className="text-sm text-slate-500">Revenue & admissions by consultant</p>
         </div>
         <div className="flex gap-2">
@@ -1437,7 +1437,7 @@ export function ConsultantPerformanceReport() {
                                 <span className="font-medium text-slate-800">
                                   {consultant.consultantName}
                                 </span>
-                                {hasTeam && (
+                                {hasTeam && showTeamOnly ? (
                                   <button
                                     onClick={() => toggleExpand(consultantId, true)}
                                     disabled={isLoading}
@@ -1456,12 +1456,12 @@ export function ConsultantPerformanceReport() {
                                       <Plus className="w-2.5 h-2.5" />
                                     )}
                                   </button>
-                                )}
-                                {consultant.teamSize && consultant.teamSize > 1 && (
+                                ):(<></>)}
+                                {consultant.teamSize && consultant.teamSize > 1 && showTeamOnly ? (
                                   <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                                     Team: {consultant.teamSize}
                                   </span>
-                                )}
+                                ):(<></>)}
                               </div>
                               {consultant.consultantEmail && (
                                 <span className="text-xs text-slate-400">{consultant.consultantEmail}</span>

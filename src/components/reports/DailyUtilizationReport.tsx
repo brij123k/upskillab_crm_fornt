@@ -1027,23 +1027,6 @@ export function DailyUtilizationReport() {
               </>
             )}
 
-            {/* Pool Filter */}
-            <div className="w-[180px]">
-              <Select value={selectedPoolId} onValueChange={setSelectedPoolId}>
-                <SelectTrigger className="h-8 text-xs rounded-xl">
-                  <SelectValue placeholder="All Pools" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-xs">All Pools</SelectItem>
-                  {pools.map((p: any) => (
-                    <SelectItem key={p._id} value={p._id} className="text-xs">
-                      {p.name || p.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Employee Search */}
             <div className="relative w-48">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
@@ -1185,7 +1168,7 @@ export function DailyUtilizationReport() {
                           <div className="flex flex-col">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span>{emp.employeeName}</span>
-                              {hasTeam && (
+                              {hasTeam && showTeamOnly ? (
                                 <button
                                   onClick={() => toggleExpand(emp.employeeId, true)}
                                   disabled={isLoading}
@@ -1204,12 +1187,12 @@ export function DailyUtilizationReport() {
                                     <Plus className="w-2.5 h-2.5" />
                                   )}
                                 </button>
-                              )}
-                              {emp.teamSize && emp.teamSize > 1 && (
+                              ):(<></>)}
+                              {emp.teamSize && emp.teamSize > 1 && showTeamOnly? (
                                 <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                                   Team: {emp.teamSize}
                                 </span>
-                              )}
+                              ):(<></>)}
                             </div>
                             {emp.employeeEmail && (
                               <span className="text-[10px] text-slate-400 truncate max-w-[120px]">
