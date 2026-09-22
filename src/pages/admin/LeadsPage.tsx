@@ -1669,6 +1669,7 @@ const handleBulkStageChange = async () => {
                                 <SelectItem value="facebook">Facebook</SelectItem>
                                 <SelectItem value="google">Google</SelectItem>
                                 <SelectItem value="positive">Positive</SelectItem>
+                                <SelectItem value="bootcamp">BootCamp</SelectItem>
                                 <SelectItem value="refurbished">Refurbished</SelectItem>
                                 <SelectItem value="api">API</SelectItem>
                               </SelectContent>
@@ -2086,6 +2087,7 @@ const handleBulkStageChange = async () => {
               <SelectItem value="facebook">Facebook</SelectItem>
               <SelectItem value="google">Google</SelectItem>
               <SelectItem value="positive">Positive</SelectItem>
+              <SelectItem value="bootcamp">Bootcamp</SelectItem>
               <SelectItem value="refurbished">Refurbished</SelectItem>
               <SelectItem value="api">API</SelectItem>
             </SelectContent>
