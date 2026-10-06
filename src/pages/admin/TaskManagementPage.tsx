@@ -69,6 +69,7 @@ import {
 import ApiConfig from '@/config/apiConfig';
 import { toast } from 'sonner';
 
+import { KpiCard, Avatar } from '@/components/reports/ReportUI';
 // Types (unchanged)
 interface User {
   _id: string;
@@ -413,50 +414,10 @@ export function TaskManagementPage() {
         {/* Stats Cards (if API provides stats) */}
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Tasks</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{stats.totalTasks}</p>
-                </div>
-                <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center">
-                  <ListTodo className="w-5 h-5 text-orange-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Completed</p>
-                  <p className="text-2xl font-bold text-emerald-600 mt-1">{stats.completed}</p>
-                </div>
-                <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">In Progress</p>
-                  <p className="text-2xl font-bold text-amber-600 mt-1">{stats.inProgress}</p>
-                </div>
-                <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
-                  <Activity className="w-5 h-5 text-amber-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Pending</p>
-                  <p className="text-2xl font-bold text-yellow-600 mt-1">{stats.pending}</p>
-                </div>
-                <div className="w-10 h-10 bg-yellow-50 rounded-xl flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-yellow-600" />
-                </div>
-              </div>
-            </Card>
+            <KpiCard icon={ListTodo} tone="orange" label="Total Tasks" value={stats.totalTasks} />
+            <KpiCard icon={CheckCircle2} tone="green" label="Completed" value={stats.completed} />
+            <KpiCard icon={Activity} tone="amber" label="In Progress" value={stats.inProgress} />
+            <KpiCard icon={Clock} tone="amber" label="Pending" value={stats.pending} />
           </div>
         )}
 
@@ -772,7 +733,7 @@ export function TaskManagementPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm text-slate-700">{task.assignTo.name}</div>
+                          <div className="flex items-center gap-2"><Avatar name={task.assignTo.name} className="w-7 h-7 text-[10px]" /><span className="text-sm font-medium text-slate-800">{task.assignTo.name}</span></div>
                           <div className="text-xs text-slate-400">{task.assignTo.email}</div>
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-sm text-slate-600">

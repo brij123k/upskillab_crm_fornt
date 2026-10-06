@@ -45,6 +45,8 @@ import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { KpiCard, KpiGrid, ChartCard, DonutWithLegend, RankedBars, HeatChip } from './ReportUI';
+import { Layers as LayersIcon, Trophy as TrophyIcon, BarChart3 as BarChartIcon, Building2 as PoolIcon } from 'lucide-react';
 
 // ───────────────────────────────────────────────────────────────────────────────
 // Types
@@ -926,6 +928,44 @@ export function PoolStagesReport() {
             )}
           </div>
 
+          {/* KPI tiles + charts */}
+          {(() => {
+            const leadSum = filteredPools.reduce((sum, p) => sum + p.totalLead, 0);
+            const topPool = [...filteredPools].sort((a, b) => b.totalLead - a.totalLead)[0];
+            const stageMap = new Map<string, number>();
+            filteredPools.forEach(p => p.stages.forEach(st => stageMap.set(st.stage, (stageMap.get(st.stage) || 0) + st.count)));
+            const stageTotals = Array.from(stageMap, ([name, value]) => ({ name, value }));
+            const topStage = [...stageTotals].sort((a, b) => b.value - a.value)[0];
+            return (
+              <>
+                <KpiGrid cols={4}>
+                  <KpiCard icon={Users} tone="orange" label="Total Leads" value={leadSum} sub={isTeamMode ? 'Team view' : 'Across all pools'} />
+                  <KpiCard icon={PoolIcon} tone="blue" label="Pools" value={filteredPools.length} sub={`${stageTotals.length} active stages`} />
+                  <KpiCard icon={TrophyIcon} tone="green" label="Top Pool" value={topPool?.poolName || '—'} sub={topPool ? `${topPool.totalLead} leads` : undefined} />
+                  <KpiCard
+                    icon={BarChartIcon}
+                    tone="violet"
+                    label="Top Stage"
+                    value={topStage?.name || '—'}
+                    sub={topStage ? `${topStage.value} leads · ${leadSum ? ((topStage.value / leadSum) * 100).toFixed(1) : 0}%` : undefined}
+                  />
+                </KpiGrid>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  <ChartCard
+                    title="Lead Stage Distribution"
+                    subtitle="All listed pools combined"
+                    action={<span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-2 py-1"><LayersIcon className="w-3 h-3" />Top 5</span>}
+                  >
+                    <DonutWithLegend data={stageTotals} centerValue={leadSum} centerLabel="Total Leads" />
+                  </ChartCard>
+                  <ChartCard title="Leads by Pool" subtitle="Ranked by total leads">
+                    <RankedBars data={filteredPools.map(p => ({ name: p.poolName, value: p.totalLead }))} limit={6} />
+                  </ChartCard>
+                </div>
+              </>
+            );
+          })()}
+
           {/* Table */}
           {loadingStages ? (
             <div className="flex items-center justify-center py-12">
@@ -983,8 +1023,8 @@ export function PoolStagesReport() {
                                 onClick={() => count > 0 && handleStageClick(pool.poolId, stageName)}
                                 disabled={count === 0 || isLoadingDetail}
                                 className={cn(
-                                  "flex flex-col items-center transition-all",
-                                  count > 0 && "hover:scale-110 cursor-pointer",
+                                  "mx-auto flex flex-col items-center transition-transform",
+                                  count > 0 && "hover:scale-105 cursor-pointer",
                                   count === 0 && "cursor-default opacity-50",
                                   isLoadingDetail && "opacity-50 cursor-wait"
                                 )}
@@ -993,21 +1033,7 @@ export function PoolStagesReport() {
                                 {isLoadingDetail ? (
                                   <Loader2 className="w-3 h-3 animate-spin text-orange-500" />
                                 ) : (
-                                  <>
-                                    <span
-                                      className={cn(
-                                        'font-medium',
-                                        count > 0 ? 'text-slate-800 hover:text-orange-600' : 'text-slate-300'
-                                      )}
-                                    >
-                                      {count || '-'}
-                                    </span>
-                                    {count > 0 && (
-                                      <span className="text-[10px] text-slate-400 mt-0.5">
-                                        {pct}%
-                                      </span>
-                                    )}
-                                  </>
+                                  <HeatChip count={count} pct={Number(pct)} />
                                 )}
                               </button>
                             </TableCell>

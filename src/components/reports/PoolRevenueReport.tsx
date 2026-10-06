@@ -52,6 +52,7 @@ import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { KpiCard, KpiGrid, ChartCard, DonutWithLegend, RankedBars, Avatar } from './ReportUI';
 
 // ───────────────────────────────────────────────────────────────────────────────
 // Types
@@ -259,7 +260,8 @@ function TeamMemberTable({
                       <div className="flex items-center gap-2 min-w-[150px]">
                         <div className="flex flex-col">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-xs font-medium text-slate-800 truncate max-w-[100px]">
+                            <Avatar name={member.employeeName} className="w-7 h-7 text-[10px]" />
+                            <span className="text-xs font-semibold text-slate-900 truncate max-w-[110px]">
                               {member.employeeName}
                             </span>
                             {hasTeam? (
@@ -308,8 +310,8 @@ function TeamMemberTable({
                             <button
                               onClick={() => onRevenueClick(member, pool.poolName, orders)}
                               className={cn(
-                                "font-medium cursor-pointer transition-all hover:scale-105 inline-flex items-center gap-1",
-                                "text-emerald-600 hover:text-emerald-700"
+                                "cursor-pointer transition-all hover:-translate-y-px inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12.5px] font-semibold tabular-nums",
+                                "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-100"
                               )}
                               title="Click to view orders"
                             >
@@ -317,7 +319,7 @@ function TeamMemberTable({
                               <Eye className="w-2.5 h-2.5 opacity-60" />
                             </button>
                           ) : (
-                            <span className="text-slate-400 text-[10px]">
+                            <span className="text-slate-300 font-normal">
                               {formatCurrency(0)}
                             </span>
                           )}
@@ -325,7 +327,7 @@ function TeamMemberTable({
                       );
                     })}
                     <TableCell className="text-xs text-center font-semibold py-2 bg-orange-50/30">
-                      <span className={memberTotal > 0 ? "text-orange-600" : "text-slate-400"}>
+                      <span className={cn("inline-flex justify-center rounded-lg px-2.5 py-1 text-[12.5px] font-bold tabular-nums", memberTotal > 0 ? "bg-slate-800 text-white" : "text-slate-300 font-normal")}>
                         {formatCurrency(memberTotal)}
                       </span>
                     </TableCell>
@@ -959,58 +961,44 @@ export function PoolRevenueReport() {
         </div>
       ) : (
         <div className="space-y-5">
-          {/* Analytics Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-            <Card className="p-5 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Revenue</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1.5">{formatCurrency(totalRevenue)}</p>
+          {/* KPI tiles + charts */}
+          {(() => {
+            const poolRev = new Map<string, number>();
+            let orderCount = 0;
+            filteredTopLevel.forEach(emp => emp.pools?.forEach(p => {
+              poolRev.set(p.poolName, (poolRev.get(p.poolName) || 0) + (p.totalRevenue || 0));
+              orderCount += p.orders?.length || 0;
+            }));
+            const poolData = Array.from(poolRev, ([name, value]) => ({ name, value }));
+            const topEmp = [...filteredTopLevel].sort((a, b) => (b.totalRevenue || 0) - (a.totalRevenue || 0))[0];
+            return (
+              <>
+                <KpiGrid cols={isTeamMode ? 5 : 4}>
+                  <KpiCard icon={IndianRupee} tone="orange" label="Total Revenue" value={formatCurrency(totalRevenue)} sub={`${orderCount} orders`} />
+                  <KpiCard icon={Users} tone="green" label="Active Employees" value={activeEmployees} sub={activeEmployees ? `Avg ${formatCurrency(totalRevenue / activeEmployees)}` : undefined} />
+                  <KpiCard icon={Building2} tone="blue" label="Total Pools" value={allPools.length} sub={`${poolData.filter(p => p.value > 0).length} with revenue`} />
+                  <KpiCard icon={TrendingUp} tone="violet" label="Top Earner" value={topEmp?.employeeName || '—'} sub={topEmp ? formatCurrency(topEmp.totalRevenue || 0) : undefined} />
+                  {isTeamMode && <KpiCard icon={UserCog} tone="rose" label="Team Mode" value="Active" sub="Showing team totals" />}
+                </KpiGrid>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  <ChartCard title="Revenue by Pool" subtitle="Share of total revenue">
+                    <DonutWithLegend
+                      data={poolData}
+                      centerValue={formatCurrency(totalRevenue)}
+                      centerLabel="Total Revenue"
+                      formatValue={formatCurrency}
+                    />
+                  </ChartCard>
+                  <ChartCard title="Top Earners" subtitle="Ranked by revenue">
+                    <RankedBars
+                      data={filteredTopLevel.map(e => ({ name: e.employeeName, value: e.totalRevenue || 0 }))}
+                      formatValue={formatCurrency}
+                    />
+                  </ChartCard>
                 </div>
-                <div className="w-11 h-11 rounded-xl bg-orange-50 flex items-center justify-center">
-                  <IndianRupee className="w-5 h-5 text-orange-500" />
-                </div>
-              </div>
-            </Card>
-            
-            <Card className="p-5 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Active Employees</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1.5">{activeEmployees}</p>
-                </div>
-                <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-emerald-500" />
-                </div>
-              </div>
-            </Card>
-            
-            <Card className="p-5 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Pools</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1.5">{allPools.length}</p>
-                </div>
-                <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center">
-                  <Building2 className="w-5 h-5 text-blue-500" />
-                </div>
-              </div>
-            </Card>
-
-            {isTeamMode && (
-              <Card className="p-5 bg-orange-50 border border-orange-200 shadow-sm">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-orange-600 uppercase tracking-wider">Team Mode</p>
-                    <p className="text-sm font-semibold text-orange-700 mt-1.5">Active</p>
-                  </div>
-                  <div className="w-11 h-11 rounded-xl bg-orange-100 flex items-center justify-center">
-                    <UserCog className="w-5 h-5 text-orange-600" />
-                  </div>
-                </div>
-              </Card>
-            )}
-          </div>
+              </>
+            );
+          })()}
 
           {/* Table */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -1061,7 +1049,8 @@ export function PoolRevenueReport() {
                           <TableCell className="text-sm sticky left-0 bg-white border-r border-slate-100 z-10 px-5 py-3.5">
                             <div className="flex flex-col">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-medium text-slate-800">{emp.employeeName}</span>
+                                <Avatar name={emp.employeeName} />
+                                <span className="font-semibold text-slate-900">{emp.employeeName}</span>
                                 {hasTeam && showTeamOnly? (
                                   <button
                                     onClick={() => toggleExpand(emp.employeeId, true)}
@@ -1108,8 +1097,8 @@ export function PoolRevenueReport() {
                                   <button
                                     onClick={() => handleRevenueClick(emp, pool.poolName, orders)}
                                     className={cn(
-                                      "font-medium cursor-pointer transition-all hover:scale-105 inline-flex items-center gap-1.5",
-                                      "text-emerald-600 hover:text-emerald-700"
+                                      "cursor-pointer transition-all hover:-translate-y-px inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-semibold tabular-nums",
+                                      "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-100"
                                     )}
                                     title="Click to view orders"
                                   >
@@ -1117,7 +1106,7 @@ export function PoolRevenueReport() {
                                     <Eye className="w-3 h-3 opacity-60" />
                                   </button>
                                 ) : (
-                                  <span className="text-slate-400">
+                                  <span className="text-slate-300 font-normal">
                                     {formatCurrency(0)}
                                   </span>
                                 )}
@@ -1126,7 +1115,8 @@ export function PoolRevenueReport() {
                           })}
                           <TableCell className="text-sm text-center font-semibold px-4 py-3.5 bg-orange-50/30 border-l border-slate-200">
                             <span className={cn(
-                              empTotal > 0 ? "text-orange-600" : "text-slate-400"
+                              "inline-flex justify-center rounded-lg px-3 py-1 text-[13px] font-bold tabular-nums",
+                              empTotal > 0 ? "bg-slate-900 text-white" : "text-slate-300 font-normal"
                             )}>
                               {formatCurrency(empTotal)}
                             </span>

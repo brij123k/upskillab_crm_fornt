@@ -52,6 +52,7 @@ import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { KpiCard, KpiGrid, ChartCard, TrendChart, RankedBars, Avatar } from './ReportUI';
 
 /* -------------------------------------------------------------------------- */
 /*                               Types                                        */
@@ -201,7 +202,8 @@ function TeamMemberTable({
                     <TableCell className="sticky left-0 bg-white border-r z-10 py-2">
                       <div className="flex flex-col min-w-[120px]">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-medium text-slate-800 truncate max-w-[100px]">
+                          <Avatar name={member.employeeName} className="w-7 h-7 text-[10px]" />
+                          <span className="text-xs font-semibold text-slate-900 truncate max-w-[110px]">
                             {member.employeeName}
                           </span>
                           {hasTeam ?(
@@ -245,14 +247,11 @@ function TeamMemberTable({
                           {hasData ? (
                             <button
                               onClick={() => onCallClick(member.employeeId, member.employeeName, date)}
-                              className="inline-flex flex-col items-center px-2 py-1 rounded-lg bg-orange-50/70 hover:bg-orange-100 transition-all hover:scale-105 cursor-pointer"
+                              className="inline-flex min-w-[4.25rem] flex-col items-stretch gap-1 rounded-xl bg-white px-2.5 py-1.5 ring-1 ring-inset ring-slate-200 shadow-sm transition-all hover:ring-orange-300 hover:bg-orange-50/60 hover:-translate-y-px cursor-pointer"
                             >
-                              <span className="text-xs font-medium text-slate-800">{metric.dial}</span>
-                              {metric.answered > 0 && (
-                                <span className="text-[8px] text-orange-600 mt-0.5">
-                                  {metric.answered} ans
-                                </span>
-                              )}
+                              <span className="text-[13px] font-bold text-slate-900 leading-none tabular-nums">{metric.dial}</span>
+                              <span className="text-[10.5px] font-medium text-emerald-600 leading-none tabular-nums">{metric.answered || 0} ans</span>
+                              <span className="h-1 w-full rounded-full bg-slate-100 overflow-hidden"><span className="block h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, ((metric.answered || 0) / metric.dial) * 100)}%` }} /></span>
                             </button>
                           ) : (
                             <span className="text-xs text-slate-300">-</span>
@@ -1141,6 +1140,57 @@ export function DailyUtilizationReport() {
             )}
           </div>
 
+          {/* KPI tiles + charts */}
+          {(() => {
+            const dayTotals = dates.map((date: string) => {
+              let dial = 0, answered = 0;
+              filteredTopLevel.forEach(emp => {
+                const m = emp.dailyMetrics?.find((x: any) => x.date === date);
+                dial += m?.dial || 0;
+                answered += m?.answered || 0;
+              });
+              return { day: formatDateShort(date), dial, answered };
+            });
+            const totalDial = dayTotals.reduce((s2, d) => s2 + d.dial, 0);
+            const totalAnswered = dayTotals.reduce((s2, d) => s2 + d.answered, 0);
+            const empTotals = filteredTopLevel.map(emp => ({
+              name: emp.employeeName,
+              value: (emp.dailyMetrics || []).reduce((s2: number, m: any) => s2 + (m.dial || 0), 0),
+            }));
+            const connect = totalDial ? (totalAnswered / totalDial) * 100 : 0;
+            return (
+              <>
+                <KpiGrid cols={4}>
+                  <KpiCard icon={Phone} tone="orange" label="Total Dials" value={totalDial.toLocaleString('en-IN')} sub={`${dates.length} day${dates.length === 1 ? '' : 's'}`} />
+                  <KpiCard icon={PhoneCall} tone="blue" label="Answered" value={totalAnswered.toLocaleString('en-IN')} sub={`${connect.toFixed(1)}% connect rate`} progress={connect} />
+                  <KpiCard icon={Users} tone="green" label="Employees" value={filteredTopLevel.length} sub={isTeamMode ? 'Team view' : 'Individual view'} />
+                  <KpiCard
+                    icon={Calendar}
+                    tone="violet"
+                    label="Avg Dials / Day"
+                    value={dates.length ? Math.round(totalDial / dates.length).toLocaleString('en-IN') : '0'}
+                    sub={filteredTopLevel.length && dates.length ? `${(totalDial / dates.length / filteredTopLevel.length).toFixed(1)} per employee` : undefined}
+                  />
+                </KpiGrid>
+                <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+                  <ChartCard title="Daily Calling Trend" subtitle="Dials vs answered, per day" className="xl:col-span-3">
+                    <TrendChart
+                      data={dayTotals}
+                      xKey="day"
+                      series={[
+                        { key: 'dial', label: 'Dials', color: '#f97316' },
+                        { key: 'answered', label: 'Answered', color: '#3b82f6' },
+                      ]}
+                    />
+                  </ChartCard>
+                  <ChartCard title="Top Callers" subtitle="Total dials in range" className="xl:col-span-2">
+                    <RankedBars data={empTotals} limit={7} formatValue={v => v.toLocaleString('en-IN')} />
+                  </ChartCard>
+                </div>
+              </>
+            );
+          })()}
+
           <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
             <Table className="min-w-[600px]">
               <TableHeader>
@@ -1167,7 +1217,8 @@ export function DailyUtilizationReport() {
                         <TableCell className="text-xs font-medium text-slate-800 sticky left-0 bg-white border-r z-10 py-3">
                           <div className="flex flex-col">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span>{emp.employeeName}</span>
+                              <Avatar name={emp.employeeName} />
+                              <span className="font-semibold text-slate-900">{emp.employeeName}</span>
                               {hasTeam && showTeamOnly ? (
                                 <button
                                   onClick={() => toggleExpand(emp.employeeId, true)}
@@ -1209,14 +1260,11 @@ export function DailyUtilizationReport() {
                               {hasData ? (
                                 <button
                                   onClick={() => handleCallClick(emp.employeeId, emp.employeeName, date)}
-                                  className="inline-flex flex-col items-center px-2 py-1 rounded-lg bg-orange-50/70 hover:bg-orange-100 transition-all hover:scale-105 cursor-pointer"
+                                  className="inline-flex min-w-[4.25rem] flex-col items-stretch gap-1 rounded-xl bg-white px-2.5 py-1.5 ring-1 ring-inset ring-slate-200 shadow-sm transition-all hover:ring-orange-300 hover:bg-orange-50/60 hover:-translate-y-px cursor-pointer"
                                 >
-                                  <span className="text-sm font-medium text-slate-800">{metric.dial}</span>
-                                  {metric.answered > 0 && (
-                                    <span className="text-[10px] text-orange-600 mt-0.5">
-                                      {metric.answered} ans
-                                    </span>
-                                  )}
+                                  <span className="text-[13px] font-bold text-slate-900 leading-none tabular-nums">{metric.dial}</span>
+                                  <span className="text-[10.5px] font-medium text-emerald-600 leading-none tabular-nums">{metric.answered || 0} ans</span>
+                                  <span className="h-1 w-full rounded-full bg-slate-100 overflow-hidden"><span className="block h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, ((metric.answered || 0) / metric.dial) * 100)}%` }} /></span>
                                 </button>
                               ) : (
                                 <span className="text-sm text-slate-300">-</span>

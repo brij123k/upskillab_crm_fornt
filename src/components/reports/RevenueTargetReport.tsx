@@ -32,6 +32,7 @@ import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { KpiCard, KpiGrid, ChartCard, Gauge, TargetProgressList, PersonCell } from './ReportUI';
 
 /* -------------------------------------------------------------------------- */
 /*                              Money & Formatters                             */
@@ -252,52 +253,35 @@ export function RevenueTargetReport() {
         </div>
       ) : (
         <div className="space-y-5">
-          {/* Summary Cards */}
-          <div className="grid gap-4 md:grid-cols-4">
-            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center">
-                  <Users className="w-5 h-5 text-orange-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Employees</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{summary.totalUsers ?? users.length}</p>
-                </div>
+          {/* KPI tiles */}
+          <KpiGrid cols={4}>
+            <KpiCard icon={Users} tone="orange" label="Employees" value={summary.totalUsers ?? users.length} sub={`${months.length} month${months.length === 1 ? '' : 's'} selected`} />
+            <KpiCard icon={Target} tone="blue" label="Combined Target" value={`₹ ${formatMoney(combinedTarget)}`} />
+            <KpiCard icon={TrendingUp} tone="green" label="Combined Achieved" value={`₹ ${formatMoney(combinedAchieved)}`} sub={combinedTarget > combinedAchieved ? `₹ ${formatMoney(combinedTarget - combinedAchieved)} to go` : 'Target met'} />
+            <KpiCard icon={CalendarDays} tone="violet" label="Achievement" value={formatPercent(combinedPercentage)} progress={Number(combinedPercentage) || 0} />
+          </KpiGrid>
+
+          {/* Charts */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <ChartCard title="Overall Achievement" subtitle="Combined across selected months">
+              <div className="py-2">
+                <Gauge
+                  value={Number(combinedPercentage) || 0}
+                  label="Target achieved"
+                  sub={`₹ ${formatMoney(combinedAchieved)} of ₹ ${formatMoney(combinedTarget)}`}
+                />
               </div>
-            </Card>
-            <Card className="p-5 bg-white border-0 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
-                  <Target className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Combined Target</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">₹ {formatMoney(combinedTarget)}</p>
-                </div>
-              </div>
-            </Card>
-            <Card className="p-5 bg-white border-0 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Combined Achieved</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">₹ {formatMoney(combinedAchieved)}</p>
-                </div>
-              </div>
-            </Card>
-            <Card className="p-5 bg-white border-0 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-sky-50 rounded-xl flex items-center justify-center">
-                  <CalendarDays className="w-5 h-5 text-sky-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Achievement</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{formatPercent(combinedPercentage)}</p>
-                </div>
-              </div>
-            </Card>
+            </ChartCard>
+            <ChartCard title="Target vs Achieved" subtitle="Employees with the largest targets" className="xl:col-span-2">
+              <TargetProgressList
+                data={filteredUsers.map((u: any) => ({
+                  name: u.name,
+                  target: Number(u.combinedTarget || 0),
+                  achieved: Number(u.combinedAchieved || 0),
+                }))}
+                formatValue={v => `₹${formatMoney(v)}`}
+              />
+            </ChartCard>
           </div>
 
           {/* Record count */}
@@ -337,36 +321,35 @@ export function RevenueTargetReport() {
                 {paginatedUsers.map((user: any) => (
                   <TableRow key={user.userId} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
                     <TableCell className="sticky left-0 z-10 bg-white border-r py-3">
-                      <div className="font-medium text-sm text-slate-800">{user.name}</div>
-                      <div className="text-[10px] text-slate-400">
-                        {user.employeeId ? `ID: ${user.employeeId}` : ''}
-                        {user.roleName ? ` | ${user.roleName}` : ''}
-                      </div>
+                      <PersonCell
+                        name={user.name}
+                        sub={`${user.employeeId ? `ID: ${user.employeeId}` : ''}${user.roleName ? ` | ${user.roleName}` : ''}`}
+                      />
                     </TableCell>
                     {months.map((month: any, index: number) => {
                       const monthRow = user.months?.[index] || {};
                       const achieved = Number(monthRow.achieved || 0);
                       const target = Number(monthRow.target || 0);
-                      const achievedClass = achieved >= target && target > 0 ? 'text-emerald-600' : 'text-amber-600';
+                      const achievedClass = achieved >= target && target > 0 ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : achieved > 0 ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-slate-50 text-slate-400 ring-slate-200';
                       return (
                         <Fragment key={`${user.userId}-${month.monthKey}`}>
                           <TableCell className="text-center py-3">
-                            <div className="font-medium text-sm text-slate-700">{formatMoney(target)}</div>
+                            <div className="font-semibold text-[13px] text-slate-800 tabular-nums">{formatMoney(target)}</div>
                             <div className="text-[10px] text-slate-400 mt-0.5">
                               {monthRow.percentage != null ? formatPercent(monthRow.percentage) : '-'}
                             </div>
                           </TableCell>
                           <TableCell className="text-center py-3">
-                            <div className={`font-semibold text-sm ${achievedClass}`}>{formatMoney(achieved)}</div>
+                            <span className={`inline-flex justify-center min-w-[3.5rem] rounded-full px-2.5 py-1 text-[12.5px] font-semibold tabular-nums ring-1 ring-inset ${achievedClass}`}>{formatMoney(achieved)}</span>
                           </TableCell>
                         </Fragment>
                       );
                     })}
                     <TableCell className="text-center py-3 bg-slate-50/50">
-                      <span className="font-medium text-sm text-slate-700">{formatMoney(user.combinedTarget || 0)}</span>
+                      <span className="font-bold text-[13px] text-slate-900 tabular-nums">{formatMoney(user.combinedTarget || 0)}</span>
                     </TableCell>
                     <TableCell className="text-center py-3 bg-slate-50/50">
-                      <span className="font-semibold text-sm text-emerald-600">{formatMoney(user.combinedAchieved || 0)}</span>
+                      <span className="inline-flex justify-center rounded-lg bg-slate-900 px-2.5 py-1 text-[13px] font-bold text-white tabular-nums">{formatMoney(user.combinedAchieved || 0)}</span>
                     </TableCell>
                   </TableRow>
                 ))}

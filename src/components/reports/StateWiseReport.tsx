@@ -48,6 +48,7 @@ import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { KpiCard, KpiGrid, ChartCard, RankedBars, DonutWithLegend, MetricPill } from './ReportUI';
 
 /* -------------------------------------------------------------------------- */
 /*                               Type Definitions                              */
@@ -172,7 +173,7 @@ function StateDetailsModal({
             </div>
           </div>
 
-          {/* Metrics Grid */}
+          {/* Funnel Metrics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             <div className="bg-blue-50/50 rounded-lg p-3">
               <p className="text-[10px] font-medium text-blue-600 uppercase tracking-wider">PCAT Scheduled</p>
@@ -228,10 +229,7 @@ function StateDetailsModal({
         </div>
 
         <div className="flex justify-end p-4 border-t border-slate-200 bg-slate-50/50 flex-shrink-0">
-          <Button
-            onClick={onClose}
-            className="rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700"
-          >
+          <Button onClick={onClose} className="rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700">
             Close
           </Button>
         </div>
@@ -243,18 +241,15 @@ function StateDetailsModal({
 /* -------------------------------------------------------------------------- */
 /*                               Main Component                                */
 /* -------------------------------------------------------------------------- */
-
 export function StateWiseReport() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Date filter
+  // Filters
   const [dateFilter, setDateFilter] = useState('today');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-
-  // Campaign & State filters
   const [campaignSearch, setCampaignSearch] = useState('');
   const [stateSearch, setStateSearch] = useState('');
 
@@ -264,20 +259,17 @@ export function StateWiseReport() {
   // Expanded campaigns
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
 
-  // State Details Modal
+  // State details modal
   const [stateModalOpen, setStateModalOpen] = useState(false);
-  const [selectedCampaign, setSelectedCampaign] = useState<string>('');
-  const [selectedState, setSelectedState] = useState<string>('');
+  const [selectedCampaign, setSelectedCampaign] = useState('');
+  const [selectedState, setSelectedState] = useState('');
   const [selectedStateData, setSelectedStateData] = useState<StateDetail | null>(null);
 
-  // ─── Fetch report data ───
+  // ─── Fetch data ───
   const fetchData = useCallback(async (page: number = 1) => {
     setLoading(true);
     try {
-      const params: any = {
-        page: page,
-        limit: 10,
-      };
+      const params: any = { page, limit: 10 };
 
       if (dateFilter === 'custom') {
         if (!fromDate || !toDate) {
@@ -287,11 +279,7 @@ export function StateWiseReport() {
         const diffTime = Math.abs(new Date(toDate).getTime() - new Date(fromDate).getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         if (diffDays > 30) {
-          toast({
-            title: 'Date range too large',
-            description: 'Max 30 days allowed.',
-            variant: 'destructive',
-          });
+          toast({ title: 'Date range too large', description: 'Max 30 days allowed.', variant: 'destructive' });
           setLoading(false);
           return;
         }
@@ -304,42 +292,33 @@ export function StateWiseReport() {
       if (campaignSearch.trim()) params.source_campaign = campaignSearch.trim();
       if (stateSearch.trim()) params.state = stateSearch.trim();
 
-      const response = await getDataHandlerWithToken(
-        ApiConfig.stateWiseReport,
-        params,
-        null,
-        true
-      );
+      const response = await getDataHandlerWithToken(ApiConfig.stateWiseReport, params, null, true);
 
       if (response) {
-        // Handle the response structure
         let reportData: ApiResponse | null = null;
-        
         if (response.startDate && Array.isArray(response.data)) {
-          reportData = response as ApiResponse;
+          reportData = response;
         } else if (response.data && response.data.startDate && Array.isArray(response.data.data)) {
-          reportData = response.data as ApiResponse;
+          reportData = response.data;
         } else if (Array.isArray(response.data)) {
           reportData = {
             startDate: '',
             endDate: '',
             totalLeads: 0,
-            page: page,
+            page,
             limit: 10,
-            // totalCampaigns: response.data.length,
             totalCampaigns: response.totalCampaigns,
             totalAdmissionDone: response.totalAdmissionDone,
-            totalRegistrationDone:response.totalAdmissionDone,
+            totalRegistrationDone: response.totalAdmissionDone,
             totalRevenue: response.totalRevenue,
             totalPages: 1,
             hasNextPage: false,
             hasPreviousPage: false,
-            data: response.data as CampaignData[],
+            data: response.data,
           };
         } else {
           reportData = null;
         }
-
         setData(reportData);
       } else {
         setData(null);
@@ -360,7 +339,7 @@ export function StateWiseReport() {
     fetchData(currentPage);
   }, [fetchData, currentPage]);
 
-  // ─── Handle page change ───
+  // ─── Pagination ───
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || (data && newPage > data.totalPages)) return;
     setCurrentPage(newPage);
@@ -478,11 +457,7 @@ export function StateWiseReport() {
             disabled={loading}
             className="rounded-xl border-slate-200"
           >
-            {loading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
-            ) : (
-              <RefreshCw className="w-3.5 h-3.5 mr-1" />
-            )}
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
             Refresh
           </Button>
           <Button
@@ -513,7 +488,6 @@ export function StateWiseReport() {
 
         {showFilters && (
           <div className="flex flex-wrap items-center gap-3 w-full">
-            {/* Date Filter */}
             <div className="w-[130px]">
               <Select value={dateFilter} onValueChange={setDateFilter}>
                 <SelectTrigger className="h-8 text-xs rounded-xl">
@@ -551,7 +525,6 @@ export function StateWiseReport() {
               </>
             )}
 
-            {/* Campaign Search */}
             <div className="relative w-44">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
               <Input
@@ -561,8 +534,6 @@ export function StateWiseReport() {
                 className="pl-7 h-8 text-xs rounded-xl border-slate-200"
               />
             </div>
-
-            {/* State Search */}
             <div className="relative w-44">
               <MapPin className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
               <Input
@@ -592,35 +563,39 @@ export function StateWiseReport() {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
-            <Card className="p-4 bg-white border border-slate-200 shadow-sm">
-              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Campaigns</p>
-              <p className="text-2xl font-bold text-slate-800">{data.totalCampaigns || data.data.length}</p>
-            </Card>
-            <Card className="p-4 bg-white border border-slate-200 shadow-sm">
-              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Total Leads</p>
-              <p className="text-2xl font-bold text-slate-800">{data.totalLeads.toLocaleString()}</p>
-            </Card>
-            <Card className="p-4 bg-white border border-slate-200 shadow-sm">
-              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Registrations</p>
-              <p className="text-2xl font-bold text-purple-600">
-                {data.totalRegistrationDone.toLocaleString()}
-              </p>
-            </Card>
-            <Card className="p-4 bg-white border border-slate-200 shadow-sm">
-              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Admissions</p>
-              <p className="text-2xl font-bold text-emerald-600">
-                {data.totalAdmissionDone}
-              </p>
-            </Card>
-            <Card className="p-4 bg-white border border-slate-200 shadow-sm">
-              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Revenue</p>
-              <p className="text-2xl font-bold text-orange-600">
-                ₹{data.totalRevenue.toLocaleString()}
-              </p>
-            </Card>
-          </div>
+          {/* KPI tiles + charts */}
+          {(() => {
+            const stateMap = new Map<string, { leads: number; revenue: number }>();
+            data.data.forEach(c => c.states.forEach(st => {
+              const cur = stateMap.get(st.state) || { leads: 0, revenue: 0 };
+              stateMap.set(st.state, { leads: cur.leads + (st.totalLeads || 0), revenue: cur.revenue + (st.revenue || 0) });
+            }));
+            const conv = data.totalLeads ? (data.totalAdmissionDone / data.totalLeads) * 100 : 0;
+            return (
+              <>
+                <KpiGrid cols={5}>
+                  <KpiCard icon={Layers} tone="blue" label="Campaigns" value={data.totalCampaigns || data.data.length} sub={`${getUniqueStates()} states`} />
+                  <KpiCard icon={Users} tone="orange" label="Total Leads" value={data.totalLeads.toLocaleString()} sub={formatDateRange() || undefined} />
+                  <KpiCard icon={TrendingUp} tone="violet" label="Registrations" value={data.totalRegistrationDone.toLocaleString()} />
+                  <KpiCard icon={UserCheck} tone="green" label="Admissions" value={data.totalAdmissionDone.toLocaleString()} sub={`${conv.toFixed(1)}% conversion`} progress={conv} />
+                  <KpiCard icon={IndianRupee} tone="rose" label="Revenue" value={`₹${data.totalRevenue.toLocaleString()}`} />
+                </KpiGrid>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  <ChartCard title="Top States by Leads" subtitle="Across campaigns on this page">
+                    <RankedBars data={Array.from(stateMap, ([name, v]) => ({ name, value: v.leads }))} limit={7} formatValue={v => v.toLocaleString()} />
+                  </ChartCard>
+                  <ChartCard title="Revenue by Campaign" subtitle="Share of total revenue">
+                    <DonutWithLegend
+                      data={data.data.map(c => ({ name: c.campaignName, value: c.totalRevenue || 0 }))}
+                      centerValue={`₹${data.totalRevenue.toLocaleString()}`}
+                      centerLabel="Revenue"
+                      formatValue={v => `₹${v.toLocaleString()}`}
+                    />
+                  </ChartCard>
+                </div>
+              </>
+            );
+          })()}
 
           {/* Main Table */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -683,13 +658,13 @@ export function StateWiseReport() {
                             <span className="font-medium text-slate-700">{campaign.totalLeads}</span>
                           </TableCell>
                           <TableCell className="text-sm text-center py-3 px-4">
-                            <span className="font-medium text-purple-600">{campaign.totalRegistrationDone}</span>
+                            <MetricPill value={campaign.totalRegistrationDone} tone="violet" />
                           </TableCell>
                           <TableCell className="text-sm text-center py-3 px-4">
-                            <span className="font-medium text-emerald-600">{campaign.totalAdmissionDone}</span>
+                            <MetricPill value={campaign.totalAdmissionDone} tone="green" />
                           </TableCell>
                           <TableCell className="text-sm text-center py-3 px-4 bg-orange-50/30">
-                            <span className="font-semibold text-orange-600">₹{campaign.totalRevenue.toLocaleString()}</span>
+                            <span className="inline-flex justify-center rounded-lg bg-slate-900 px-2.5 py-1 text-[13px] font-bold text-white tabular-nums">₹{campaign.totalRevenue.toLocaleString()}</span>
                           </TableCell>
                           <TableCell className="text-sm text-center py-3 px-4">
                             <span className="text-sm text-slate-500">{totalStates}</span>
@@ -768,18 +743,14 @@ export function StateWiseReport() {
                                           <TableCell className="text-xs text-center py-2 px-3 text-slate-600">
                                             {state.pcatDone}
                                           </TableCell>
-                                          <TableCell className="text-xs text-center py-2 px-3 text-purple-600 font-medium">
-                                            {state.registrationDone}
-                                          </TableCell>
-                                          <TableCell className="text-xs text-center py-2 px-3 text-emerald-600 font-medium">
-                                            {state.admissionDone}
-                                          </TableCell>
+                                          <TableCell className="text-xs text-center py-2 px-3 "><MetricPill value={state.registrationDone} tone="violet" /></TableCell>
+                                          <TableCell className="text-xs text-center py-2 px-3 "><MetricPill value={state.admissionDone} tone="green" /></TableCell>
                                           <TableCell className="text-xs text-center py-2 px-3 font-medium text-orange-600">
                                             ₹{state.revenue.toLocaleString()}
                                           </TableCell>
                                           <TableCell className="text-xs text-center py-2 px-3">
                                             <span className={cn(
-                                              "px-2 py-0.5 rounded-full font-medium text-[10px]",
+                                              "px-2.5 py-1 rounded-full font-semibold text-[11.5px] tabular-nums ring-1 ring-inset ring-black/5",
                                               state.conversionPercentage > 50 ? "bg-emerald-100 text-emerald-700" :
                                               state.conversionPercentage > 25 ? "bg-amber-100 text-amber-700" :
                                               "bg-slate-100 text-slate-600"
@@ -789,7 +760,7 @@ export function StateWiseReport() {
                                           </TableCell>
                                           <TableCell className="text-xs text-center py-2 px-3">
                                             <span className={cn(
-                                              "px-2 py-0.5 rounded-full font-medium text-[10px]",
+                                              "px-2.5 py-1 rounded-full font-semibold text-[11.5px] tabular-nums ring-1 ring-inset ring-black/5",
                                               state.registrationPercentage > 50 ? "bg-purple-100 text-purple-700" :
                                               state.registrationPercentage > 25 ? "bg-indigo-100 text-indigo-700" :
                                               "bg-slate-100 text-slate-600"

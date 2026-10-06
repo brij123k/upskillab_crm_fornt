@@ -50,6 +50,7 @@ import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { KpiCard, KpiGrid, ChartCard, RankedBars, Avatar } from './ReportUI';
 
 /* -------------------------------------------------------------------------- */
 /*                                Types                                       */
@@ -226,7 +227,8 @@ function TeamMemberTable({
                     <TableCell className="sticky left-0 bg-white border-r z-10 py-2">
                       <div className="flex flex-col min-w-[150px]">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-medium text-slate-800 truncate max-w-[120px]">
+                          <Avatar name={member.consultantName} className="w-7 h-7 text-[10px]" />
+                          <span className="text-xs font-semibold text-slate-900 truncate max-w-[120px]">
                             {member.consultantName}
                           </span>
                           {hasTeam? (
@@ -267,9 +269,9 @@ function TeamMemberTable({
                         onClick={() => onMetricClick(member, 'assigned-leads')}
                         disabled={!member.totalLeadAssigned}
                         className={cn(
-                          "text-xs font-medium transition-all hover:scale-105 px-2 py-1 rounded-lg",
+                          "text-[13px] font-medium tabular-nums transition-all hover:scale-105 px-3 py-1 rounded-full min-w-[2.75rem]",
                           member.totalLeadAssigned > 0
-                            ? "text-blue-600 hover:bg-blue-50 cursor-pointer"
+                            ? "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 hover:bg-blue-100 cursor-pointer font-semibold"
                             : "text-slate-400 cursor-not-allowed"
                         )}
                       >
@@ -281,9 +283,9 @@ function TeamMemberTable({
                         onClick={() => onMetricClick(member, 'admission-leads')}
                         disabled={!member.admDone}
                         className={cn(
-                          "text-xs font-medium transition-all hover:scale-105 px-2 py-1 rounded-lg",
+                          "text-[13px] font-medium tabular-nums transition-all hover:scale-105 px-3 py-1 rounded-full min-w-[2.75rem]",
                           member.admDone > 0
-                            ? "text-emerald-600 hover:bg-emerald-50 cursor-pointer"
+                            ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-100 cursor-pointer font-semibold"
                             : "text-slate-400 cursor-not-allowed"
                         )}
                       >
@@ -295,9 +297,9 @@ function TeamMemberTable({
                         onClick={() => onMetricClick(member, 'orders')}
                         disabled={!member.realisedRevenue}
                         className={cn(
-                          "text-xs font-medium transition-all hover:scale-105 px-2 py-1 rounded-lg",
+                          "text-[13px] font-medium tabular-nums transition-all hover:scale-105 px-3 py-1 rounded-full min-w-[2.75rem]",
                           member.realisedRevenue > 0
-                            ? "text-orange-600 hover:bg-orange-50 cursor-pointer"
+                            ? "bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200 hover:bg-orange-100 cursor-pointer font-bold"
                             : "text-slate-400 cursor-not-allowed"
                         )}
                       >
@@ -1341,55 +1343,40 @@ export function ConsultantPerformanceReport() {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Revenue</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(totalRevenue)}</p>
+          {/* KPI tiles + charts */}
+          {(() => {
+            const top = [...filteredTopLevel].sort((a, b) => (b.realisedRevenue || 0) - (a.realisedRevenue || 0))[0];
+            const convRate = totalLeads ? (totalAdmissions / totalLeads) * 100 : 0;
+            return (
+              <>
+                <KpiGrid cols={isTeamMode ? 5 : 4}>
+                  <KpiCard icon={IndianRupee} tone="orange" label="Total Revenue" value={formatCurrency(totalRevenue)} sub={totalAdmissions ? `${formatCurrency(totalRevenue / totalAdmissions)} per admission` : undefined} />
+                  <KpiCard icon={Users} tone="blue" label="Total Leads" value={totalLeads.toLocaleString('en-IN')} sub={`${filteredTopLevel.length} employees`} />
+                  <KpiCard icon={UserCheck} tone="green" label="Total Admissions" value={totalAdmissions.toLocaleString('en-IN')} sub={`${convRate.toFixed(1)}% conversion`} progress={convRate} />
+                  <KpiCard icon={Award} tone="violet" label="Top Performer" value={top?.consultantName || '—'} sub={top ? formatCurrency(top.realisedRevenue || 0) : undefined} />
+                  {isTeamMode && <KpiCard icon={UserCog} tone="rose" label="Team Mode" value="Active" sub="Showing team totals" />}
+                </KpiGrid>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  <ChartCard title="Revenue Leaderboard" subtitle="Ranked by realised revenue">
+                    <RankedBars
+                      data={filteredTopLevel.map(c => ({ name: c.consultantName, value: c.realisedRevenue || 0 }))}
+                      formatValue={formatCurrency}
+                    />
+                  </ChartCard>
+                  <ChartCard title="Admissions Leaderboard" subtitle="Ranked by admissions done">
+                    <RankedBars
+                      data={filteredTopLevel.map(c => ({
+                        name: c.consultantName,
+                        value: c.admDone || 0,
+                        sub: c.totalLeadAssigned ? `${((c.admDone / c.totalLeadAssigned) * 100).toFixed(1)}% of ${c.totalLeadAssigned} leads` : undefined,
+                      }))}
+                      color="#22c55e"
+                    />
+                  </ChartCard>
                 </div>
-                <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center">
-                  <IndianRupee className="w-5 h-5 text-orange-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Leads</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{totalLeads}</p>
-                </div>
-                <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                  <Users className="w-5 h-5 text-blue-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Admissions</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{totalAdmissions}</p>
-                </div>
-                <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
-                  <UserCheck className="w-5 h-5 text-emerald-600" />
-                </div>
-              </div>
-            </Card>
-            {isTeamMode && (
-              <Card className="p-5 bg-orange-50 border border-orange-200 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-orange-600 uppercase tracking-wider">Team Mode</p>
-                    <p className="text-sm font-semibold text-orange-700 mt-1">Active</p>
-                  </div>
-                  <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
-                    <UserCog className="w-5 h-5 text-orange-600" />
-                  </div>
-                </div>
-              </Card>
-            )}
-          </div>
+              </>
+            );
+          })()}
 
           {/* Table View */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -1434,7 +1421,8 @@ export function ConsultantPerformanceReport() {
                           <TableCell className="text-sm sticky left-0 bg-white border-r border-slate-100 z-10 py-3 px-4">
                             <div className="flex flex-col">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-medium text-slate-800">
+                                <Avatar name={consultant.consultantName} />
+                                <span className="font-semibold text-slate-900">
                                   {consultant.consultantName}
                                 </span>
                                 {hasTeam && showTeamOnly ? (
@@ -1473,9 +1461,9 @@ export function ConsultantPerformanceReport() {
                               onClick={() => handleMetricClick(consultant, 'assigned-leads')}
                               disabled={!consultant.totalLeadAssigned}
                               className={cn(
-                                "text-sm font-medium transition-all hover:scale-105 px-3 py-1 rounded-lg",
+                                "text-[13px] font-medium tabular-nums transition-all hover:scale-105 px-3 py-1 rounded-full min-w-[2.75rem]",
                                 consultant.totalLeadAssigned > 0
-                                  ? "text-blue-600 hover:bg-blue-50 cursor-pointer"
+                                  ? "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 hover:bg-blue-100 cursor-pointer font-semibold"
                                   : "text-slate-400 cursor-not-allowed"
                               )}
                             >
@@ -1487,9 +1475,9 @@ export function ConsultantPerformanceReport() {
                               onClick={() => handleMetricClick(consultant, 'admission-leads')}
                               disabled={!consultant.admDone}
                               className={cn(
-                                "text-sm font-medium transition-all hover:scale-105 px-3 py-1 rounded-lg",
+                                "text-[13px] font-medium tabular-nums transition-all hover:scale-105 px-3 py-1 rounded-full min-w-[2.75rem]",
                                 consultant.admDone > 0
-                                  ? "text-emerald-600 hover:bg-emerald-50 cursor-pointer"
+                                  ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-100 cursor-pointer font-semibold"
                                   : "text-slate-400 cursor-not-allowed"
                               )}
                             >
@@ -1502,9 +1490,9 @@ export function ConsultantPerformanceReport() {
                               onClick={() => handleMetricClick(consultant, 'orders')}
                               disabled={!consultant.realisedRevenue}
                               className={cn(
-                                "text-sm font-medium transition-all hover:scale-105 px-3 py-1 rounded-lg",
+                                "text-[13px] font-medium tabular-nums transition-all hover:scale-105 px-3 py-1 rounded-full min-w-[2.75rem]",
                                 consultant.realisedRevenue > 0
-                                  ? "text-orange-600 hover:bg-orange-50 cursor-pointer"
+                                  ? "bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200 hover:bg-orange-100 cursor-pointer font-bold"
                                   : "text-slate-400 cursor-not-allowed"
                               )}
                             >

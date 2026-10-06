@@ -34,6 +34,7 @@ import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 
+import { Avatar } from '@/components/reports/ReportUI';
 interface PaymentHistoryFilters {
     search: string;
     orderId: string;
@@ -573,7 +574,10 @@ export function PaymentHistoryPage() {
                                                 </div>
                                             </TableCell>
                                             <TableCell className="whitespace-nowrap">
-                                                <div className="font-medium">{payment.customer_details?.customer_name || payment.orderRef?.studentName}</div>
+                                                <div className="flex items-center gap-2.5">
+                                                    <Avatar name={payment.customer_details?.customer_name || payment.orderRef?.studentName} className="w-8 h-8 text-[11px]" />
+                                                    <span className="font-semibold text-slate-900">{payment.customer_details?.customer_name || payment.orderRef?.studentName}</span>
+                                                </div>
                                                 <div className="text-xs text-muted-foreground">
                                                     {payment.orderRef?.fatherName && `Father: ${payment.orderRef.fatherName}`}
                                                 </div>
@@ -585,9 +589,9 @@ export function PaymentHistoryPage() {
                                                 </div>
                                             </TableCell>
                                             <TableCell className="whitespace-nowrap">
-                                                <div className="font-medium text-green-600">
+                                                <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-[12.5px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200 tabular-nums">
                                                     {formatCurrency(payment.link_amount_paid || payment.link_amount)}
-                                                </div>
+                                                </span>
                                                 {payment.link_amount && payment.link_amount !== payment.link_amount_paid && (
                                                     <div className="text-xs text-muted-foreground line-through">
                                                         {formatCurrency(payment.link_amount)}

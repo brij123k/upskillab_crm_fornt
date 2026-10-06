@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -22,8 +23,8 @@
     --secondary: 30 15% 94%;
     --secondary-foreground: 24 10% 20%;
 
-    --muted: 30 15% 94%;
-    --muted-foreground: 24 10% 45%;
+    --muted: 220 20% 96%;
+    --muted-foreground: 215 16% 47%;
 
     --accent: 30 15% 94%;
     --accent-foreground: 24 10% 20%;
@@ -31,11 +32,11 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 30 20% 90%;
-    --input: 30 20% 90%;
+    --border: 226 20% 92%;
+    --input: 226 20% 90%;
     --ring: 24 95% 53%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
     /* Panel-specific accent colors */
     --admin-accent: 24 95% 53%;

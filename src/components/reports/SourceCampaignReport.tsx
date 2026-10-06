@@ -39,6 +39,7 @@ import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { KpiCard, KpiGrid, ChartCard, RankedBars, DonutWithLegend, HeatChip } from './ReportUI';
 
 /* -------------------------------------------------------------------------- */
 /*                               Type Definitions                              */
@@ -379,71 +380,43 @@ export function SourceCampaignReport() {
         </div>
       ) : (
         <div className="space-y-5">
-          {/* Summary Cards - Enhanced with conversion data */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <Card className="p-4 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Total Leads</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{grandTotal.toLocaleString()}</p>
+          {/* KPI tiles + charts */}
+          {(() => {
+            const avgConv = sourceCampaigns.length
+              ? sourceCampaigns.reduce((sum, camp) => sum + (conversionData[camp] || 0), 0) / sourceCampaigns.length
+              : 0;
+            const totalAdmissions = sourceCampaigns.reduce((sum, camp) => sum + (admissionByCampaign[camp] || 0), 0);
+            const campaignData = sourceCampaigns.map(camp => ({
+              name: camp,
+              value: columnTotals[camp] || totalsByCampaign[camp] || 0,
+              sub: conversionData[camp] !== undefined ? `${conversionData[camp]}% conversion` : undefined,
+            }));
+            return (
+              <>
+                <KpiGrid cols={(startDate || endDate) ? 5 : 4}>
+                  <KpiCard icon={BarChart3} tone="orange" label="Total Leads" value={grandTotal.toLocaleString()} sub={`${totalAdmissions.toLocaleString()} admissions`} />
+                  <KpiCard icon={Layers} tone="blue" label="Campaigns" value={sourceCampaigns.length} />
+                  <KpiCard icon={Target} tone="violet" label="Lead Stages" value={filteredRows.length} />
+                  <KpiCard icon={Percent} tone="green" label="Avg Conversion" value={`${avgConv.toFixed(1)}%`} progress={avgConv} />
+                  {(startDate || endDate) && (
+                    <KpiCard icon={Calendar} tone="rose" label="Date Range" value={<span className="text-base">{formatDate(startDate)} – {formatDate(endDate)}</span>} />
+                  )}
+                </KpiGrid>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  <ChartCard title="Lead Sources" subtitle="Leads per campaign with conversion rate">
+                    <RankedBars data={campaignData} limit={7} formatValue={v => v.toLocaleString()} />
+                  </ChartCard>
+                  <ChartCard title="Lead Stage Distribution" subtitle="All campaigns combined">
+                    <DonutWithLegend
+                      data={filteredRows.map((r: any) => ({ name: r.sourceCampaignName, value: r.total || 0 }))}
+                      centerValue={grandTotal.toLocaleString()}
+                      centerLabel="Total Leads"
+                    />
+                  </ChartCard>
                 </div>
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl flex items-center justify-center">
-                  <BarChart3 className="w-5 h-5 text-orange-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-4 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Campaigns</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{sourceCampaigns.length}</p>
-                </div>
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl flex items-center justify-center">
-                  <Layers className="w-5 h-5 text-blue-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-4 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Lead Stages</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{filteredRows.length}</p>
-                </div>
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl flex items-center justify-center">
-                  <Target className="w-5 h-5 text-purple-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-4 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Avg Conversion</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">
-                    {sourceCampaigns.length ? 
-                      (sourceCampaigns.reduce((sum, camp) => sum + (conversionData[camp] || 0), 0) / sourceCampaigns.length).toFixed(1) : 0}%
-                  </p>
-                </div>
-                <div className="w-10 h-10 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl flex items-center justify-center">
-                  <Percent className="w-5 h-5 text-emerald-600" />
-                </div>
-              </div>
-            </Card>
-            {(startDate || endDate) && (
-              <Card className="p-4 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Date Range</p>
-                    <p className="text-sm font-medium text-slate-700 mt-1">
-                      {formatDate(startDate)} / {formatDate(endDate)}
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl flex items-center justify-center">
-                    <Calendar className="w-5 h-5 text-slate-600" />
-                  </div>
-                </div>
-              </Card>
-            )}
-          </div>
+              </>
+            );
+          })()}
 
 
           {/* Main Table */}
@@ -490,12 +463,17 @@ export function SourceCampaignReport() {
                       </div>
                     </TableCell>
                     {sourceCampaigns.map((campaign: string) => (
-                      <TableCell key={campaign} className="text-xs text-right text-slate-600 py-3">
-                        {(item[campaign] || 0).toLocaleString()}
+                      <TableCell key={campaign} className="text-right py-3">
+                        <HeatChip
+                          count={Number(item[campaign] || 0)}
+                          pct={columnTotals[campaign] ? (Number(item[campaign] || 0) / Number(columnTotals[campaign])) * 100 : 0}
+                        />
                       </TableCell>
                     ))}
-                    <TableCell className="text-xs text-right font-semibold text-slate-800 py-3">
-                      {(item.total || 0).toLocaleString()}
+                    <TableCell className="text-right py-3">
+                      <span className="inline-flex min-w-[2.75rem] justify-center rounded-lg bg-slate-900 px-2.5 py-1 text-[13px] font-bold text-white tabular-nums">
+                        {(item.total || 0).toLocaleString()}
+                      </span>
                     </TableCell>
                   </TableRow>
                 ))}

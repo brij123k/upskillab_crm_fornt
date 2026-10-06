@@ -52,6 +52,8 @@ import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { KpiCard, KpiGrid, ChartCard, DonutWithLegend, RankedBars, Avatar, sumStages, HeatChip } from './ReportUI';
+import { Trophy, Layers, BarChart3 } from 'lucide-react';
 
 // ───────────────────────────────────────────────────────────────────────────────
 // Types
@@ -216,7 +218,8 @@ function TeamMemberTable({
                     className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
                   >
                     <TableCell className="sticky left-0 bg-white border-r z-10 py-2">
-                      <div className="flex items-center gap-2 min-w-[140px]">
+                      <div className="flex items-center gap-2.5 min-w-[160px]">
+                        <Avatar name={member.employeeName} className="w-7 h-7 text-[10px]" />
                         <div className="flex flex-col">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-xs font-medium text-slate-800 truncate max-w-[100px]">
@@ -269,8 +272,8 @@ function TeamMemberTable({
                             onClick={() => count > 0 && onStageClick(member.employeeId, stage)}
                             disabled={count === 0 || isLoadingDetail}
                             className={cn(
-                              "flex flex-col items-center transition-all",
-                              count > 0 && "hover:scale-110 cursor-pointer",
+                              "mx-auto flex flex-col items-center transition-transform",
+                              count > 0 && "hover:scale-105 cursor-pointer",
                               count === 0 && "cursor-default opacity-50",
                               isLoadingDetail && "opacity-50 cursor-wait"
                             )}
@@ -279,28 +282,14 @@ function TeamMemberTable({
                             {isLoadingDetail ? (
                               <Loader2 className="w-3 h-3 animate-spin text-orange-500" />
                             ) : (
-                              <>
-                                <span
-                                  className={cn(
-                                    'font-medium text-xs',
-                                    count > 0 ? 'text-slate-800 hover:text-orange-600' : 'text-slate-300'
-                                  )}
-                                >
-                                  {count || '-'}
-                                </span>
-                                {count > 0 && (
-                                  <span className="text-[8px] text-slate-400 mt-0.5">
-                                    {pct}%
-                                  </span>
-                                )}
-                              </>
+                              <HeatChip count={count} pct={Number(pct)} />
                             )}
                           </button>
                         </TableCell>
                       );
                     })}
-                    <TableCell className="text-xs text-center font-bold text-orange-700 py-2">
-                      {member.totalLead}
+                    <TableCell className="text-center py-2">
+                      <span className="inline-flex min-w-[2.75rem] justify-center rounded-lg bg-slate-800 px-2.5 py-1 text-[13px] font-bold text-white tabular-nums">{member.totalLead}</span>
                     </TableCell>
                   </TableRow>
                   {/* Nested team members for this member */}
@@ -1317,6 +1306,45 @@ export function EmployeeStagesReport() {
             )}
           </div>
 
+          {/* KPI tiles */}
+          {(() => {
+            const leadSum = filteredTopLevel.reduce((sum, emp) => sum + emp.totalLead, 0);
+            const top = [...filteredTopLevel].sort((a, b) => b.totalLead - a.totalLead)[0];
+            const stageTotals = sumStages(filteredTopLevel);
+            return (
+              <>
+                <KpiGrid cols={4}>
+                  <KpiCard icon={Users} tone="orange" label="Total Leads" value={leadSum} sub={`${dateFilterOptions.find(o => o.value === dateFilter)?.label || ''}`} />
+                  <KpiCard icon={UsersIcon} tone="blue" label="Employees" value={filteredTopLevel.length} sub={isTeamMode ? 'Team view' : 'Individual view'} />
+                  <KpiCard
+                    icon={BarChart3}
+                    tone="green"
+                    label="Avg Leads / Employee"
+                    value={filteredTopLevel.length ? (leadSum / filteredTopLevel.length).toFixed(1) : '0'}
+                    sub={`${stageTotals.length} active stages`}
+                  />
+                  <KpiCard icon={Trophy} tone="violet" label="Top Performer" value={top?.employeeName || '—'} sub={top ? `${top.totalLead} leads` : undefined} />
+                </KpiGrid>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  <ChartCard
+                    title="Lead Stage Distribution"
+                    subtitle="Across all listed employees"
+                    action={<span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-2 py-1"><Layers className="w-3 h-3" />Top 5</span>}
+                  >
+                    <DonutWithLegend data={stageTotals} centerValue={leadSum} centerLabel="Total Leads" />
+                  </ChartCard>
+                  <ChartCard title="Top Employees" subtitle="Ranked by total leads">
+                    <RankedBars
+                      data={filteredTopLevel.map(e => ({ name: e.employeeName, value: e.totalLead }))}
+                      limit={6}
+                    />
+                  </ChartCard>
+                </div>
+              </>
+            );
+          })()}
+
           {/* Main Table */}
           {loadingStages ? (
             <div className="flex items-center justify-center py-12">
@@ -1359,7 +1387,8 @@ export function EmployeeStagesReport() {
                           className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
                         >
                           <TableCell className="sticky left-0 bg-white border-r z-10 py-2.5">
-                            <div className="flex items-center gap-2 min-w-[150px]">
+                            <div className="flex items-center gap-2.5 min-w-[170px]">
+                              <Avatar name={emp.employeeName} />
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <span className="text-xs font-medium text-slate-800 truncate max-w-[120px]">
@@ -1413,8 +1442,8 @@ export function EmployeeStagesReport() {
                                   onClick={() => count > 0 && handleStageClick(emp.employeeId, stage)}
                                   disabled={count === 0 || isLoadingDetail}
                                   className={cn(
-                                    "flex flex-col items-center transition-all",
-                                    count > 0 && "hover:scale-110 cursor-pointer",
+                                    "mx-auto flex flex-col items-center transition-transform",
+                                    count > 0 && "hover:scale-105 cursor-pointer",
                                     count === 0 && "cursor-default opacity-50",
                                     isLoadingDetail && "opacity-50 cursor-wait"
                                   )}
@@ -1423,28 +1452,14 @@ export function EmployeeStagesReport() {
                                   {isLoadingDetail ? (
                                     <Loader2 className="w-3 h-3 animate-spin text-orange-500" />
                                   ) : (
-                                    <>
-                                      <span
-                                        className={cn(
-                                          'font-medium text-xs',
-                                          count > 0 ? 'text-slate-800 hover:text-orange-600' : 'text-slate-300'
-                                        )}
-                                      >
-                                        {count || '-'}
-                                      </span>
-                                      {count > 0 && (
-                                        <span className="text-[8px] text-slate-400 mt-0.5">
-                                          {pct}%
-                                        </span>
-                                      )}
-                                    </>
+                                    <HeatChip count={count} pct={Number(pct)} />
                                   )}
                                 </button>
                               </TableCell>
                             );
                           })}
-                          <TableCell className="text-xs text-center font-bold text-orange-700 py-2.5">
-                            {emp.totalLead}
+                          <TableCell className="text-center py-2.5">
+                            <span className="inline-flex min-w-[2.75rem] justify-center rounded-lg bg-slate-900 px-2.5 py-1 text-[13px] font-bold text-white tabular-nums">{emp.totalLead}</span>
                           </TableCell>
                         </TableRow>
 

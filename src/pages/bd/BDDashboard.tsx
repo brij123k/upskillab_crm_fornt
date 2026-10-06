@@ -32,6 +32,16 @@ import { toast } from '@/hooks/use-toast';
 import { hasModulePermission } from '@/utils/modulePermissions';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Avatar } from '@/components/reports/ReportUI';
+
+const QUICK_TONES = [
+  'bg-orange-50 text-orange-600',
+  'bg-rose-50 text-rose-600',
+  'bg-blue-50 text-blue-600',
+  'bg-emerald-50 text-emerald-600',
+  'bg-violet-50 text-violet-600',
+  'bg-amber-50 text-amber-600',
+];
 import {
   AreaChart,
   Area,
@@ -431,7 +441,7 @@ export function BDDashboard() {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6 max-w-[1600px] mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -463,18 +473,16 @@ export function BDDashboard() {
         {statCards.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <Card key={index} className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <Card key={index}>
               <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                      {stat.title}
-                    </p>
-                    <p className="text-2xl font-bold text-slate-800 mt-1">{stat.value}</p>
-                    <p className="text-xs text-slate-400 mt-1">{stat.change}</p>
+                <div className="flex items-start gap-4">
+                  <div className={cn("w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0", stat.bgColor)}>
+                    <Icon className={cn("h-6 w-6", stat.iconColor)} />
                   </div>
-                  <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center", stat.bgColor)}>
-                    <Icon className={cn("h-5 w-5", stat.iconColor)} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-600">{stat.title}</p>
+                    <p className="text-3xl font-bold text-slate-900 mt-1 tabular-nums">{stat.value}</p>
+                    <p className="text-xs text-slate-500 mt-1">{stat.change}</p>
                   </div>
                 </div>
               </CardContent>
@@ -773,27 +781,27 @@ export function BDDashboard() {
                   <p className="text-xs text-slate-400">Activities will appear here as they happen</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-1">
                   {recentActivities.map((activity) => {
                     const dotColors = {
-                      success: 'bg-emerald-500',
-                      error: 'bg-red-500',
-                      warning: 'bg-amber-500',
-                      info: 'bg-blue-500'
+                      success: 'bg-emerald-500 ring-emerald-100',
+                      error: 'bg-red-500 ring-red-100',
+                      warning: 'bg-amber-500 ring-amber-100',
+                      info: 'bg-blue-500 ring-blue-100'
                     };
                     return (
-                      <div key={activity._id} className="flex items-start gap-3 group">
-                        <div className="flex-shrink-0 mt-0.5">
-                          <Circle className={cn("h-2.5 w-2.5 fill-current", dotColors[activity.type])} />
+                      <div key={activity._id} className="relative flex items-center gap-3 rounded-xl px-2 py-2 -mx-2 hover:bg-slate-50 transition-colors group">
+                        <div className="relative flex-shrink-0">
+                          <Avatar name={activity.user} className="w-9 h-9 text-xs" />
+                          <span className={cn("absolute -bottom-0.5 -right-0.5 block h-3 w-3 rounded-full ring-2 ring-white", (dotColors[activity.type] || "bg-slate-400").split(' ')[0])} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-slate-700">{activity.action}</p>
-                          <div className="flex items-center gap-3 mt-0.5">
-                            <span className="text-xs text-slate-400">{activity.user}</span>
-                            <span className="text-xs text-slate-300">•</span>
-                            <span className="text-xs text-slate-400">{activity.time}</span>
-                          </div>
+                          <p className="text-sm font-medium text-slate-800 truncate capitalize">{String(activity.action || '').toLowerCase()}</p>
+                          <p className="text-xs text-slate-500 truncate">{activity.user}</p>
                         </div>
+                        <span className="flex-shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500">
+                          {activity.time}
+                        </span>
                       </div>
                     );
                   })}
@@ -819,12 +827,12 @@ export function BDDashboard() {
                     <button
                       key={index}
                       onClick={action.onClick}
-                      className="flex flex-col items-center justify-center p-4 rounded-xl border border-slate-200 hover:border-orange-200 hover:bg-orange-50 transition-all duration-200 group"
+                      className="flex flex-col items-center justify-center p-4 rounded-2xl border border-slate-100 bg-white hover:border-orange-200 hover:shadow-[0_8px_20px_-12px_rgba(249,115,22,0.5)] hover:-translate-y-0.5 transition-all duration-200 group"
                     >
-                      <div className="w-9 h-9 rounded-lg bg-slate-100 group-hover:bg-orange-100 flex items-center justify-center transition-colors duration-200">
-                        <Icon className="h-4 w-4 text-slate-600 group-hover:text-orange-600 transition-colors duration-200" />
+                      <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center transition-transform duration-200 group-hover:scale-110", QUICK_TONES[index % QUICK_TONES.length])}>
+                        <Icon className="h-5 w-5" />
                       </div>
-                      <span className="text-xs font-medium text-slate-600 group-hover:text-slate-800 mt-2 text-center">
+                      <span className="text-xs font-semibold text-slate-700 group-hover:text-slate-900 mt-2.5 text-center">
                         {action.label}
                       </span>
                     </button>

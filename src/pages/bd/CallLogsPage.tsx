@@ -51,6 +51,7 @@ import ApiConfig from '@/config/apiConfig';
 import { LeadHistoryModal } from '@/components/modal/LeadHistory';
 import { hasModulePermission } from '@/utils/modulePermissions';
 
+import { KpiCard, Avatar, StageBadge } from '@/components/reports/ReportUI';
 interface LogType {
   _id: string;
   leadId: number;
@@ -341,61 +342,11 @@ export function CallLogsPage() {
         {/* Stats Cards */}
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Calls</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{stats.totalDials}</p>
-                </div>
-                <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center">
-                  <PhoneCall className="w-5 h-5 text-orange-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Answered</p>
-                  <p className="text-2xl font-bold text-emerald-600 mt-1">{stats.totalAnswered}</p>
-                </div>
-                <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-emerald-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Talk Time</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{formatDuration(stats.totalTalkTime)}</p>
-                </div>
-                <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-amber-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Manual Logs</p>
-                  <p className="text-2xl font-bold text-purple-600 mt-1">{stats.totalInteractions}</p>
-                </div>
-                <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
-                  <Mic className="w-5 h-5 text-purple-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Records</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{stats.totalRecords}</p>
-                </div>
-                <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-                  <Activity className="w-5 h-5 text-slate-600" />
-                </div>
-              </div>
-            </Card>
+            <KpiCard icon={PhoneCall} tone="orange" label="Total Calls" value={stats.totalDials} />
+            <KpiCard icon={CheckCircle} tone="green" label="Answered" value={stats.totalAnswered} />
+            <KpiCard icon={Clock} tone="amber" label="Talk Time" value={formatDuration(stats.totalTalkTime)} />
+            <KpiCard icon={Mic} tone="violet" label="Manual Logs" value={stats.totalInteractions} />
+            <KpiCard icon={Activity} tone="teal" label="Total Records" value={stats.totalRecords} />
           </div>
         )}
 
@@ -589,27 +540,32 @@ export function CallLogsPage() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium text-slate-800 text-sm">#{log.leadId}</div>
-                        <div className="text-xs text-slate-400">{log.leadName}</div>
+                        <div className="flex items-center gap-2.5">
+                          <Avatar name={log.leadName || String(log.leadId)} className="w-8 h-8 text-[11px]" />
+                          <div className="min-w-0">
+                            <div className="font-semibold text-slate-900 text-sm truncate">{log.leadName || '—'}</div>
+                            <div className="text-[11px] text-slate-400">#{log.leadId}</div>
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm text-slate-700">{log.userId?.name || 'Unknown'}</div>
+                        <div className="text-sm font-medium text-slate-800">{log.userId?.name || 'Unknown'}</div>
                         {log.userId?.employeeId && <div className="text-xs text-slate-400">ID: {log.userId.employeeId}</div>}
                       </TableCell>
                       <TableCell>
-                        <span className="font-mono text-sm text-slate-600">{formatDuration(log.duration)}</span>
+                        <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-slate-700">{formatDuration(log.duration)}</span>
                       </TableCell>
                       <TableCell>
                         {log.logType === 'manual' ? (
-                          <span className="text-xs text-purple-600">Manual Entry</span>
+                          <span className="inline-flex items-center rounded-full bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-700 ring-1 ring-inset ring-purple-200">Manual Entry</span>
                         ) : log.answered ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-emerald-600"><CheckCircle className="w-3 h-3" />Answered</span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200"><CheckCircle className="w-3 h-3" />Answered</span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-xs text-red-600"><XCircle className="w-3 h-3" />Missed</span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-inset ring-red-200"><XCircle className="w-3 h-3" />Missed</span>
                         )}
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-slate-600">{log.stageId?.name || '—'}</span>
+                        <StageBadge label={log.stageId?.name} />
                       </TableCell>
                       <TableCell className="max-w-[200px]">
                         <p className="text-sm text-slate-600 truncate">{log.outcome || '—'}</p>
@@ -620,7 +576,7 @@ export function CallLogsPage() {
     : formatDate(log.interactionAt || log.createdAt)}
 </TableCell>
                       <TableCell>
-                        <span className="text-sm font-medium text-slate-700">{log.callCount30Days || 0}</span>
+                        <span className="inline-flex min-w-[2rem] justify-center rounded-full bg-orange-50 px-2 py-0.5 text-xs font-bold text-orange-700 ring-1 ring-inset ring-orange-200">{log.callCount30Days || 0}</span>
                       </TableCell>
                       <TableCell>
                         <Button 

@@ -29,25 +29,26 @@ export function TopNav({ panel }: TopNavProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/70 bg-white px-6 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
       <div className="flex items-center gap-4 flex-1">{/* search area if needed */}</div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <NotificationDropdown />
+        <span className="hidden md:block h-6 w-px bg-slate-200" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="gap-2 pl-2 pr-3">
-              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <span className="text-xs font-medium text-primary-foreground">
+            <Button variant="ghost" className="gap-2.5 h-11 pl-1.5 pr-3 rounded-full hover:bg-slate-50">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-b from-orange-500 to-orange-600 flex items-center justify-center shadow-[0_4px_10px_-4px_rgba(249,115,22,0.8)]">
+                <span className="text-xs font-semibold text-white">
                   {user?.name?.split(' ').map(n => n[0]).join('') || 'U'}
                 </span>
               </div>
               <div className="hidden md:block text-left">
-                <p className="text-sm font-medium">{user?.name || 'User'}</p>
+                <p className="text-sm font-semibold text-slate-800">{user?.name || 'User'}</p>
               </div>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              <ChevronDown className="h-4 w-4 text-slate-400" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-56 rounded-xl">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem>

@@ -79,47 +79,72 @@ export function ReportsPage() {
     }
   }, [visibleReports, activeReport]);
 
-  const CurrentComponent = visibleReports.find(r => r.id === activeReport)?.component;
+  const current = visibleReports.find(r => r.id === activeReport);
+  const CurrentComponent = current?.component;
+
+  const today = new Date().toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div className="reports-shell">
       <div className="max-w-[1600px] mx-auto space-y-6">
-        
+
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Reports</h1>
-          <p className="text-slate-500 mt-1">Analytics & performance metrics</p>
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-[32px] leading-tight font-bold text-slate-900 tracking-tight">Reports</h1>
+            <p className="text-slate-500 mt-1 text-[15px]">Analytics &amp; performance insights</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-2 h-11 px-4 rounded-xl bg-white border border-slate-200/80 text-sm text-slate-700 shadow-sm">
+              <Calendar className="w-4 h-4 text-slate-500" />
+              {today}
+            </div>
+            {current && (
+              <div className="inline-flex items-center gap-2 h-11 px-4 rounded-xl bg-orange-50 border border-orange-100 text-sm font-medium text-orange-700">
+                <current.icon className="w-4 h-4" />
+                {current.name}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Tab bar – same design as Users page */}
-        <div className="border-b border-slate-200">
-          <div className="flex flex-wrap gap-2 pb-2">
-            {visibleReports.map((tab) => (
+        {/* Tab bar */}
+        <div className="flex flex-wrap gap-2.5">
+          {visibleReports.map((tab) => {
+            const isActive = activeReport === tab.id;
+            return (
               <button
                 key={tab.id}
                 onClick={() => setActiveReport(tab.id)}
                 className={cn(
-                  "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all",
-                  activeReport === tab.id
-                    ? "bg-orange-500 text-white shadow-sm"
-                    : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                  "inline-flex items-center gap-2 h-11 px-5 text-sm font-medium rounded-xl transition-all duration-200",
+                  isActive
+                    ? "bg-gradient-to-b from-orange-500 to-orange-600 text-white shadow-[0_6px_16px_-6px_rgba(249,115,22,0.7)]"
+                    : "bg-white text-slate-700 border border-slate-200/80 shadow-sm hover:border-orange-200 hover:text-orange-600 hover:bg-orange-50/40"
                 )}
               >
-                <tab.icon className="w-4 h-4" />
+                <tab.icon className={cn("w-4 h-4", isActive ? "text-white" : "text-slate-500")} />
                 {tab.name}
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
 
         {/* Report Content */}
-        <Card className="border-0 shadow-sm overflow-hidden bg-white">
-          <div className="p-5">
+        <Card className="rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden bg-white">
+          <div className="p-5 lg:p-6">
             {CurrentComponent ? (
               <CurrentComponent />
             ) : (
-              <div className="text-center py-16 text-slate-400">
-                <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <div className="text-center py-20 text-slate-400">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-orange-50 flex items-center justify-center">
+                  <BarChart3 className="w-8 h-8 text-orange-400" />
+                </div>
                 <p className="text-sm">Select a report to view its data.</p>
               </div>
             )}

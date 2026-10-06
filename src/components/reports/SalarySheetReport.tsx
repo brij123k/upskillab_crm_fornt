@@ -36,6 +36,8 @@ import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { KpiCard, KpiGrid, ChartCard, RankedBars, DonutWithLegend, Avatar, MetricPill } from './ReportUI';
+import { UserCheck } from 'lucide-react';
 
 /* -------------------------------------------------------------------------- */
 /*                               Constants & Helpers                          */
@@ -335,46 +337,56 @@ export function SalarySheetReport() {
         </div>
       ) : (
         <div className="space-y-5">
-          {/* Summary Cards */}
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center">
-                  <Users className="w-5 h-5 text-orange-600" />
+          {/* KPI tiles + charts */}
+          {(() => {
+            const sum = (k: string) => filteredEmployees.reduce((acc: number, e: any) => acc + (Number(e[k]) || 0), 0);
+            const working = sum('totalWorkingDays');
+            const present = sum('totalPresent');
+            const attendance = working ? (present / working) * 100 : 0;
+            const byDesignation = new Map<string, number>();
+            filteredEmployees.forEach((e: any) => {
+              const key = e.designation || 'Unassigned';
+              byDesignation.set(key, (byDesignation.get(key) || 0) + (Number(e.finalSalary) || 0));
+            });
+            return (
+              <>
+                <KpiGrid cols={4}>
+                  <KpiCard icon={Users} tone="orange" label="Employees" value={summary.totalEmployees ?? employees.length} sub={`${filteredEmployees.length} records shown`} />
+                  <KpiCard
+                    icon={Wallet}
+                    tone="green"
+                    label="Total Payroll"
+                    value={`₹ ${formatMoney(totalPayroll)}`}
+                    sub={filteredEmployees.length ? `Avg ₹ ${formatMoney(totalPayroll / filteredEmployees.length)}` : undefined}
+                  />
+                  <KpiCard icon={UserCheck} tone="blue" label="Attendance" value={`${attendance.toFixed(1)}%`} sub={`${formatNumber(present)} of ${formatNumber(working)} days`} progress={attendance} />
+                  <KpiCard icon={CalendarDays} tone="violet" label="Period" value={<span className="text-lg">{periodLabel}</span>} />
+                </KpiGrid>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  <ChartCard title="Attendance Breakdown" subtitle="Total days across listed employees">
+                    <DonutWithLegend
+                      data={[
+                        { name: 'Present', value: present, color: '#22c55e' },
+                        { name: 'Half Day', value: sum('totalHalfDay'), color: '#f59e0b' },
+                        { name: 'Leave', value: sum('totalLeave'), color: '#3b82f6' },
+                        { name: 'Week Off', value: sum('wo'), color: '#8b5cf6' },
+                        { name: 'Absent', value: sum('totalAbsent'), color: '#f43f5e' },
+                      ]}
+                      centerValue={formatNumber(working)}
+                      centerLabel="Working Days"
+                      formatValue={formatNumber}
+                    />
+                  </ChartCard>
+                  <ChartCard title="Payroll by Designation" subtitle="Final salary totals">
+                    <RankedBars
+                      data={Array.from(byDesignation, ([name, value]) => ({ name, value }))}
+                      formatValue={v => `₹${formatMoney(v)}`}
+                    />
+                  </ChartCard>
                 </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Employees</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">
-                    {summary.totalEmployees ?? employees.length}
-                  </p>
-                </div>
-              </div>
-            </Card>
-            <Card className="p-5 bg-white border-0 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
-                  <Wallet className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Payroll</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">
-                    ₹ {formatMoney(totalPayroll)}
-                  </p>
-                </div>
-              </div>
-            </Card>
-            <Card className="p-5 bg-white border-0 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
-                  <CalendarDays className="w-5 h-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Period</p>
-                  <p className="text-sm font-semibold text-slate-700 mt-1">{periodLabel}</p>
-                </div>
-              </div>
-            </Card>
-          </div>
+              </>
+            );
+          })()}
 
           {/* Info & Search (already integrated into filter bar, but we still show record count) */}
           <div className="text-xs text-slate-500">
@@ -405,20 +417,20 @@ export function SalarySheetReport() {
               <TableBody>
                 {paginatedEmployees.map((emp: any) => (
                   <TableRow key={emp.userId || `${emp.empId}-${emp.empName}`} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
-                    <TableCell className="text-xs font-medium text-slate-800">{emp.empId}</TableCell>
-                    <TableCell className="text-xs text-slate-700">{emp.empName}</TableCell>
-                    <TableCell className="text-xs text-slate-600">{emp.designation}</TableCell>
+                    <TableCell><span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[11.5px] font-semibold text-slate-700">{emp.empId}</span></TableCell>
+                    <TableCell className="text-xs text-slate-700"><span className="inline-flex items-center gap-2"><Avatar name={emp.empName} className="w-7 h-7 text-[10px]" />{emp.empName}</span></TableCell>
+                    <TableCell className="text-slate-600">{emp.designation ? <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-0.5 text-[11.5px] font-medium text-blue-700 ring-1 ring-inset ring-blue-100">{emp.designation}</span> : '-'}</TableCell>
                     <TableCell className="text-xs text-slate-600">{emp.vintage || '-'}</TableCell>
-                    <TableCell className="text-xs text-right text-slate-700">{formatMoney(emp.salary)}</TableCell>
+                    <TableCell className="text-right font-medium text-slate-800">₹{formatMoney(emp.salary)}</TableCell>
                     <TableCell className="text-xs text-right text-slate-600">{formatNumber(emp.totalWorkingDays)}</TableCell>
-                    <TableCell className="text-xs text-right text-slate-600">{formatNumber(emp.totalPresent)}</TableCell>
-                    <TableCell className="text-xs text-right text-slate-600">{formatNumber(emp.totalHalfDay)}</TableCell>
-                    <TableCell className="text-xs text-right text-slate-600">{formatNumber(emp.totalLeave)}</TableCell>
+                    <TableCell className="text-right"><MetricPill value={formatNumber(emp.totalPresent)} tone="green" /></TableCell>
+                    <TableCell className="text-right"><MetricPill value={formatNumber(emp.totalHalfDay)} tone="orange" /></TableCell>
+                    <TableCell className="text-right"><MetricPill value={formatNumber(emp.totalLeave)} tone="blue" /></TableCell>
                     <TableCell className="text-xs text-right text-slate-600">{formatNumber(emp.wo)}</TableCell>
-                    <TableCell className="text-xs text-right text-slate-600">{formatNumber(emp.totalAbsent)}</TableCell>
-                    <TableCell className="text-xs text-right font-medium text-slate-800">{formatNumber(emp.totalPayableDays)}</TableCell>
-                    <TableCell className="text-xs text-right text-slate-700">{formatMoney(emp.basicSalary)}</TableCell>
-                    <TableCell className="text-xs text-right font-semibold text-slate-800">{formatMoney(emp.finalSalary)}</TableCell>
+                    <TableCell className="text-right">{Number(emp.totalAbsent) > 0 ? <span className="inline-flex justify-center min-w-[2.25rem] rounded-full bg-rose-50 px-2.5 py-1 text-[12.5px] font-semibold text-rose-700 ring-1 ring-inset ring-rose-200 tabular-nums">{formatNumber(emp.totalAbsent)}</span> : <span className="text-slate-300 font-normal">0</span>}</TableCell>
+                    <TableCell className="text-right font-bold text-slate-900">{formatNumber(emp.totalPayableDays)}</TableCell>
+                    <TableCell className="text-right text-slate-700">₹{formatMoney(emp.basicSalary)}</TableCell>
+                    <TableCell className="text-right"><span className="inline-flex rounded-lg bg-slate-900 px-2.5 py-1 text-[13px] font-bold text-white tabular-nums">₹{formatMoney(emp.finalSalary)}</span></TableCell>
                   </TableRow>
                 ))}
               </TableBody>

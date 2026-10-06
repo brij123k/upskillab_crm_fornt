@@ -54,6 +54,8 @@ import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { KpiCard, KpiGrid, ChartCard, Funnel, RankedBars, Avatar, MetricPill } from './ReportUI';
+import { PhoneCall } from 'lucide-react';
 
 /* -------------------------------------------------------------------------- */
 /*                                Utility Helpers                              */
@@ -332,8 +334,9 @@ function TeamMemberTable({
                     <TableCell className="sticky left-0 bg-white border-r z-10 py-2">
                       <div className="flex flex-col min-w-[110px]">
                         <div className="flex items-center gap-1.5 flex-wrap">
+                          <Avatar name={member.employeeName} className="w-7 h-7 text-[10px]" />
                           <span 
-                            className="text-xs font-medium text-slate-800 truncate max-w-[80px] cursor-pointer hover:text-orange-600"
+                            className="text-xs font-semibold text-slate-900 truncate max-w-[110px] cursor-pointer hover:text-orange-600"
                             onClick={() => onEmployeeClick(member)}
                           >
                             {member.employeeName}
@@ -371,7 +374,7 @@ function TeamMemberTable({
                     </TableCell>
                     <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.designation || '-'}</TableCell>
                     <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.vintage || '-'}</TableCell>
-                    <TableCell className="text-[10px] text-center font-medium py-2 text-slate-800">{member.leadAssigned || 0}</TableCell>
+                    <TableCell className="text-center py-3 font-bold text-slate-900">{member.leadAssigned || 0}</TableCell>
                     <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.newLead || 0}</TableCell>
                     <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.totalDial || 0}</TableCell>
                     <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.uniqDial || 0}</TableCell>
@@ -379,8 +382,8 @@ function TeamMemberTable({
                     <TableCell className="text-[10px] text-center py-2 text-slate-600">{formatTime(member.answeredTalkTime)}</TableCell>
                     <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.pcatScheduled || 0}</TableCell>
                     <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.pcatDone || 0}</TableCell>
-                    <TableCell className="text-[10px] text-center font-medium py-2 text-slate-800">{member.registrationDone || 0}</TableCell>
-                    <TableCell className="text-[10px] text-center font-medium py-2 text-slate-800">{member.admissionDone || 0}</TableCell>
+                    <TableCell className="text-center py-3"><MetricPill value={member.registrationDone || 0} tone="violet" /></TableCell>
+                    <TableCell className="text-center py-3"><MetricPill value={member.admissionDone || 0} tone="green" /></TableCell>
                   </TableRow>
                   {/* Nested team members */}
                   {isExpanded && member.children && member.children.length > 0 && (
@@ -1224,6 +1227,51 @@ export function UtilizationReport() {
             )}
           </div>
 
+          {/* KPI tiles + charts */}
+          <KpiGrid cols={5}>
+            <KpiCard icon={Users} tone="orange" label="Leads Assigned" value={totals.leadAssigned.toLocaleString('en-IN')} sub={`${totals.newLead.toLocaleString('en-IN')} new leads`} />
+            <KpiCard icon={Phone} tone="blue" label="Total Dials" value={totals.totalDial.toLocaleString('en-IN')} sub={`${totals.uniqDial.toLocaleString('en-IN')} unique`} />
+            <KpiCard
+              icon={PhoneCall}
+              tone="green"
+              label="Answered Calls"
+              value={totals.answeredCall.toLocaleString('en-IN')}
+              sub={`${totals.totalDial ? ((totals.answeredCall / totals.totalDial) * 100).toFixed(1) : '0.0'}% connect rate`}
+              progress={totals.totalDial ? (totals.answeredCall / totals.totalDial) * 100 : 0}
+            />
+            <KpiCard icon={Clock} tone="violet" label="Talk Time" value={formatTime(totals.answeredTalkTime)} sub={totals.answeredCall ? `${formatTime(Math.round(totals.answeredTalkTime / totals.answeredCall))} avg / call` : undefined} />
+            <KpiCard
+              icon={UserCheck}
+              tone="rose"
+              label="Admissions"
+              value={totals.admissionDone.toLocaleString('en-IN')}
+              sub={`${totals.leadAssigned ? ((totals.admissionDone / totals.leadAssigned) * 100).toFixed(1) : '0.0'}% of leads`}
+            />
+          </KpiGrid>
+
+          <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+            <ChartCard title="Effort Funnel" subtitle="% shows conversion from the previous step" className="xl:col-span-3">
+              <Funnel
+                steps={[
+                  { name: 'Leads Assigned', value: totals.leadAssigned },
+                  { name: 'Unique Dials', value: totals.uniqDial },
+                  { name: 'Answered', value: totals.answeredCall },
+                  { name: 'PCAT Scheduled', value: totals.pcatScheduled },
+                  { name: 'PCAT Done', value: totals.pcatDone },
+                  { name: 'Registration', value: totals.registrationDone },
+                  { name: 'Admission', value: totals.admissionDone },
+                ]}
+              />
+            </ChartCard>
+            <ChartCard title="Most Active Callers" subtitle="Ranked by total dials" className="xl:col-span-2">
+              <RankedBars
+                data={filteredTopLevel.map((e: any) => ({ name: e.employeeName, value: e.totalDial || 0 }))}
+                limit={7}
+                formatValue={v => v.toLocaleString('en-IN')}
+              />
+            </ChartCard>
+          </div>
+
           {/* Table */}
           <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
             <Table>
@@ -1259,8 +1307,9 @@ export function UtilizationReport() {
                         <TableCell className="text-xs sticky left-0 bg-white border-r z-10 py-3">
                           <div className="flex flex-col">
                             <div className="flex items-center gap-1.5 flex-wrap">
+                              <Avatar name={emp.employeeName} />
                               <span 
-                                className="font-medium text-slate-800 cursor-pointer hover:text-orange-600"
+                                className="font-semibold text-slate-900 cursor-pointer hover:text-orange-600"
                                 onClick={() => handleEmployeeClick(emp)}
                               >
                                 {emp.employeeName}
@@ -1298,7 +1347,7 @@ export function UtilizationReport() {
                         </TableCell>
                         <TableCell className="text-xs text-center py-3 text-slate-600">{emp.designation || '-'}</TableCell>
                         <TableCell className="text-xs text-center py-3 text-slate-600">{emp.vintage || '-'}</TableCell>
-                        <TableCell className="text-xs text-center font-medium py-3 text-slate-800">{emp.leadAssigned || 0}</TableCell>
+                        <TableCell className="text-center py-3 font-bold text-slate-900">{emp.leadAssigned || 0}</TableCell>
                         <TableCell className="text-xs text-center py-3 text-slate-600">{emp.newLead || 0}</TableCell>
                         <TableCell className="text-xs text-center py-3 text-slate-600">{emp.totalDial || 0}</TableCell>
                         <TableCell className="text-xs text-center py-3 text-slate-600">{emp.uniqDial || 0}</TableCell>
@@ -1306,8 +1355,8 @@ export function UtilizationReport() {
                         <TableCell className="text-xs text-center py-3 text-slate-600">{formatTime(emp.answeredTalkTime)}</TableCell>
                         <TableCell className="text-xs text-center py-3 text-slate-600">{emp.pcatScheduled || 0}</TableCell>
                         <TableCell className="text-xs text-center py-3 text-slate-600">{emp.pcatDone || 0}</TableCell>
-                        <TableCell className="text-xs text-center font-medium py-3 text-slate-800">{emp.registrationDone || 0}</TableCell>
-                        <TableCell className="text-xs text-center font-medium py-3 text-slate-800">{emp.admissionDone || 0}</TableCell>
+                        <TableCell className="text-center py-3"><MetricPill value={emp.registrationDone || 0} tone="violet" /></TableCell>
+                        <TableCell className="text-center py-3"><MetricPill value={emp.admissionDone || 0} tone="green" /></TableCell>
                       </TableRow>
 
                       {/* Nested Team Members */}

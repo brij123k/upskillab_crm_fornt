@@ -1,0 +1,311 @@
+/* -------------------------------------------------------------------------- */
+/*  App theme – visual-only overrides for every page inside the panel layout.  */
+/*  All rules are scoped under .app-shell (set in PanelLayout), so public      */
+/*  pages such as Login are untouched by this file.                           */
+/* -------------------------------------------------------------------------- */
+
+.app-shell {
+  --app-canvas: #f6f7fb;
+  --app-border: #eceef3;
+  --app-muted: #64748b;
+  --app-heading: #0f172a;
+  background-color: var(--app-canvas);
+}
+
+/* ── Page wrappers: let the shared canvas show through ───────────────────── */
+.app-shell main > div.min-h-screen,
+.app-shell main > div > div.min-h-screen,
+.app-shell main [class*='from-slate-50'].min-h-screen,
+.app-shell main .min-h-screen.bg-gray-50,
+.app-shell main .min-h-screen.bg-slate-50 {
+  background: transparent;
+}
+
+/* Page roots that add their own padding / full-height box – the layout's
+   <main> already provides both, so avoid doubling them up. */
+.app-shell main > div.min-h-screen,
+.app-shell main > div.md\:p-6 {
+  min-height: 0;
+  padding: 0;
+}
+
+/* ── Hand-built tab bars (pill buttons inside a bordered strip) ──────────── */
+.app-shell main .border-b:has(> .flex.flex-wrap > button) {
+  border-bottom-color: transparent;
+}
+.app-shell main .border-b > .flex.flex-wrap:has(> button) {
+  gap: 0.625rem;
+  padding-bottom: 0.25rem;
+}
+.app-shell main .border-b > .flex.flex-wrap > button {
+  height: 2.75rem;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+/* ── Solid orange buttons written by hand → same gradient as primary ─────── */
+.app-shell main button.bg-orange-500,
+.app-shell main a.bg-orange-500 {
+  background-image: linear-gradient(to bottom, #f97316, #ea580c);
+  box-shadow: 0 6px 16px -8px rgba(249, 115, 22, 0.8);
+}
+.app-shell main button.bg-orange-500:hover,
+.app-shell main a.bg-orange-500:hover {
+  background-image: linear-gradient(to bottom, #ea580c, #ea580c);
+}
+
+/* ── Page titles & subtitles ─────────────────────────────────────────────── */
+.app-shell main h1.text-2xl,
+.app-shell main h1.text-3xl {
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--app-heading);
+}
+.app-shell main h1 + p {
+  color: var(--app-muted);
+  font-size: 0.95rem;
+}
+
+/* ── Cards: always keep a hairline border on the grey canvas ─────────────── */
+.app-shell .ui-card.border-0 {
+  border-width: 1px;
+  border-color: var(--app-border);
+}
+
+/* ── Stat / KPI rows: tinted cards like the dashboard design ─────────────── */
+.app-shell .grid[class*='grid-cols-4'] > .ui-card,
+.app-shell .grid[class*='grid-cols-5'] > .ui-card,
+.app-shell .grid[class*='grid-cols-6'] > .ui-card,
+.reports-shell .grid > .ui-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.app-shell .grid[class*='grid-cols-4'] > .ui-card:hover,
+.app-shell .grid[class*='grid-cols-5'] > .ui-card:hover,
+.app-shell .grid[class*='grid-cols-6'] > .ui-card:hover,
+.reports-shell .grid > .ui-card:hover {
+  box-shadow: 0 10px 28px -14px rgba(15, 23, 42, 0.22);
+  transform: translateY(-1px);
+}
+
+.app-shell .grid[class*='grid-cols-4'] > .ui-card:nth-child(5n + 1),
+.app-shell .grid[class*='grid-cols-5'] > .ui-card:nth-child(5n + 1),
+.app-shell .grid[class*='grid-cols-6'] > .ui-card:nth-child(5n + 1),
+.reports-shell .grid > .ui-card:nth-child(5n + 1) {
+  background: linear-gradient(135deg, #fff4ea 0%, #ffffff 70%);
+  border-color: #fde3cc;
+}
+.app-shell .grid[class*='grid-cols-4'] > .ui-card:nth-child(5n + 2),
+.app-shell .grid[class*='grid-cols-5'] > .ui-card:nth-child(5n + 2),
+.app-shell .grid[class*='grid-cols-6'] > .ui-card:nth-child(5n + 2),
+.reports-shell .grid > .ui-card:nth-child(5n + 2) {
+  background: linear-gradient(135deg, #edf4ff 0%, #ffffff 70%);
+  border-color: #d6e6ff;
+}
+.app-shell .grid[class*='grid-cols-4'] > .ui-card:nth-child(5n + 3),
+.app-shell .grid[class*='grid-cols-5'] > .ui-card:nth-child(5n + 3),
+.app-shell .grid[class*='grid-cols-6'] > .ui-card:nth-child(5n + 3),
+.reports-shell .grid > .ui-card:nth-child(5n + 3) {
+  background: linear-gradient(135deg, #eafaf2 0%, #ffffff 70%);
+  border-color: #c9f0dc;
+}
+.app-shell .grid[class*='grid-cols-4'] > .ui-card:nth-child(5n + 4),
+.app-shell .grid[class*='grid-cols-5'] > .ui-card:nth-child(5n + 4),
+.app-shell .grid[class*='grid-cols-6'] > .ui-card:nth-child(5n + 4),
+.reports-shell .grid > .ui-card:nth-child(5n + 4) {
+  background: linear-gradient(135deg, #f4f0ff 0%, #ffffff 70%);
+  border-color: #e2d9ff;
+}
+.app-shell .grid[class*='grid-cols-4'] > .ui-card:nth-child(5n + 5),
+.app-shell .grid[class*='grid-cols-5'] > .ui-card:nth-child(5n + 5),
+.app-shell .grid[class*='grid-cols-6'] > .ui-card:nth-child(5n + 5),
+.reports-shell .grid > .ui-card:nth-child(5n + 5) {
+  background: linear-gradient(135deg, #fff0f2 0%, #ffffff 70%);
+  border-color: #ffd6dd;
+}
+
+/* ── Section headings inside cards / reports ─────────────────────────────── */
+.reports-shell h3.text-base,
+.reports-shell h2.text-xl {
+  font-size: 1.05rem;
+  line-height: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--app-heading);
+}
+
+/* ── Table containers ────────────────────────────────────────────────────── */
+.app-shell .overflow-x-auto.border,
+.app-shell .rounded-xl.border:has(table),
+.app-shell .rounded-lg.border:has(> table),
+.app-shell .rounded-lg.border:has(> div > table),
+.app-shell .rounded-md.border:has(> div > table) {
+  border-color: var(--app-border);
+  border-radius: 14px;
+}
+
+/* ── Tables (covers both shadcn tables and plain <table> markup) ─────────── */
+.app-shell table thead tr {
+  background-color: #f8f9fc;
+  border-bottom-color: var(--app-border);
+}
+.app-shell table thead th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+.app-shell table thead th.sticky {
+  background-color: #f8f9fc;
+}
+.app-shell table tbody tr {
+  border-bottom-color: #f1f3f7;
+}
+.app-shell table tbody tr:hover {
+  background-color: #fffaf5;
+}
+
+/* ── Native form controls used directly in pages ─────────────────────────── */
+.app-shell input[type='date'],
+.app-shell input[type='datetime-local'],
+.app-shell input[type='month'] {
+  border-color: var(--app-border);
+  border-radius: 0.75rem;
+}
+
+/* ── Thin, unobtrusive scrollbars on wide tables ─────────────────────────── */
+.app-shell .overflow-x-auto::-webkit-scrollbar,
+.app-shell .overflow-auto::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.app-shell .overflow-x-auto::-webkit-scrollbar-thumb,
+.app-shell .overflow-auto::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 999px;
+}
+.app-shell .overflow-x-auto::-webkit-scrollbar-track,
+.app-shell .overflow-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ========================================================================== */
+/*  Data tables – professional styling (all panel pages)                                 */
+/* ========================================================================== */
+.app-shell table {
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'cv11' 1;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* Header */
+.app-shell table thead th {
+  height: auto;
+  padding-top: 0.8rem;
+  padding-bottom: 0.8rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--app-border);
+}
+.app-shell table thead th div,
+.app-shell table thead th span {
+  letter-spacing: inherit;
+}
+
+/* Body cells */
+.app-shell table tbody td {
+  padding-top: 0.8rem;
+  padding-bottom: 0.8rem;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #334155;
+  border-bottom: 1px solid #f1f3f7;
+  vertical-align: middle;
+}
+.app-shell table tbody td.text-xs,
+.app-shell table tbody td .text-xs,
+.app-shell table tbody td .text-sm {
+  font-size: 13px;
+}
+.app-shell table tbody td .text-\[8px\],
+.app-shell table tbody td .text-\[9px\],
+.app-shell table tbody td .text-\[10px\] {
+  font-size: 11px;
+  line-height: 1.3;
+}
+.app-shell table thead th .text-\[8px\],
+.app-shell table thead th .text-\[9px\],
+.app-shell table thead th .text-\[10px\] {
+  font-size: 10.5px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* First column = the row's identity (employee / stage / pool) */
+.app-shell table tbody tr > td:first-child {
+  font-weight: 600;
+  color: #0f172a;
+}
+.app-shell table tbody tr > td:first-child .text-slate-400,
+.app-shell table tbody tr > td:first-child .text-\[10px\],
+.app-shell table tbody tr > td:first-child .text-\[9px\] {
+  font-weight: 400;
+  color: #94a3b8;
+}
+
+/* Zebra striping + hover */
+.app-shell table tbody tr:nth-child(even) > td {
+  background-color: #fbfcfe;
+}
+.app-shell table tbody tr:nth-child(even) > td.sticky {
+  background-color: #fbfcfe;
+}
+.app-shell table tbody tr:hover > td,
+.app-shell table tbody tr:hover > td.sticky {
+  background-color: #fff8f1;
+}
+
+/* Sticky first column gets a soft divider shadow while scrolling */
+.app-shell table td.sticky,
+.app-shell table th.sticky {
+  box-shadow: inset -1px 0 0 #eef0f4;
+  border-right-color: transparent;
+}
+
+/* Nested team tables sit on a soft panel */
+.app-shell table table {
+  background: #ffffff;
+}
+
+/* Badges inside cells */
+.app-shell table td .rounded-full {
+  font-weight: 600;
+}
+
+/* Muted placeholders */
+.app-shell table td .text-slate-300 {
+  color: #cbd5e1;
+  font-weight: 400;
+}
+
+/* Totals rows (rendered with bg-slate-50 + font-semibold) */
+.reports-shell table tbody tr.font-semibold > td,
+.reports-shell table tbody tr.bg-slate-50 > td {
+  background-color: #fff7ed !important;
+  color: #9a3412;
+  font-weight: 700;
+  border-top: 1px solid #fed7aa;
+}
+

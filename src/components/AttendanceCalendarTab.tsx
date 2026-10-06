@@ -48,6 +48,7 @@ import { getDataHandlerWithToken, patchTokenDataHandler } from '@/config/service
 import ApiConfig from '@/config/apiConfig';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 
+import { KpiCard } from '@/components/reports/ReportUI';
 interface AttendanceRecord {
   _id: string;
   userId: {
@@ -487,61 +488,11 @@ export function AttendanceCalendarTab({
 
     return (
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card className="p-4 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total</p>
-              <p className="text-2xl font-bold text-slate-800 mt-1">{total}</p>
-            </div>
-            <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center">
-              <Activity className="w-5 h-5 text-slate-600" />
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Present</p>
-              <p className="text-2xl font-bold text-emerald-600 mt-1">{present}</p>
-            </div>
-            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-emerald-600" />
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Absent</p>
-              <p className="text-2xl font-bold text-red-600 mt-1">{absent}</p>
-            </div>
-            <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
-              <XCircle className="w-5 h-5 text-red-600" />
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Half Day</p>
-              <p className="text-2xl font-bold text-amber-600 mt-1">{halfDay}</p>
-            </div>
-            <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
-              <Clock className="w-5 h-5 text-amber-600" />
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Pending Requests</p>
-              <p className="text-2xl font-bold text-amber-600 mt-1">{pendingRequests}</p>
-            </div>
-            <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-amber-600" />
-            </div>
-          </div>
-        </Card>
+        <KpiCard icon={Activity} tone="teal" label="Total" value={total} />
+        <KpiCard icon={CheckCircle} tone="green" label="Present" value={present} />
+        <KpiCard icon={XCircle} tone="rose" label="Absent" value={absent} />
+        <KpiCard icon={Clock} tone="amber" label="Half Day" value={halfDay} />
+        <KpiCard icon={AlertTriangle} tone="amber" label="Pending Requests" value={pendingRequests} />
       </div>
     );
   };

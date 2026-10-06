@@ -42,7 +42,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-[#f6f7fb] bg-[radial-gradient(ellipse_at_top,_rgba(249,115,22,0.10),_transparent_60%)]">
       <div className="w-full max-w-md animate-fade-in">
         <div className="flex items-center justify-center mb-8">
           <div className="flex items-center gap-3">

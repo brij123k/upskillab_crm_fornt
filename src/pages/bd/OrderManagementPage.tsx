@@ -249,6 +249,7 @@ import { useNavigate } from 'react-router-dom';
 import { hasModulePermission } from '@/utils/modulePermissions';
 import { hasPermission } from '@/utils/permissions';
 import { cn } from '@/lib/utils';
+import { Avatar } from '@/components/reports/ReportUI';
 export function OrderManagementPage() {
     // State declarations
     const [orders, setOrders] = useState<OrderType[]>([]);
@@ -1475,18 +1476,23 @@ const validateLoan = useCallback(() => {
               className="border-b border-slate-50 hover:bg-slate-50/50 cursor-pointer transition-colors"
             >
               <TableCell className="py-3">
-                <span className="font-mono text-sm text-slate-600">{order._id.slice(-8)}</span>
+                <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-slate-700">#{order._id.slice(-8)}</span>
               </TableCell>
               <TableCell>
-                <div className="font-medium text-slate-800 text-sm">{order.studentName}</div>
-                <div className="text-xs text-slate-400">{order.mobile}</div>
+                <div className="flex items-center gap-2.5">
+                  <Avatar name={order.studentName} className="w-8 h-8 text-[11px]" />
+                  <div className="min-w-0">
+                    <div className="font-semibold text-slate-900 text-sm truncate">{order.studentName}</div>
+                    <div className="text-[11px] text-slate-400">{order.mobile}</div>
+                  </div>
+                </div>
               </TableCell>
               <TableCell>
-                <div className="text-sm text-slate-700">{order.courseName}</div>
+                <div className="text-sm font-medium text-slate-800">{order.courseName}</div>
                 <div className="text-xs text-slate-400">{order.courseDuration} days</div>
               </TableCell>
               <TableCell>
-                <div className="font-medium text-slate-800 text-sm">{formatCurrency(order.finalFee)}</div>
+                <div className="font-bold text-slate-900 text-sm tabular-nums">{formatCurrency(order.finalFee)}</div>
                 {order.discount > 0 && (
                   <div className="text-xs text-slate-400 line-through">{formatCurrency(order.totalFee)}</div>
                 )}
@@ -1504,12 +1510,12 @@ const validateLoan = useCallback(() => {
               </TableCell>
               <TableCell>
                 {order.Approved ? (
-                  <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
                     <CheckCircle2 className="w-3 h-3" />
                     Approved
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-xs text-yellow-600">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">
                     <XCircle className="w-3 h-3" />
                     Pending
                   </span>

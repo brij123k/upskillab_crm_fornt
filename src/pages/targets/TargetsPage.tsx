@@ -53,6 +53,8 @@ import { getDataHandlerWithToken, postDataHandlerWithToken } from '@/config/serv
 import ApiConfig from '@/config/apiConfig';
 import { useToast } from '@/hooks/use-toast';
 
+import { KpiCard, PersonCell, Tag } from '@/components/reports/ReportUI';
+import { cn } from '@/lib/utils';
 // -------------------- types & constants (unchanged) --------------------
 type TargetMetricKey = 'calls' | 'meets' | 'pcatDone' | 'registrationDone' | 'revenue' | 'tasks';
 
@@ -319,39 +321,9 @@ export function TargetsPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Users</p>
-                <p className="text-2xl font-bold text-slate-800 mt-1">{summary.totalUsers || 0}</p>
-              </div>
-              <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center">
-                <Users className="w-5 h-5 text-orange-600" />
-              </div>
-            </div>
-          </Card>
-          <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Target Value</p>
-                <p className="text-2xl font-bold text-emerald-600 mt-1">{formatNumber(summary.totalTarget || 0)}</p>
-              </div>
-              <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-emerald-600" />
-              </div>
-            </div>
-          </Card>
-          <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Achieved</p>
-                <p className="text-2xl font-bold text-blue-600 mt-1">{formatNumber(summary.totalAchieved || 0)}</p>
-              </div>
-              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                <BarChart3 className="w-5 h-5 text-blue-600" />
-              </div>
-            </div>
-          </Card>
+          <KpiCard icon={Users} tone="orange" label="Total Users" value={summary.totalUsers || 0} />
+          <KpiCard icon={TrendingUp} tone="green" label="Target Value" value={formatNumber(summary.totalTarget || 0)} />
+          <KpiCard icon={BarChart3} tone="blue" label="Achieved" value={formatNumber(summary.totalAchieved || 0)} />
           <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
@@ -430,20 +402,25 @@ export function TargetsPage() {
                             }}
                           >
                             <TableCell>
-                              <div className="font-medium text-slate-800 text-sm">{row.name}</div>
-                              <div className="text-xs text-slate-400">ID: {row.employeeId || '-'}</div>
+                              <PersonCell name={row.name} sub={`ID: ${row.employeeId || '-'}`} />
                             </TableCell>
-                            <TableCell className="text-sm text-slate-600">{row.roleName}</TableCell>
+                            <TableCell><Tag>{row.roleName}</Tag></TableCell>
                             <TableCell className="text-right text-sm text-slate-700">
                               {selectedMetricRow?.target ?? 0}
                             </TableCell>
-                            <TableCell className="text-right text-sm text-slate-700">
+                            <TableCell className="text-right text-sm font-bold text-slate-900">
                               {selectedMetricRow?.achieved ?? 0}
                             </TableCell>
                             <TableCell className="text-right">
-                              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600">
-                                {selectedMetricRow?.percentage ?? 0}%
-                              </span>
+                              <div className="ml-auto flex w-32 items-center gap-2">
+                                <div className="h-1.5 flex-1 rounded-full bg-slate-100 overflow-hidden">
+                                  <div
+                                    className={cn('h-full rounded-full', Number(selectedMetricRow?.percentage ?? 0) >= 100 ? 'bg-emerald-500' : Number(selectedMetricRow?.percentage ?? 0) >= 50 ? 'bg-orange-500' : 'bg-rose-500')}
+                                    style={{ width: `${Math.min(100, Number(selectedMetricRow?.percentage ?? 0))}%` }}
+                                  />
+                                </div>
+                                <span className="w-10 text-right text-xs font-bold text-slate-800 tabular-nums">{selectedMetricRow?.percentage ?? 0}%</span>
+                              </div>
                             </TableCell>
                             <TableCell className="text-right text-sm text-slate-600">{row.daysLeft ?? 0}</TableCell>
                             <TableCell className="text-right">

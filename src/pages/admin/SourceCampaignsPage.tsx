@@ -48,6 +48,7 @@ import ApiConfig from '@/config/apiConfig';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
+import { KpiCard } from '@/components/reports/ReportUI';
 /* -------------------------------------------------- */
 /*  Types & Helpers                                   */
 /* -------------------------------------------------- */
@@ -268,28 +269,8 @@ export function SourceCampaignsPage() {
 
         {/* Summary cards */}
         <div className="grid gap-4 md:grid-cols-3">
-          <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Campaigns</p>
-                <p className="text-2xl font-bold text-slate-800 mt-1">{summary.total}</p>
-              </div>
-              <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center">
-                <BarChart3 className="w-5 h-5 text-orange-600" />
-              </div>
-            </div>
-          </Card>
-          <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Active</p>
-                <p className="text-2xl font-bold text-emerald-600 mt-1">{summary.active}</p>
-              </div>
-              <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
-                <Power className="w-5 h-5 text-emerald-600" />
-              </div>
-            </div>
-          </Card>
+          <KpiCard icon={BarChart3} tone="orange" label="Total Campaigns" value={summary.total} />
+          <KpiCard icon={Power} tone="green" label="Active" value={summary.active} />
           <Card className="p-5 bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>

@@ -38,6 +38,8 @@ import ApiConfig from '@/config/apiConfig';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
+import { KpiCard } from '@/components/reports/ReportUI';
+import { ClipboardList as LRTotalIcon, Clock as LRPendingIcon, CheckCircle2 as LRApprovedIcon, XCircle as LRRejectedIcon, Ban as LRCancelledIcon } from 'lucide-react';
 type UserRef = {
   _id: string;
   id?: string;
@@ -308,37 +310,12 @@ export function LeaveRequestsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
-        <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-slate-50 to-slate-100">
-          <CardContent className="p-3">
-            <p className="text-xs font-medium text-slate-600 uppercase tracking-wider">Total</p>
-            <div className="mt-1 text-2xl font-bold text-slate-800">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-amber-200 shadow-sm bg-gradient-to-br from-amber-50 to-amber-100">
-          <CardContent className="p-3">
-            <p className="text-xs font-medium text-amber-700 uppercase tracking-wider">Pending</p>
-            <div className="mt-1 text-2xl font-bold text-amber-700">{stats.pending}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-emerald-200 shadow-sm bg-gradient-to-br from-emerald-50 to-emerald-100">
-          <CardContent className="p-3">
-            <p className="text-xs font-medium text-emerald-700 uppercase tracking-wider">Approved</p>
-            <div className="mt-1 text-2xl font-bold text-emerald-700">{stats.approved}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-red-200 shadow-sm bg-gradient-to-br from-red-50 to-red-100">
-          <CardContent className="p-3">
-            <p className="text-xs font-medium text-red-700 uppercase tracking-wider">Rejected</p>
-            <div className="mt-1 text-2xl font-bold text-red-700">{stats.rejected}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-slate-50 to-slate-100">
-          <CardContent className="p-3">
-            <p className="text-xs font-medium text-slate-600 uppercase tracking-wider">Cancelled</p>
-            <div className="mt-1 text-2xl font-bold text-slate-700">{stats.cancelled}</div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
+        <KpiCard icon={LRTotalIcon} tone="orange" label="Total" value={stats.total} />
+        <KpiCard icon={LRPendingIcon} tone="amber" label="Pending" value={stats.pending} />
+        <KpiCard icon={LRApprovedIcon} tone="green" label="Approved" value={stats.approved} />
+        <KpiCard icon={LRRejectedIcon} tone="rose" label="Rejected" value={stats.rejected} />
+        <KpiCard icon={LRCancelledIcon} tone="teal" label="Cancelled" value={stats.cancelled} />
       </div>
 
       {/* Filters */}

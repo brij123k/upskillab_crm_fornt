@@ -59,6 +59,7 @@ import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { KpiCard, KpiGrid, ChartCard, RankedBars, DonutWithLegend } from './ReportUI';
 
 /* -------------------------------------------------------------------------- */
 /*                               Constants & Helpers                          */
@@ -836,6 +837,41 @@ export function SourceCampaignRevenueReport() {
             )}
           </div> */}
 
+          {/* KPI tiles + charts */}
+          <KpiGrid cols={4}>
+            <KpiCard icon={Users} tone="orange" label="Total Leads" value={filteredTotals.totalLead.toLocaleString()} sub={formatDateRange() || undefined} />
+            <KpiCard
+              icon={IndianRupee}
+              tone="green"
+              label="Total Revenue"
+              value={formatCurrency(filteredTotals.totalRevenue)}
+              sub={filteredTotals.totalLead ? `${formatCurrency(filteredTotals.totalRevenue / filteredTotals.totalLead)} per lead` : undefined}
+            />
+            <KpiCard icon={Layers} tone="blue" label="Campaigns" value={campaigns.length} />
+            <KpiCard icon={isTeamMode ? UserCog : TrendingUp} tone="violet" label="Sources" value={filteredRows.length} sub={isTeamMode ? 'Team view' : undefined} />
+          </KpiGrid>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <ChartCard title="Revenue by Source" subtitle="Share of total revenue">
+              <DonutWithLegend
+                data={filteredRows.map((r: any) => ({ name: r.source, value: r.totalRevenue || 0 }))}
+                centerValue={formatCurrency(filteredTotals.totalRevenue)}
+                centerLabel="Total Revenue"
+                formatValue={formatCurrency}
+              />
+            </ChartCard>
+            <ChartCard title="Revenue by Campaign" subtitle="With lead counts">
+              <RankedBars
+                data={campaigns.map((c: string) => ({
+                  name: c,
+                  value: columnTotals[c]?.revenue || 0,
+                  sub: `${(columnTotals[c]?.lead || 0).toLocaleString()} leads`,
+                }))}
+                limit={7}
+                formatValue={formatCurrency}
+              />
+            </ChartCard>
+          </div>
+
           {/* Main Table */}
           <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
             <Table>
@@ -875,6 +911,9 @@ export function SourceCampaignRevenueReport() {
                     <TableRow key={item.source || idx} className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors group">
                       <TableCell className="text-sm font-medium text-slate-800 sticky left-0 bg-white border-r border-slate-100 z-10 px-5 py-3.5">
                         <div className="flex items-center gap-2">
+                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-orange-50 text-[11px] font-bold text-orange-600 ring-1 ring-inset ring-orange-100">
+                            {String(item.source || '?').slice(0, 2).toUpperCase()}
+                          </span>
                           <span>{item.source}</span>
                           <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-500">
                             {item.totalLead || 0} leads
@@ -899,19 +938,21 @@ export function SourceCampaignRevenueReport() {
                               onClick={() => hasData && handleCellClick(item.source, campaign, 'lead')}
                               disabled={!hasData}
                               className={cn(
-                                "flex flex-col items-center w-full transition-colors",
-                                hasData ? "cursor-pointer hover:opacity-70" : "cursor-default opacity-50"
+                                "mx-auto inline-flex min-w-[5.5rem] flex-col items-center gap-1 rounded-xl px-2.5 py-1.5 transition-all",
+                                hasData
+                                  ? "cursor-pointer bg-white ring-1 ring-inset ring-slate-200 shadow-sm hover:ring-orange-300 hover:bg-orange-50/60 hover:-translate-y-px"
+                                  : "cursor-default"
                               )}
                             >
                               <div className={cn(
-                                "font-medium",
-                                lead > 0 ? "text-slate-700" : "text-slate-400"
+                                "text-[13px] font-bold leading-none tabular-nums",
+                                lead > 0 ? "text-slate-900" : "text-slate-300 font-normal"
                               )}>
                                 {lead.toLocaleString()}
                               </div>
                               <div className={cn(
-                                "text-xs font-medium",
-                                rev > 0 ? "text-emerald-600" : "text-slate-400"
+                                "text-[11.5px] font-semibold leading-none tabular-nums",
+                                rev > 0 ? "text-emerald-600" : "text-slate-300 font-normal"
                               )}>
                                 {formatCurrency(rev)}
                               </div>
@@ -924,12 +965,12 @@ export function SourceCampaignRevenueReport() {
                       >
                         <button
                           onClick={() => handleCellClick(item.source, 'total', 'total')}
-                          className="flex flex-col items-center w-full hover:opacity-70 transition-opacity"
+                          className="mx-auto inline-flex min-w-[6rem] flex-col items-center gap-1 rounded-xl bg-slate-900 px-3 py-1.5 transition-all hover:bg-slate-800"
                         >
-                          <div className="font-bold text-slate-800">
+                          <div className="text-[13px] font-bold leading-none text-white tabular-nums">
                             {item.totalLead?.toLocaleString() || 0}
                           </div>
-                          <div className="text-xs font-semibold text-orange-600">
+                          <div className="text-[11.5px] font-semibold leading-none text-orange-300 tabular-nums">
                             {formatCurrency(item.totalRevenue || 0)}
                           </div>
                         </button>

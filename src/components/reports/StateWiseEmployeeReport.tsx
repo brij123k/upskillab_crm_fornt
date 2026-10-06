@@ -52,6 +52,7 @@ import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { KpiCard, KpiGrid, ChartCard, RankedBars, DonutWithLegend, Avatar, MetricPill } from './ReportUI';
 
 /* -------------------------------------------------------------------------- */
 /*                               Type Definitions                              */
@@ -255,15 +256,11 @@ function TeamMemberTable({
                     <TableCell className="text-xs text-center py-2 font-medium text-slate-700">
                       {member.totalLeads}
                     </TableCell>
-                    <TableCell className="text-xs text-center py-2 font-medium text-purple-600">
-                      {member.totalRegistrationDone}
-                    </TableCell>
-                    <TableCell className="text-xs text-center py-2 font-medium text-emerald-600">
-                      {member.totalAdmissionDone}
-                    </TableCell>
+                    <TableCell className="text-xs text-center py-2 "><MetricPill value={member.totalRegistrationDone} tone="violet" /></TableCell>
+                    <TableCell className="text-xs text-center py-2 "><MetricPill value={member.totalAdmissionDone} tone="green" /></TableCell>
                     <TableCell className="text-xs text-center py-2">
                       <span className={cn(
-                        "px-2 py-0.5 rounded-full font-medium text-[10px]",
+                        "px-2.5 py-1 rounded-full font-semibold text-[11.5px] tabular-nums ring-1 ring-inset ring-black/5",
                         member.registrationConversionPercentage > 20 ? "bg-purple-100 text-purple-700" :
                         member.registrationConversionPercentage > 10 ? "bg-indigo-100 text-indigo-700" :
                         "bg-slate-100 text-slate-600"
@@ -273,7 +270,7 @@ function TeamMemberTable({
                     </TableCell>
                     <TableCell className="text-xs text-center py-2">
                       <span className={cn(
-                        "px-2 py-0.5 rounded-full font-medium text-[10px]",
+                        "px-2.5 py-1 rounded-full font-semibold text-[11.5px] tabular-nums ring-1 ring-inset ring-black/5",
                         member.conversionPercentage > 15 ? "bg-emerald-100 text-emerald-700" :
                         member.conversionPercentage > 8 ? "bg-amber-100 text-amber-700" :
                         "bg-slate-100 text-slate-600"
@@ -281,9 +278,7 @@ function TeamMemberTable({
                         {member.conversionPercentage || 0}%
                       </span>
                     </TableCell>
-                    <TableCell className="text-xs text-center font-semibold text-orange-600 py-2 bg-orange-50/30">
-                      ₹{member.totalRevenue.toLocaleString()}
-                    </TableCell>
+                    <TableCell className="text-xs text-center py-2 bg-orange-50/30"><span className="inline-flex justify-center rounded-lg bg-slate-900 px-2.5 py-1 text-[13px] font-bold text-white tabular-nums">₹{member.totalRevenue.toLocaleString()}</span></TableCell>
                   </TableRow>
                   {/* Nested team members */}
                   {isExpanded && member.children && member.children.length > 0 && (
@@ -376,7 +371,7 @@ function EmployeeDetailsModal({ isOpen, onClose, employee }: EmployeeDetailsModa
             </div>
           </div>
 
-          {/* Conversion Cards */}
+          {/* Conversion Metrics */}
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div className="bg-indigo-50 rounded-lg p-3">
               <p className="text-[10px] font-medium text-indigo-600 uppercase tracking-wider">Registration Conv. %</p>
@@ -388,7 +383,7 @@ function EmployeeDetailsModal({ isOpen, onClose, employee }: EmployeeDetailsModa
             </div>
           </div>
 
-          {/* States Table */}
+          {/* State Breakdown */}
           <div className="border border-slate-200 rounded-lg overflow-hidden">
             <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex items-center justify-between">
               <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
@@ -418,15 +413,15 @@ function EmployeeDetailsModal({ isOpen, onClose, employee }: EmployeeDetailsModa
                 <TableBody>
                   {employee.states.map((state) => {
                     const stageEntries = Object.entries(state.stages);
-                    const totalStateStages = stageEntries.reduce((acc, [, count]) => acc + count, 0);
+                    const stateTotal = stageEntries.reduce((sum, [, count]) => sum + count, 0);
                     return (
                       <TableRow key={state.state} className="border-b border-slate-50 hover:bg-slate-50/60">
                         <TableCell className="text-xs font-medium text-slate-800">{state.state}</TableCell>
                         <TableCell className="text-xs text-center text-slate-600">{state.totalLeads}</TableCell>
                         <TableCell className="text-xs text-center text-slate-600">{state.pcatScheduled}</TableCell>
                         <TableCell className="text-xs text-center text-slate-600">{state.pcatDone}</TableCell>
-                        <TableCell className="text-xs text-center font-medium text-purple-600">{state.registrationDone}</TableCell>
-                        <TableCell className="text-xs text-center font-medium text-emerald-600">{state.admissionDone}</TableCell>
+                        <TableCell className="text-xs text-center "><MetricPill value={state.registrationDone} tone="violet" /></TableCell>
+                        <TableCell className="text-xs text-center "><MetricPill value={state.admissionDone} tone="green" /></TableCell>
                         <TableCell className="text-xs text-center font-medium text-orange-600">₹{state.revenue.toLocaleString()}</TableCell>
                         <TableCell className="text-xs text-center">
                           <span className="px-2 py-0.5 rounded-full font-medium text-[10px] bg-purple-100 text-purple-700">
@@ -441,10 +436,10 @@ function EmployeeDetailsModal({ isOpen, onClose, employee }: EmployeeDetailsModa
                         <TableCell className="text-xs">
                           <div className="flex flex-wrap gap-1">
                             {stageEntries.map(([stage, count]) => {
-                              const pct = totalStateStages > 0 ? Math.round((count / totalStateStages) * 100) : 0;
+                              const percentage = stateTotal > 0 ? Math.round((count / stateTotal) * 100) : 0;
                               return (
                                 <Badge key={stage} variant="outline" className="text-[9px] px-1.5 py-0">
-                                  {stage}: {count} ({pct}%)
+                                  {stage}: {count} ({percentage}%)
                                 </Badge>
                               );
                             })}
@@ -472,37 +467,35 @@ function EmployeeDetailsModal({ isOpen, onClose, employee }: EmployeeDetailsModa
 /* -------------------------------------------------------------------------- */
 /*                               Main Component                                */
 /* -------------------------------------------------------------------------- */
+interface LevelType {
+  _id: string;
+  name: string;
+}
 
 export function StateWiseEmployeeReport() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Date filter
+  // Filters
   const [dateFilter, setDateFilter] = useState('today');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-
-  // Level filter
-  const [levels, setLevels] = useState<any[]>([]);
+  const [levels, setLevels] = useState<LevelType[]>([]);
   const [selectedLevel, setSelectedLevel] = useState('1');
-
-  // Team filter (checkbox)
-  const [showTeamOnly, setShowTeamOnly] = useState<boolean>(false);
-
-  // Client-side search
+  const [showTeamOnly, setShowTeamOnly] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [stateSearch, setStateSearch] = useState('');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
 
-  // ─── Hierarchical State ──────────────────────────────────────────────────
+  // Hierarchy
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
   const [hierarchicalData, setHierarchicalData] = useState<EmployeeData[]>([]);
   const [loadingHierarchy, setLoadingHierarchy] = useState<Set<string>>(new Set());
 
-  // ─── Employee Details Modal ─────────────────────────────────────────────
+  // Details modal
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeData | null>(null);
 
@@ -510,12 +503,14 @@ export function StateWiseEmployeeReport() {
   useEffect(() => {
     const fetchLevels = async () => {
       try {
-        const res = await getDataHandlerWithToken('getAllLevels', null, null);
-        if (res) {
-          setLevels(res);
-          if (res.length) setSelectedLevel(extractLevelNumber(res[0].name).toString());
+        const response = await getDataHandlerWithToken('getAllLevels', null, null);
+        if (response) {
+          setLevels(response);
+          if (response.length) {
+            setSelectedLevel(extractLevelNumber(response[0].name).toString());
+          }
         }
-      } catch (error) {
+      } catch {
         toast({ title: 'Error', description: 'Failed to load levels', variant: 'destructive' });
       }
     };
@@ -527,7 +522,7 @@ export function StateWiseEmployeeReport() {
     return match ? parseInt(match[0], 10) : 1;
   };
 
-  // ─── Build Hierarchy ──────────────────────────────────────────────────────
+  // ─── Build hierarchy ───
   const buildHierarchy = useCallback((employees: EmployeeData[]): EmployeeData[] => {
     return employees.map(emp => ({
       ...emp,
@@ -542,13 +537,11 @@ export function StateWiseEmployeeReport() {
     try {
       const params: any = {
         level: parseInt(selectedLevel) || 1,
-        page: page,
+        page,
         limit: 10,
       };
 
-      if (showTeamOnly) {
-        params.team = true;
-      }
+      if (showTeamOnly) params.team = true;
 
       if (dateFilter === 'custom') {
         if (!fromDate || !toDate) {
@@ -558,11 +551,7 @@ export function StateWiseEmployeeReport() {
         const diffTime = Math.abs(new Date(toDate).getTime() - new Date(fromDate).getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         if (diffDays > 30) {
-          toast({
-            title: 'Date range too large',
-            description: 'Max 30 days allowed.',
-            variant: 'destructive',
-          });
+          toast({ title: 'Date range too large', description: 'Max 30 days allowed.', variant: 'destructive' });
           setLoading(false);
           return;
         }
@@ -575,17 +564,11 @@ export function StateWiseEmployeeReport() {
       if (employeeSearch.trim()) params.employee = employeeSearch.trim();
       if (stateSearch.trim()) params.state = stateSearch.trim();
 
-      const response = await getDataHandlerWithToken(
-        ApiConfig.stateWiseEmployeeReport,
-        params,
-        null,
-        true
-      );
+      const response = await getDataHandlerWithToken(ApiConfig.stateWiseEmployeeReport, params, null, true);
 
       if (response) {
         const reportData = response as ApiResponse;
         setData(reportData);
-        
         const employees = reportData.data || [];
         const hierarchy = buildHierarchy(employees);
         setHierarchicalData(hierarchy);
@@ -611,23 +594,21 @@ export function StateWiseEmployeeReport() {
     fetchData(currentPage);
   }, [fetchData, currentPage]);
 
-  // ─── Fetch Team Hierarchy ──────────────────────────────────────────────
+  // ─── Fetch team hierarchy ───
   const fetchTeamHierarchy = useCallback(async (employeeId: string) => {
     if (loadingHierarchy.has(employeeId)) return;
 
     setLoadingHierarchy(prev => new Set(prev).add(employeeId));
-    
+
     try {
       const params: any = {
-        employeeId: employeeId,
+        employeeId,
         level: parseInt(selectedLevel) || 1,
         page: 1,
         limit: 10,
       };
 
-      if (showTeamOnly) {
-        params.team = true;
-      }
+      if (showTeamOnly) params.team = true;
 
       if (dateFilter === 'custom') {
         if (fromDate && toDate) {
@@ -638,19 +619,12 @@ export function StateWiseEmployeeReport() {
         params.dateFilter = dateFilter;
       }
 
-      const response = await getDataHandlerWithToken(
-        ApiConfig.stateWiseEmployeeReportTeam,
-        params,
-        null,
-        true
-      );
-
-      const result = response as ApiResponse;
-      const teamData = result?.data || [];
+      const response = await getDataHandlerWithToken(ApiConfig.stateWiseEmployeeReportTeam, params, null, true);
+      const teamData = response?.data || [];
 
       if (teamData.length > 0) {
         const updateHierarchy = (nodes: EmployeeData[]): EmployeeData[] => {
-          return nodes.map((node: EmployeeData) => {
+          return nodes.map(node => {
             if (node.employeeId === employeeId) {
               const teamMembers = teamData.map((member: any) => ({
                 ...member,
@@ -659,26 +633,19 @@ export function StateWiseEmployeeReport() {
                 isTeamMember: true,
                 children: [],
               }));
-              return {
-                ...node,
-                children: teamMembers,
-              };
+              return { ...node, children: teamMembers };
             }
             if (node.children && node.children.length > 0) {
-              return {
-                ...node,
-                children: updateHierarchy(node.children),
-              };
+              return { ...node, children: updateHierarchy(node.children) };
             }
             return node;
           });
         };
-
         setHierarchicalData(prev => updateHierarchy(prev));
         setExpandedEmployees(prev => new Set(prev).add(employeeId));
       } else {
         const updateHierarchy = (nodes: EmployeeData[]): EmployeeData[] => {
-          return nodes.map((node: EmployeeData) => {
+          return nodes.map(node => {
             if (node.employeeId === employeeId) {
               return { ...node, children: [] };
             }
@@ -706,7 +673,7 @@ export function StateWiseEmployeeReport() {
     }
   }, [selectedLevel, showTeamOnly, dateFilter, fromDate, toDate, loadingHierarchy]);
 
-  // ─── Toggle Expand ──────────────────────────────────────────────────────
+  // ─── Toggle expand ───
   const toggleExpand = useCallback(async (employeeId: string, hasTeam: boolean) => {
     if (expandedEmployees.has(employeeId)) {
       setExpandedEmployees(prev => {
@@ -714,9 +681,9 @@ export function StateWiseEmployeeReport() {
         newSet.delete(employeeId);
         return newSet;
       });
-      
+
       const removeChildren = (nodes: EmployeeData[]): EmployeeData[] => {
-        return nodes.map((node: EmployeeData) => {
+        return nodes.map(node => {
           if (node.employeeId === employeeId) {
             return { ...node, children: [] };
           }
@@ -732,14 +699,14 @@ export function StateWiseEmployeeReport() {
     }
   }, [expandedEmployees, fetchTeamHierarchy]);
 
-  // ─── Handle page change ───
+  // ─── Pagination ───
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || (data && newPage > data.totalPages)) return;
     setCurrentPage(newPage);
     setExpandedEmployees(new Set());
   };
 
-  // ─── Handle employee click for details ───
+  // ─── Employee click ───
   const handleEmployeeClick = (employee: EmployeeData) => {
     setSelectedEmployee(employee);
     setDetailsModalOpen(true);
@@ -764,18 +731,18 @@ export function StateWiseEmployeeReport() {
       'States',
     ];
     const rows: any[] = [];
-    data.data.forEach(employee => {
-      const statesStr = employee.states.map(s => `${s.state}:${s.totalLeads}`).join('; ');
+    data.data.forEach(emp => {
+      const statesStr = emp.states.map(s => `${s.state}:${s.totalLeads}`).join('; ');
       rows.push([
-        employee.employeeName,
-        employee.employeeCode,
-        employee.totalLeads,
-        employee.totalRegistrationDone,
-        employee.totalAdmissionDone,
-        employee.totalRevenue,
-        employee.registrationConversionPercentage || 0,
-        employee.conversionPercentage || 0,
-        employee.teamSize || '',
+        emp.employeeName,
+        emp.employeeCode,
+        emp.totalLeads,
+        emp.totalRegistrationDone,
+        emp.totalAdmissionDone,
+        emp.totalRevenue,
+        emp.registrationConversionPercentage || 0,
+        emp.conversionPercentage || 0,
+        emp.teamSize || '',
         statesStr,
       ]);
     });
@@ -853,11 +820,7 @@ export function StateWiseEmployeeReport() {
             disabled={loading}
             className="rounded-xl border-slate-200"
           >
-            {loading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
-            ) : (
-              <RefreshCw className="w-3.5 h-3.5 mr-1" />
-            )}
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
             Refresh
           </Button>
           <Button
@@ -889,7 +852,6 @@ export function StateWiseEmployeeReport() {
 
           {showFilters && (
             <div className="flex flex-wrap items-center gap-3 w-full mt-2 pt-2 border-t border-slate-100">
-              {/* Level Radio Buttons */}
               {levels.length > 0 && (
                 <div className="flex items-center gap-2">
                   <Label className="text-xs font-semibold text-slate-500 uppercase">Level</Label>
@@ -912,7 +874,6 @@ export function StateWiseEmployeeReport() {
                 </div>
               )}
 
-              {/* Team Checkbox */}
               <div className="flex items-center gap-2 ml-1">
                 <div className="flex items-center space-x-2">
                   <Checkbox
@@ -923,16 +884,12 @@ export function StateWiseEmployeeReport() {
                     }}
                     className="h-4 w-4 rounded border-slate-300 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
                   />
-                  <Label
-                    htmlFor="team-filter-employee"
-                    className="text-xs font-medium text-slate-600 cursor-pointer"
-                  >
+                  <Label htmlFor="team-filter-employee" className="text-xs font-medium text-slate-600 cursor-pointer">
                     Team
                   </Label>
                 </div>
               </div>
 
-              {/* Date Filter */}
               <div className="w-[130px]">
                 <Select value={dateFilter} onValueChange={setDateFilter}>
                   <SelectTrigger className="h-8 text-xs rounded-xl">
@@ -970,7 +927,6 @@ export function StateWiseEmployeeReport() {
                 </>
               )}
 
-              {/* Employee Search */}
               <div className="relative w-44">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                 <Input
@@ -980,8 +936,6 @@ export function StateWiseEmployeeReport() {
                   className="pl-7 h-8 text-xs rounded-xl border-slate-200"
                 />
               </div>
-
-              {/* State Search */}
               <div className="relative w-44">
                 <MapPin className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                 <Input
@@ -1030,10 +984,7 @@ export function StateWiseEmployeeReport() {
             <>
               <span className="w-1 h-1 rounded-full bg-slate-300" />
               <span>
-                Range:{' '}
-                <span className="font-medium text-slate-700">
-                  {fromDate} to {toDate}
-                </span>
+                Range: <span className="font-medium text-slate-700">{fromDate} to {toDate}</span>
               </span>
             </>
           )}
@@ -1041,8 +992,7 @@ export function StateWiseEmployeeReport() {
             <>
               <span className="w-1 h-1 rounded-full bg-slate-300" />
               <span>
-                Employee:{' '}
-                <span className="font-medium text-slate-700">"{employeeSearch}"</span>
+                Employee: <span className="font-medium text-slate-700">"{employeeSearch}"</span>
               </span>
             </>
           )}
@@ -1050,8 +1000,7 @@ export function StateWiseEmployeeReport() {
             <>
               <span className="w-1 h-1 rounded-full bg-slate-300" />
               <span>
-                State:{' '}
-                <span className="font-medium text-slate-700">"{stateSearch}"</span>
+                State: <span className="font-medium text-slate-700">"{stateSearch}"</span>
               </span>
             </>
           )}
@@ -1074,33 +1023,38 @@ export function StateWiseEmployeeReport() {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-            <Card className="p-4 bg-white border-0 shadow-sm">
-              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Employees</p>
-              <p className="text-2xl font-bold text-slate-800 mt-1">{data.totalEmployees}</p>
-            </Card>
-            <Card className="p-4 bg-white border-0 shadow-sm">
-              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">States</p>
-              <p className="text-2xl font-bold text-slate-800 mt-1">{getUniqueStates()}</p>
-            </Card>
-            <Card className="p-4 bg-white border-0 shadow-sm">
-              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Total Leads</p>
-              <p className="text-2xl font-bold text-slate-800 mt-1">{data.totalLeads.toLocaleString()}</p>
-            </Card>
-            <Card className="p-4 bg-white border-0 shadow-sm">
-              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Registrations</p>
-              <p className="text-2xl font-bold text-purple-600 mt-1">{data.totalRegistrationDone.toLocaleString()}</p>
-            </Card>
-            <Card className="p-4 bg-white border-0 shadow-sm">
-              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Admissions</p>
-              <p className="text-2xl font-bold text-emerald-600 mt-1">{data.totalAdmissionDone.toLocaleString()}</p>
-            </Card>
-            <Card className="p-4 bg-white border-0 shadow-sm">
-              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Revenue</p>
-              <p className="text-2xl font-bold text-orange-600 mt-1">₹{data.totalRevenue.toLocaleString()}</p>
-            </Card>
-          </div>
+          {/* KPI tiles + charts */}
+          {(() => {
+            const stateMap = new Map<string, number>();
+            topLevelEmployees.forEach(emp => emp.states?.forEach(st => stateMap.set(st.state, (stateMap.get(st.state) || 0) + (st.totalLeads || 0))));
+            const conv = data.totalLeads ? (data.totalAdmissionDone / data.totalLeads) * 100 : 0;
+            return (
+              <>
+                <KpiGrid cols={5}>
+                  <KpiCard icon={Users} tone="orange" label="Employees" value={data.totalEmployees} sub={`${getUniqueStates()} states covered`} />
+                  <KpiCard icon={Layers} tone="blue" label="Total Leads" value={data.totalLeads.toLocaleString()} />
+                  <KpiCard icon={TrendingUp} tone="violet" label="Registrations" value={data.totalRegistrationDone.toLocaleString()} />
+                  <KpiCard icon={UserCheck} tone="green" label="Admissions" value={data.totalAdmissionDone.toLocaleString()} sub={`${conv.toFixed(1)}% conversion`} progress={conv} />
+                  <KpiCard icon={IndianRupee} tone="rose" label="Revenue" value={`₹${data.totalRevenue.toLocaleString()}`} />
+                </KpiGrid>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  <ChartCard title="Top Employees by Revenue" subtitle="With admissions done">
+                    <RankedBars
+                      data={topLevelEmployees.map(e => ({ name: e.employeeName, value: e.totalRevenue || 0, sub: `${e.totalAdmissionDone || 0} admissions` }))}
+                      formatValue={v => `₹${v.toLocaleString()}`}
+                    />
+                  </ChartCard>
+                  <ChartCard title="Leads by State" subtitle="Share of listed employees' leads">
+                    <DonutWithLegend
+                      data={Array.from(stateMap, ([name, value]) => ({ name, value }))}
+                      centerValue={data.totalLeads.toLocaleString()}
+                      centerLabel="Total Leads"
+                    />
+                  </ChartCard>
+                </div>
+              </>
+            );
+          })()}
 
           {/* Main Table */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -1156,6 +1110,7 @@ export function StateWiseEmployeeReport() {
                           <TableCell className="text-sm sticky left-0 bg-white border-r border-slate-100 z-10 py-3 px-4">
                             <div className="flex flex-col">
                               <div className="flex items-center gap-1.5 flex-wrap">
+                                <Avatar name={employee.employeeName} className="w-7 h-7 text-[10px] mr-1" />
                                 <span className="font-medium text-slate-800 hover:text-orange-600">
                                   {employee.employeeName}
                                 </span>
@@ -1199,15 +1154,11 @@ export function StateWiseEmployeeReport() {
                           <TableCell className="text-sm text-center py-3 px-4 font-medium text-slate-700">
                             {employee.totalLeads}
                           </TableCell>
-                          <TableCell className="text-sm text-center py-3 px-4 font-medium text-purple-600">
-                            {employee.totalRegistrationDone}
-                          </TableCell>
-                          <TableCell className="text-sm text-center py-3 px-4 font-medium text-emerald-600">
-                            {employee.totalAdmissionDone}
-                          </TableCell>
+                          <TableCell className="text-sm text-center py-3 px-4 "><MetricPill value={employee.totalRegistrationDone} tone="violet" /></TableCell>
+                          <TableCell className="text-sm text-center py-3 px-4 "><MetricPill value={employee.totalAdmissionDone} tone="green" /></TableCell>
                           <TableCell className="text-sm text-center py-3 px-4">
                             <span className={cn(
-                              "px-2 py-1 rounded-full font-medium text-[11px]",
+                              "px-2.5 py-1 rounded-full font-semibold text-[11.5px] tabular-nums ring-1 ring-inset ring-black/5",
                               employee.registrationConversionPercentage > 20 ? "bg-purple-100 text-purple-700" :
                               employee.registrationConversionPercentage > 10 ? "bg-indigo-100 text-indigo-700" :
                               "bg-slate-100 text-slate-600"
@@ -1217,7 +1168,7 @@ export function StateWiseEmployeeReport() {
                           </TableCell>
                           <TableCell className="text-sm text-center py-3 px-4">
                             <span className={cn(
-                              "px-2 py-1 rounded-full font-medium text-[11px]",
+                              "px-2.5 py-1 rounded-full font-semibold text-[11.5px] tabular-nums ring-1 ring-inset ring-black/5",
                               employee.conversionPercentage > 15 ? "bg-emerald-100 text-emerald-700" :
                               employee.conversionPercentage > 8 ? "bg-amber-100 text-amber-700" :
                               "bg-slate-100 text-slate-600"
@@ -1225,9 +1176,7 @@ export function StateWiseEmployeeReport() {
                               {employee.conversionPercentage || 0}%
                             </span>
                           </TableCell>
-                          <TableCell className="text-sm text-center py-3 px-4 bg-orange-50/30 font-semibold text-orange-600">
-                            ₹{employee.totalRevenue.toLocaleString()}
-                          </TableCell>
+                          <TableCell className="text-sm text-center py-3 px-4 bg-orange-50/30 "><span className="inline-flex justify-center rounded-lg bg-slate-900 px-2.5 py-1 text-[13px] font-bold text-white tabular-nums">₹{employee.totalRevenue.toLocaleString()}</span></TableCell>
                           <TableCell className="text-sm text-center py-3 px-4">
                             <span className="text-sm text-slate-500">{employee.states.length}</span>
                           </TableCell>
