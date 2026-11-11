@@ -78,8 +78,11 @@ interface Order {
   discount: number;
   finalFee: number;
   revenue: number;
-  loanDisbursementAmount: number | null;
-  lumpsumTotalReceived: number | null;
+  /** Received revenue by source (numbers; 0 when the source is not used). */
+  loanDisbursementAmount: number;
+  lumpsumTotalReceived: number;
+  subscriptionRevenue?: number;
+  creditRevenue?: number;
   status: string;
   approved: boolean;
 }
@@ -1318,6 +1321,13 @@ export function PoolRevenueReport() {
                               {order.discount > 0 && (
                                 <span>Discount: {formatCurrency(order.discount)}</span>
                               )}
+                            </div>
+                            {/* Received revenue by source */}
+                            <div className="flex flex-wrap justify-end gap-x-3 text-[11px] text-slate-400">
+                              {!!order.lumpsumTotalReceived && <span>Lumpsum: {formatCurrency(order.lumpsumTotalReceived)}</span>}
+                              {!!order.loanDisbursementAmount && <span>Loan: {formatCurrency(order.loanDisbursementAmount)}</span>}
+                              {!!order.subscriptionRevenue && <span>Subscription: {formatCurrency(order.subscriptionRevenue)}</span>}
+                              {!!order.creditRevenue && <span>Credits: {formatCurrency(order.creditRevenue)}</span>}
                             </div>
                           </div>
                         </div>

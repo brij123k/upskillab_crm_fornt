@@ -192,7 +192,12 @@ function OrderDetailsModal({
                         </div>
                       </TableCell>
                       <TableCell className="text-sm font-semibold text-emerald-600 py-3">
-                        {formatCurrency(order?.lumpsumDetails?.totalReceived || order?.loanDetails?.disbursementAmount || 0)}
+                        {formatCurrency(
+                          order?.calculatedRevenue ??
+                          order?.paymentSummary?.reportedRevenue ??
+                          order?.paymentSummary?.actualReceivedRevenue ??
+                          (order?.lumpsumDetails?.totalReceived || order?.loanDetails?.disbursementAmount || 0)
+                        )}
                       </TableCell>
                       <TableCell className="py-3">
                         <Badge className={cn('text-xs', getStatusColor(order.status))}>

@@ -103,6 +103,9 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'send_reminders', label: 'Send Reminders' },
       { id: 'payment_link_generator', label: 'Generate Payment Link' },
       { id: 'read_payment_history', label: 'Read Payment History' },
+      { id: 'record_payment', label: 'Record Payment (mark credit paid / add received amount)' },
+      { id: 'revert_payment', label: 'Revert Payment (revert credit / reduce disbursement / refund)' },
+      { id: 'read_pending_credits', label: 'View Pending Credits Report' },
     ]
   },
   loan_partner: {

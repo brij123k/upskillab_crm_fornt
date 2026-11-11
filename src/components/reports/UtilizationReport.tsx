@@ -55,7 +55,7 @@ import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { KpiCard, KpiGrid, ChartCard, Funnel, RankedBars, Avatar, MetricPill } from './ReportUI';
-import { PhoneCall } from 'lucide-react';
+import { PhoneCall, Activity } from 'lucide-react';
 
 /* -------------------------------------------------------------------------- */
 /*                                Utility Helpers                              */
@@ -447,6 +447,21 @@ export function UtilizationReport() {
   const [createdFromDate, setCreatedFromDate] = useState('');
   const [createdToDate, setCreatedToDate] = useState('');
 
+  // Activity date filter: what employees did in the period (assigned, new
+  // leads, calls, stage changes). When set, the assigned/created filters are off.
+  const [activityDateFilter, setActivityDateFilter] = useState<string>('');
+  const [activityFromDate, setActivityFromDate] = useState('');
+  const [activityToDate, setActivityToDate] = useState('');
+  const isActivityMode = !!activityDateFilter && activityDateFilter !== 'none';
+
+  const handleActivityFilterChange = (value: string) => {
+    setActivityDateFilter(value);
+    if (value && value !== 'none') {
+      setAssignedDateFilter('');
+      setCreatedDateFilter('');
+    }
+  };
+
   // User filter
   const [users, setUsers] = useState<any[]>([]);
   const [selectedUserId, setSelectedUserId] = useState('all');
@@ -538,8 +553,26 @@ export function UtilizationReport() {
         params.team = true;
       }
 
+      // Activity Date Filter - replaces the assigned/created filters
+      if (isActivityMode) {
+        if (activityDateFilter === 'custom') {
+          if (!activityFromDate || !activityToDate) {
+            setLoading(false);
+            return;
+          }
+          if (!validateDateRange(activityFromDate, activityToDate)) {
+            setLoading(false);
+            return;
+          }
+          params.activityDateFrom = activityFromDate;
+          params.activityDateTo = activityToDate;
+        } else {
+          params.activityDateFilter = activityDateFilter;
+        }
+      }
+
       // Assigned Date Filter - only send if not empty
-      if (assignedDateFilter && assignedDateFilter !== '') {
+      if (!isActivityMode && assignedDateFilter && assignedDateFilter !== '') {
         if (assignedDateFilter === 'custom') {
           if (!assignedFromDate || !assignedToDate) {
             setLoading(false);
@@ -557,7 +590,7 @@ export function UtilizationReport() {
       }
 
       // Created Date Filter - only send if not empty
-      if (createdDateFilter && createdDateFilter !== '') {
+      if (!isActivityMode && createdDateFilter && createdDateFilter !== '') {
         if (createdDateFilter === 'custom') {
           if (!createdFromDate || !createdToDate) {
             setLoading(false);
@@ -599,7 +632,7 @@ export function UtilizationReport() {
       setLoading(false);
       setCurrentPage(0);
     }
-  }, [selectedLevel, showTeamOnly, assignedDateFilter, assignedFromDate, assignedToDate, createdDateFilter, createdFromDate, createdToDate, selectedUserId, buildHierarchy]);
+  }, [selectedLevel, showTeamOnly, assignedDateFilter, assignedFromDate, assignedToDate, createdDateFilter, createdFromDate, createdToDate, activityDateFilter, activityFromDate, activityToDate, isActivityMode, selectedUserId, buildHierarchy]);
 
   useEffect(() => {
     fetchData();
@@ -621,8 +654,20 @@ export function UtilizationReport() {
         params.team = true;
       }
 
+      // Activity Date Filter
+      if (isActivityMode) {
+        if (activityDateFilter === 'custom') {
+          if (activityFromDate && activityToDate) {
+            params.activityDateFrom = activityFromDate;
+            params.activityDateTo = activityToDate;
+          }
+        } else {
+          params.activityDateFilter = activityDateFilter;
+        }
+      }
+
       // Assigned Date Filter
-      if (assignedDateFilter && assignedDateFilter !== '') {
+      if (!isActivityMode && assignedDateFilter && assignedDateFilter !== '') {
         if (assignedDateFilter === 'custom') {
           if (assignedFromDate && assignedToDate) {
             params.assignedDateFrom = assignedFromDate;
@@ -634,7 +679,7 @@ export function UtilizationReport() {
       }
 
       // Created Date Filter
-      if (createdDateFilter && createdDateFilter !== '') {
+      if (!isActivityMode && createdDateFilter && createdDateFilter !== '') {
         if (createdDateFilter === 'custom') {
           if (createdFromDate && createdToDate) {
             params.createdDateFrom = createdFromDate;
@@ -715,7 +760,7 @@ export function UtilizationReport() {
         return newSet;
       });
     }
-  }, [selectedLevel, showTeamOnly, assignedDateFilter, assignedFromDate, assignedToDate, createdDateFilter, createdFromDate, createdToDate, selectedUserId, loadingHierarchy]);
+  }, [selectedLevel, showTeamOnly, assignedDateFilter, assignedFromDate, assignedToDate, createdDateFilter, createdFromDate, createdToDate, activityDateFilter, activityFromDate, activityToDate, isActivityMode, selectedUserId, loadingHierarchy]);
 
   // ─── Toggle Expand ──────────────────────────────────────────────────────
   const toggleExpand = useCallback(async (employeeId: string, hasTeam: boolean) => {
@@ -746,7 +791,7 @@ export function UtilizationReport() {
   // ─── Reset pagination when filters change ───
   useEffect(() => {
     setCurrentPage(0);
-  }, [selectedLevel, showTeamOnly, assignedDateFilter, assignedFromDate, assignedToDate, createdDateFilter, createdFromDate, createdToDate, selectedUserId, searchTerm]);
+  }, [selectedLevel, showTeamOnly, assignedDateFilter, assignedFromDate, assignedToDate, createdDateFilter, createdFromDate, createdToDate, activityDateFilter, activityFromDate, activityToDate, selectedUserId, searchTerm]);
 
   // ─── Export CSV ───
   const handleExport = () => {
@@ -809,24 +854,34 @@ export function UtilizationReport() {
         params.team = true;
       }
 
-      // ─── Assigned Date Parameters ───
-      if (assignedDateFilter === 'custom' && assignedFromDate && assignedToDate) {
-        params.assignedStartDate = assignedFromDate;
-        params.assignedEndDate = assignedToDate;
-      } else if (assignedDateFilter && assignedDateFilter !== 'none' && assignedDateFilter !== 'custom') {
-        params.assignedDateFilter = assignedDateFilter;
-      }
+      if (isActivityMode) {
+        // ─── Activity: leads the employee moved into this stage in the period ───
+        if (activityDateFilter === 'custom') {
+          params.activityDateFrom = activityFromDate;
+          params.activityDateTo = activityToDate;
+        } else {
+          params.activityDateFilter = activityDateFilter;
+        }
+      } else {
+        // ─── Assigned Date Parameters ───
+        if (assignedDateFilter === 'custom' && assignedFromDate && assignedToDate) {
+          params.assignedDateFrom = assignedFromDate;
+          params.assignedDateTo = assignedToDate;
+        } else if (assignedDateFilter && assignedDateFilter !== 'none' && assignedDateFilter !== 'custom') {
+          params.assignedDateFilter = assignedDateFilter;
+        }
 
-      // ─── Created Date Parameters ───
-      if (createdDateFilter === 'custom' && createdFromDate && createdToDate) {
-        params.createdStartDate = createdFromDate;
-        params.createdEndDate = createdToDate;
-      } else if (createdDateFilter && createdDateFilter !== 'none' && createdDateFilter !== 'custom') {
-        params.createdDateFilter = createdDateFilter;
+        // ─── Created Date Parameters ───
+        if (createdDateFilter === 'custom' && createdFromDate && createdToDate) {
+          params.createdDateFrom = createdFromDate;
+          params.createdDateTo = createdToDate;
+        } else if (createdDateFilter && createdDateFilter !== 'none' && createdDateFilter !== 'custom') {
+          params.createdDateFilter = createdDateFilter;
+        }
       }
 
       // ─── Fallback: If no date filters are set, use the data's date range ───
-      if (!assignedDateFilter && !createdDateFilter) {
+      if (!isActivityMode && !assignedDateFilter && !createdDateFilter) {
         if (data?.startDate && data?.endDate) {
           params.assignedStartDate = data.startDate;
           params.assignedEndDate = data.endDate;
@@ -922,6 +977,7 @@ export function UtilizationReport() {
     (assignedDateFilter === 'custom' && (assignedFromDate || assignedToDate)) ||
     (createdDateFilter && createdDateFilter !== '') ||
     (createdDateFilter === 'custom' && (createdFromDate || createdToDate)) ||
+    isActivityMode ||
     selectedUserId !== 'all' ||
     searchTerm !== '';
 
@@ -1023,7 +1079,7 @@ export function UtilizationReport() {
                 <Label className="text-[10px] font-medium text-slate-500 uppercase whitespace-nowrap">Assigned</Label>
               </div>
               <div className="w-[110px]">
-                <Select value={assignedDateFilter} onValueChange={setAssignedDateFilter}>
+                <Select value={assignedDateFilter} onValueChange={setAssignedDateFilter} disabled={isActivityMode}>
                   <SelectTrigger className="h-8 text-xs rounded-xl">
                     <SelectValue placeholder="None" />
                   </SelectTrigger>
@@ -1067,7 +1123,7 @@ export function UtilizationReport() {
                 <Label className="text-[10px] font-medium text-slate-500 uppercase whitespace-nowrap">Created</Label>
               </div>
               <div className="w-[110px]">
-                <Select value={createdDateFilter} onValueChange={setCreatedDateFilter}>
+                <Select value={createdDateFilter} onValueChange={setCreatedDateFilter} disabled={isActivityMode}>
                   <SelectTrigger className="h-8 text-xs rounded-xl">
                     <SelectValue placeholder="None" />
                   </SelectTrigger>
@@ -1103,6 +1159,60 @@ export function UtilizationReport() {
                 </div>
                 <span className="text-[10px] text-slate-400">Max 31 days</span>
               </>
+            )}
+
+            {/* Activity Date Filter */}
+            <div
+              className="flex items-center gap-2"
+              title="What employees did in the period: leads assigned, new leads, calls and stage changes they made"
+            >
+              <div className="flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-slate-400" />
+                <Label className="text-[10px] font-medium text-slate-500 uppercase whitespace-nowrap">Activity</Label>
+              </div>
+              <div className="w-[110px]">
+                <Select value={activityDateFilter} onValueChange={handleActivityFilterChange}>
+                  <SelectTrigger className={cn('h-8 text-xs rounded-xl', isActivityMode && 'border-orange-400 text-orange-700')}>
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" className="text-xs">None</SelectItem>
+                    {dateFilterOptions.map(opt => (
+                      <SelectItem key={`activity-${opt.value}`} value={opt.value} className="text-xs">
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {activityDateFilter === 'custom' && (
+              <>
+                <div className="relative w-[120px]">
+                  <input
+                    type="date"
+                    value={activityFromDate}
+                    onChange={(e) => setActivityFromDate(e.target.value)}
+                    className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                  />
+                </div>
+                <div className="relative w-[120px]">
+                  <input
+                    type="date"
+                    value={activityToDate}
+                    onChange={(e) => setActivityToDate(e.target.value)}
+                    className="w-full h-8 px-2 text-xs border rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400">Max 31 days</span>
+              </>
+            )}
+
+            {isActivityMode && (
+              <span className="text-[10px] text-orange-600">
+                Showing what employees did in this period (Assigned / Created filters are off)
+              </span>
             )}
 
             {/* Employee Search */}
@@ -1168,6 +1278,20 @@ export function UtilizationReport() {
               </span>
             </>
           )}
+          {isActivityMode && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span>
+                Activity:{' '}
+                <span className="font-medium text-orange-600">
+                  {activityDateFilter === 'custom'
+                    ? `${formatDate(activityFromDate)} – ${formatDate(activityToDate)}`
+                    : getDateFilterLabel(activityDateFilter)}{' '}
+                  (employee activity)
+                </span>
+              </span>
+            </>
+          )}
           {selectedUserId !== 'all' && (
             <>
               <span className="w-1 h-1 rounded-full bg-slate-300" />
@@ -1208,6 +1332,17 @@ export function UtilizationReport() {
           {/* Summary row */}
           <div className="flex items-center gap-4 text-sm text-slate-500">
             <span className="font-medium text-slate-700">{filteredTopLevel.length} employees</span>
+            {data.mode === 'activity' && data.activityStartDate && data.activityEndDate && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                <span className="flex items-center gap-1 text-orange-600">
+                  <Activity className="w-3.5 h-3.5" />
+                  <span className="font-medium">
+                    Employee activity · {formatDateRange(data.activityStartDate, data.activityEndDate)}
+                  </span>
+                </span>
+              </>
+            )}
             {data.startDate && data.endDate && (
               <>
                 <span className="w-1 h-1 rounded-full bg-slate-300" />

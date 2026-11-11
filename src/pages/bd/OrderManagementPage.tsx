@@ -28,7 +28,9 @@ import {
     Receipt,
     Info,
     BookOpen,
-    ExternalLink
+    ExternalLink,
+    Wallet,
+    AlertTriangle
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -54,6 +56,24 @@ import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 import ApiConfig from '@/config/apiConfig';
 import { format } from 'date-fns';
 import axios from 'axios';
+import { PaymentSourcesEditor } from '@/components/orders/PaymentSourcesEditor';
+import { OrderFinancialsDialog, PaymentLinkTarget } from '@/components/orders/OrderFinancialsDialog';
+import {
+    CreditEntry,
+    LoanEntry,
+    LumpsumPaymentEntry,
+    OrderFinancials,
+    PAYMENT_MODE_BADGE,
+    PaymentSourcesDraft,
+    PaymentSummary,
+    SubscriptionEntry,
+    buildPaymentSourcesPayload,
+    draftFromOrder,
+    emptyPaymentSources,
+    extractApiError,
+    toMoney,
+    validateDraft,
+} from '@/lib/orderPayments';
 
 interface PaymentType {
     _id: string;
@@ -73,6 +93,7 @@ interface PaymentType {
     link_notes: {
         orderId: string;
     };
+    event_time?: string;
     createdAt: string;
 }
 
@@ -97,7 +118,16 @@ interface OrderType {
     totalFee: number;
     discount: number;
     finalFee: number;
-    paymentMode: 'Lumpsum' | 'Loan' | 'Subscription';
+    /** Single source, 'Mixed' for several, or 'Credit' when covered by credits only. */
+    paymentMode: string;
+    /** Every source on the order (v2), e.g. ['Lumpsum', 'Loan', 'Credit']. */
+    paymentModes?: string[];
+    paymentSchemaVersion?: number;
+    paymentSummary?: PaymentSummary;
+    lumpsumPayments?: LumpsumPaymentEntry[];
+    loans?: LoanEntry[];
+    subscriptions?: SubscriptionEntry[];
+    credits?: CreditEntry[];
     counsellorId: {
         _id: string;
         name: string;
@@ -208,30 +238,43 @@ interface OrderForm {
     discount: number;
     GSTEnabled?: boolean;
     GSTAmount?: number;
-    paymentMode: string;
     orderDate: string;
     feeDepositDate: string;
     remarks: string;
-    lumpsumDetails?: {
-        registrationDate: string;
-        registrationAmount: number;
-        totalReceived: number;
-        paymentType: string;
-    };
-    loanDetails?: {
-        loanPartner: string;
-        loanAmount: number;
-        disbursementAmount: number;
-        firstEmiDate: string;
-    };
-    subscriptionDetails?: {
-        gateway: string;
-        installmentAmount: number;
-        firstInstallmentDate: string;
-        lastInstallmentDate: string;
-        numberOfInstallments: number;
-    };
+    /** Lumpsum payments, loans, subscriptions and credits (order payments v2). */
+    payments: PaymentSourcesDraft;
 }
+
+/** Payment modes an order can be filtered by (matches paymentMode or any of paymentModes). */
+const PAYMENT_MODE_FILTERS = ['Lumpsum', 'Loan', 'Subscription', 'Credit', 'Mixed'];
+const ORDER_STATUS_FILTERS = ['Pending Payment', 'Loan Processing', 'Partially Paid', 'Fully Paid', 'Cancelled'];
+
+/** Sources of an order: paymentModes for v2 orders, the single paymentMode for legacy ones. */
+const getOrderModes = (order: { paymentModes?: string[]; paymentMode?: string }): string[] =>
+    order.paymentModes?.length ? order.paymentModes : order.paymentMode ? [order.paymentMode] : [];
+
+const emptyOrderForm = (): OrderForm => ({
+    mobile: '',
+    email: '',
+    studentName: '',
+    fatherName: '',
+    dob: '',
+    education: '',
+    address: '',
+    city: '',
+    state: '',
+    courseVertical: '',
+    courseName: '',
+    courseDuration: '',
+    totalFee: 0,
+    discount: 0,
+    GSTEnabled: false,
+    GSTAmount: 0,
+    orderDate: new Date().toISOString().slice(0, 16),
+    feeDepositDate: new Date().toISOString().slice(0, 16),
+    remarks: '',
+    payments: emptyPaymentSources(),
+});
 
 interface Filters {
     search: string;
@@ -309,47 +352,19 @@ export function OrderManagementPage() {
     });
 
     // Form state
-    const [orderForm, setOrderForm] = useState<OrderForm>({
-        mobile: '',
-        email: '',
-        studentName: '',
-        fatherName: '',
-        dob: '',
-        education: '',
-        address: '',
-        city: '',
-        state: '',
-        courseVertical: '',
-        courseName: '',
-        courseDuration: '',
-        totalFee: 0,
-        discount: 0,
-        GSTEnabled: false,
-        GSTAmount: 0,
-        paymentMode: 'Lumpsum',
-        orderDate: new Date().toISOString().slice(0, 16),
-        feeDepositDate: new Date().toISOString().slice(0, 16),
-        remarks: '',
-        lumpsumDetails: {
-            registrationDate: new Date().toISOString().slice(0, 16),
-            registrationAmount: 0,
-            totalReceived: 0,
-            paymentType: 'UPI'
-        },
-        loanDetails: {
-            loanPartner: '',
-            loanAmount: 0,
-            disbursementAmount: 0,
-            firstEmiDate: new Date().toISOString().slice(0, 16)
-        },
-        subscriptionDetails: {
-            gateway: 'Cashfree',
-            installmentAmount: 0,
-            firstInstallmentDate: new Date().toISOString().slice(0, 16),
-            lastInstallmentDate: new Date().toISOString().slice(0, 16),
-            numberOfInstallments: 1
-        }
-    });
+    const [orderForm, setOrderForm] = useState<OrderForm>(emptyOrderForm);
+    // Errors returned by the API for the payment structure (400 errors[])
+    const [paymentServerErrors, setPaymentServerErrors] = useState<string[]>([]);
+    const [loadingEditPayments, setLoadingEditPayments] = useState(false);
+    // Payments & credits dialog
+    const [financialsOrder, setFinancialsOrder] = useState<OrderType | null>(null);
+    // Payment link target (lumpsum balance, a lumpsum entry, or a credit)
+    const [paymentLinkTarget, setPaymentLinkTarget] = useState<PaymentLinkTarget | null>(null);
+    const [paymentLinkFinancials, setPaymentLinkFinancials] = useState<OrderFinancials | null>(null);
+    const [loadingPaymentLinkInfo, setLoadingPaymentLinkInfo] = useState(false);
+    // Subscription plans of the selected order (an order can have several)
+    const [subscriptionEntries, setSubscriptionEntries] = useState<SubscriptionEntry[]>([]);
+    const [subscriptionEntryId, setSubscriptionEntryId] = useState('');
 
     const [addingOrder, setAddingOrder] = useState(false);
     const [updatingOrder, setUpdatingOrder] = useState(false);
@@ -550,94 +565,26 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
         });
     };
 
-    const validateLumpsum = useCallback(() => {
-  if (orderForm.paymentMode !== 'Lumpsum') return true;
-  
-  const finalFee = calculateFinalFee();
-  const registrationAmount = orderForm.lumpsumDetails?.registrationAmount || 0;
-  const totalReceived = orderForm.lumpsumDetails?.totalReceived || 0;
-  
-  if (registrationAmount > finalFee) {
-    toast({
-      title: 'Validation Error',
-      description: 'Registration amount cannot exceed the final fee',
-      variant: 'destructive',
-    });
-    return false;
-  }
-  
-  if (totalReceived > finalFee) {
-    toast({
-      title: 'Validation Error',
-      description: 'Total received cannot exceed the final fee',
-      variant: 'destructive',
-    });
-    return false;
-  }
-  
-  if (totalReceived < registrationAmount) {
-    toast({
-      title: 'Validation Error',
-      description: 'Total received cannot be less than registration amount',
-      variant: 'destructive',
-    });
-    return false;
-  }
-  
-  return true;
-}, [orderForm.paymentMode, orderForm.lumpsumDetails, calculateFinalFee]);
+    // ===== Order payments v2 =====
 
-// Validate Loan fields
-const validateLoan = useCallback(() => {
-  if (orderForm.paymentMode !== 'Loan') return true;
-  
-  const finalFee = calculateFinalFee();
-  const loanAmount = orderForm.loanDetails?.loanAmount || 0;
-  const disbursementAmount = orderForm.loanDetails?.disbursementAmount || 0;
-  
-  if (loanAmount > finalFee) {
-    toast({
-      title: 'Validation Error',
-      description: 'Loan amount cannot exceed the final fee',
-      variant: 'destructive',
-    });
-    return false;
-  }
-  
-  if (disbursementAmount > finalFee) {
-    toast({
-      title: 'Validation Error',
-      description: 'Disbursement amount cannot exceed the final fee',
-      variant: 'destructive',
-    });
-    return false;
-  }
-  
-  if (disbursementAmount > loanAmount) {
-    toast({
-      title: 'Validation Error',
-      description: 'Disbursement amount cannot exceed the loan amount',
-      variant: 'destructive',
-    });
-    return false;
-  }
-  
-  if (disbursementAmount === 0) {
-    toast({
-      title: 'Validation Error',
-      description: 'Disbursement amount is required',
-      variant: 'destructive',
-    });
-    return false;
-  }
-  
-  return true;
-}, [orderForm.paymentMode, orderForm.loanDetails, calculateFinalFee]);
+    // Client-side checks of the payment structure (the API re-validates and returns errors[]).
+    const getPaymentErrors = () => validateDraft(orderForm.payments, calculateFinalFee());
+
+    const showApiError = (error: any, fallback: string) => {
+        const { message, errors } = extractApiError(error, fallback);
+        if (errors.length) setPaymentServerErrors(errors);
+        toast({
+            title: "Error",
+            description: errors.length ? `${message}: ${errors[0]}${errors.length > 1 ? ` (+${errors.length - 1} more)` : ''}` : message,
+            variant: "destructive",
+        });
+    };
 
     // Create order
     const handleCreateOrder = async () => {
         try {
             setAddingOrder(true);
+            setPaymentServerErrors([]);
 
             // Validate required fields
             if (!orderForm.studentName || !orderForm.mobile || !orderForm.email || !orderForm.courseName) {
@@ -648,12 +595,12 @@ const validateLoan = useCallback(() => {
                 });
                 return;
             }
-            if (!validateLumpsum()) {
-      return;
-    }
-     if (!validateLoan()) {
-      return;
-    }
+            const paymentErrors = getPaymentErrors();
+            if (paymentErrors.length) {
+                toast({ title: "Payment structure", description: paymentErrors[0], variant: "destructive" });
+                return;
+            }
+
             const finalFee = calculateFinalFee();
             const dataToSend: any = {
                 mobile: orderForm.mobile,
@@ -671,38 +618,14 @@ const validateLoan = useCallback(() => {
                 totalFee: orderForm.totalFee,
                 finalFee: finalFee,
                 discount: orderForm.discount,
-                paymentMode: orderForm.paymentMode,
                 orderDate: new Date(orderForm.orderDate).toISOString(),
                 feeDepositDate: new Date(orderForm.feeDepositDate).toISOString(),
                 remarks: orderForm.remarks,
                 GSTEnabled: orderForm.GSTEnabled,
                 GSTAmount: orderForm.GSTAmount,
+                // paymentMode is derived by the API from the sources
+                ...buildPaymentSourcesPayload(orderForm.payments),
             };
-
-            // Add payment mode specific details
-            if (orderForm.paymentMode === 'Lumpsum' && orderForm.lumpsumDetails) {
-                dataToSend.lumpsumDetails = {
-                    registrationDate: new Date(orderForm.lumpsumDetails.registrationDate).toISOString(),
-                    registrationAmount: orderForm.lumpsumDetails.registrationAmount,
-                    totalReceived: orderForm.lumpsumDetails.totalReceived,
-                    paymentType: orderForm.lumpsumDetails.paymentType,
-                };
-            } else if (orderForm.paymentMode === 'Loan' && orderForm.loanDetails) {
-                dataToSend.loanDetails = {
-                    loanPartner: orderForm.loanDetails.loanPartner,
-                    loanAmount: orderForm.loanDetails.loanAmount,
-                    disbursementAmount: orderForm.loanDetails.disbursementAmount,
-                    firstEmiDate: new Date(orderForm.loanDetails.firstEmiDate).toISOString(),
-                };
-            } else if (orderForm.paymentMode === 'Subscription' && orderForm.subscriptionDetails) {
-                dataToSend.subscriptionDetails = {
-                    gateway: orderForm.subscriptionDetails.gateway,
-                    installmentAmount: orderForm.subscriptionDetails.installmentAmount,
-                    firstInstallmentDate: new Date(orderForm.subscriptionDetails.firstInstallmentDate).toISOString(),
-                    lastInstallmentDate: new Date(orderForm.subscriptionDetails.lastInstallmentDate).toISOString(),
-                    numberOfInstallments: orderForm.subscriptionDetails.numberOfInstallments,
-                };
-            }
 
             await postDataHandlerWithToken("Order", dataToSend);
 
@@ -716,22 +639,25 @@ const validateLoan = useCallback(() => {
             fetchOrders();
         } catch (error: any) {
             console.log(error);
-            toast({
-                title: "Error",
-                description: error?.message || "Failed to create order",
-                variant: "destructive",
-            });
+            showApiError(error, "Failed to create order");
         } finally {
             setAddingOrder(false);
         }
     };
 
-    // Update order
+    // Update order (only unapproved orders; approved orders change payments via "Payments & Credits")
     const handleUpdateOrder = async () => {
         if (!selectedOrder) return;
 
         try {
             setUpdatingOrder(true);
+            setPaymentServerErrors([]);
+
+            const paymentErrors = getPaymentErrors();
+            if (paymentErrors.length) {
+                toast({ title: "Payment structure", description: paymentErrors[0], variant: "destructive" });
+                return;
+            }
 
             const finalFee = calculateFinalFee();
             const dataToSend: any = {
@@ -750,12 +676,13 @@ const validateLoan = useCallback(() => {
                 totalFee: orderForm.totalFee,
                 discount: orderForm.discount,
                 finalFee: finalFee,
-                paymentMode: orderForm.paymentMode,
                 orderDate: new Date(orderForm.orderDate).toISOString(),
                 feeDepositDate: new Date(orderForm.feeDepositDate).toISOString(),
                 remarks: orderForm.remarks,
                 GSTEnabled: orderForm.GSTEnabled,
                 GSTAmount: orderForm.GSTAmount,
+                // Items with _id update, items without _id are added, missing items are removed.
+                ...buildPaymentSourcesPayload(orderForm.payments),
             };
             const endpoint = ApiConfig.updateOrder(selectedOrder._id);
             await patchTokenDataHandler(endpoint, dataToSend, true);
@@ -768,17 +695,13 @@ const validateLoan = useCallback(() => {
             setEditModalOpen(false);
             fetchOrders();
         } catch (error: any) {
-            toast({
-                title: "Error",
-                description: error.response?.data?.message || "Failed to update order",
-                variant: "destructive",
-            });
+            showApiError(error, "Failed to update order");
         } finally {
             setUpdatingOrder(false);
         }
     };
 
-    // Approve order
+    // Approve order (refused by the API when sources + credits do not equal the final fee)
     const handleApproveOrder = async (orderId: string, currentApprovalStatus: boolean) => {
         try {
             setApprovingOrder(true);
@@ -792,9 +715,10 @@ const validateLoan = useCallback(() => {
 
             fetchOrders();
         } catch (error: any) {
+            const { message, errors } = extractApiError(error, "Failed to update order approval status");
             toast({
-                title: "Error",
-                description: error.response?.data?.message || "Failed to update order approval status",
+                title: "Cannot approve",
+                description: errors.length ? `${message}: ${errors.join('; ')}` : message,
                 variant: "destructive",
             });
         } finally {
@@ -802,42 +726,39 @@ const validateLoan = useCallback(() => {
         }
     };
 
-    // Create payment link
+    // Outstanding (not yet received) amount of the active lumpsum payments
+    const getLumpsumOutstanding = (financials: OrderFinancials | null, entryId?: string) => {
+        if (!financials) return 0;
+        return toMoney(
+            (financials.lumpsumPayments || [])
+                .filter(e => !['Failed', 'Refunded'].includes(e.status))
+                .filter(e => !entryId || e._id === entryId)
+                .reduce((sum, e) => sum + Math.max(0, toMoney(e.amount) - toMoney(e.amountReceived)), 0)
+        );
+    };
+
+    // Create payment link (lumpsum balance, one lumpsum entry, or one credit)
     const handleCreatePaymentLink = async () => {
-        if (!selectedOrder) return;
+        if (!selectedOrder || !paymentLinkTarget) return;
 
         try {
             setPaymentLoading(true);
 
-            let endpoint = ApiConfig.createPaymentLink;
-            let data: any = {
+            const data: any = {
                 name: selectedOrder.studentName,
                 email: selectedOrder.email,
                 phone: selectedOrder.mobile,
                 amount: paymentAmount,
                 orderId: selectedOrder._id,
+                paymentType,
             };
-
-            // Add payment type for lumpsum
-            if (selectedOrder.paymentMode === 'Lumpsum') {
-                data.paymentType = paymentType;
+            if (paymentLinkTarget.type === 'credit') {
+                data.creditId = paymentLinkTarget.creditId;
+            } else if (paymentLinkTarget.lumpsumEntryId) {
+                data.lumpsumEntryId = paymentLinkTarget.lumpsumEntryId;
             }
 
-            // If subscription, use subscription endpoint
-            if (selectedOrder.paymentMode === 'Subscription' && selectedOrder.subscriptionDetails) {
-                endpoint = ApiConfig.createSubscription;
-                data = {
-                    name: selectedOrder.studentName,
-                    email: selectedOrder.email,
-                    phone: selectedOrder.mobile,
-                    orderId: selectedOrder._id,
-                    amount: paymentAmount,
-                    installmentAmount: selectedOrder.subscriptionDetails.installmentAmount,
-                    numberOfInstallments: selectedOrder.subscriptionDetails.numberOfInstallments,
-                };
-            }
-
-            const response = await postDataHandlerWithToken(endpoint, data, true);
+            const response = await postDataHandlerWithToken(ApiConfig.createPaymentLink, data, true);
 
             if (response?.paymentLink || response?.authLink) {
                 const paymentLink = response.paymentLink || response.authLink;
@@ -853,7 +774,7 @@ const validateLoan = useCallback(() => {
         } catch (error: any) {
             toast({
                 title: "Error",
-                description: error?.message || "Failed to create payment link",
+                description: extractApiError(error, "Failed to create payment link").message,
                 variant: "destructive",
             });
         } finally {
@@ -861,69 +782,24 @@ const validateLoan = useCallback(() => {
         }
     };
 
-    // Get max amount for payment
+    // Max amount for the selected payment link target
     const getMaxAmount = () => {
-        if (!selectedOrder) return 0;
-
-        if (selectedOrder.paymentMode === 'Lumpsum' && selectedOrder.lumpsumDetails) {
-            return selectedOrder.lumpsumDetails.pendingAmount;
-        }
-
-        if (selectedOrder.paymentMode === 'Subscription' && selectedOrder.subscriptionDetails) {
-            return selectedOrder.subscriptionDetails.installmentAmount;
-        }
-
-        return selectedOrder.finalFee;
+        if (!selectedOrder || !paymentLinkTarget) return 0;
+        if (paymentLinkTarget.type === 'credit') return paymentLinkTarget.amount;
+        if (paymentLinkFinancials) return getLumpsumOutstanding(paymentLinkFinancials, paymentLinkTarget.lumpsumEntryId);
+        return paymentLinkTarget.amount;
     };
 
     // Reset form
     const resetForm = () => {
-        setOrderForm({
-            mobile: '',
-            email: '',
-            studentName: '',
-            fatherName: '',
-            dob: '',
-            education: '',
-            address: '',
-            city: '',
-            state: '',
-            courseVertical: '',
-            courseName: '',
-            courseDuration: '',
-            totalFee: 0,
-            discount: 0,
-            GSTEnabled: false,
-            GSTAmount: 0,
-            paymentMode: 'Lumpsum',
-            orderDate: new Date().toISOString().slice(0, 16),
-            feeDepositDate: new Date().toISOString().slice(0, 16),
-            remarks: '',
-            lumpsumDetails: {
-                registrationDate: new Date().toISOString().slice(0, 16),
-                registrationAmount: 0,
-                totalReceived: 0,
-                paymentType: 'UPI'
-            },
-            loanDetails: {
-                loanPartner: '',
-                loanAmount: 0,
-                disbursementAmount: 0,
-                firstEmiDate: new Date().toISOString().slice(0, 16)
-            },
-            subscriptionDetails: {
-                gateway: 'Cashfree',
-                installmentAmount: 0,
-                firstInstallmentDate: new Date().toISOString().slice(0, 16),
-                lastInstallmentDate: new Date().toISOString().slice(0, 16),
-                numberOfInstallments: 1
-            }
-        });
+        setOrderForm(emptyOrderForm());
+        setPaymentServerErrors([]);
     };
 
-    // Edit order - populate form
-    const handleEditOrder = (order: OrderType) => {
+    // Edit order - populate form (payment entries come from /financials so legacy orders work too)
+    const handleEditOrder = async (order: OrderType) => {
         setSelectedOrder(order);
+        setPaymentServerErrors([]);
         setOrderForm({
             mobile: order.mobile,
             email: order.email,
@@ -941,31 +817,26 @@ const validateLoan = useCallback(() => {
             discount: order.discount,
             GSTEnabled: order.GSTEnabled || false,
             GSTAmount: order.GSTAmount || 0,
-            paymentMode: order.paymentMode,
             orderDate: new Date(order.orderDate).toISOString().slice(0, 16),
             feeDepositDate: new Date(order.feeDepositDate).toISOString().slice(0, 16),
             remarks: order.remarks || '',
-            lumpsumDetails: order.lumpsumDetails ? {
-                registrationDate: new Date(order.lumpsumDetails.registrationDate).toISOString().slice(0, 16),
-                registrationAmount: order.lumpsumDetails.registrationAmount,
-                totalReceived: order.lumpsumDetails.totalReceived,
-                paymentType: order.lumpsumDetails.paymentType,
-            } : undefined,
-            loanDetails: order.loanDetails ? {
-                loanPartner: order.loanDetails.loanPartner?._id || '',
-                loanAmount: order.loanDetails.loanAmount,
-                disbursementAmount: order.loanDetails.disbursementAmount,
-                firstEmiDate: new Date(order.loanDetails.firstEmiDate).toISOString().slice(0, 16),
-            } : undefined,
-            subscriptionDetails: order.subscriptionDetails ? {
-                gateway: order.subscriptionDetails.gateway,
-                installmentAmount: order.subscriptionDetails.installmentAmount,
-                firstInstallmentDate: new Date(order.subscriptionDetails.firstInstallmentDate).toISOString().slice(0, 16),
-                lastInstallmentDate: new Date(order.subscriptionDetails.lastInstallmentDate).toISOString().slice(0, 16),
-                numberOfInstallments: order.subscriptionDetails.numberOfInstallments,
-            } : undefined,
+            payments: draftFromOrder(order),
         });
         setEditModalOpen(true);
+
+        try {
+            setLoadingEditPayments(true);
+            const financials: OrderFinancials = await getDataHandlerWithToken(ApiConfig.getOrderFinancials(order._id), null, null, true);
+            setOrderForm(prev => ({ ...prev, payments: draftFromOrder(financials) }));
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: extractApiError(error, "Failed to load the payment sources of this order").message,
+                variant: "destructive",
+            });
+        } finally {
+            setLoadingEditPayments(false);
+        }
     };
 
     // View order details
@@ -974,18 +845,60 @@ const validateLoan = useCallback(() => {
         setViewModalOpen(true);
     };
 
-    // Open payment modal
-    const handlePaymentModal = (order: OrderType) => {
+    // Open the payment link modal; target defaults to the outstanding lumpsum balance
+    const handlePaymentModal = async (order: OrderType, target?: PaymentLinkTarget) => {
         setSelectedOrder(order);
-        if (order.paymentMode === 'Lumpsum' && order.lumpsumDetails) {
-            setPaymentAmount(order.lumpsumDetails.pendingAmount);
-        } else if (order.paymentMode === 'Subscription' && order.subscriptionDetails) {
-            setPaymentAmount(order.subscriptionDetails.installmentAmount);
-        } else {
-            setPaymentAmount(order.finalFee);
-        }
         setPaymentType('UPI');
+        setPaymentLinkFinancials(null);
+        setPaymentLinkTarget(target || null);
+        setPaymentAmount(target?.amount || 0);
         setPaymentModalOpen(true);
+
+        try {
+            setLoadingPaymentLinkInfo(true);
+            const financials: OrderFinancials = await getDataHandlerWithToken(ApiConfig.getOrderFinancials(order._id), null, null, true);
+            setPaymentLinkFinancials(financials);
+            if (!target) {
+                const outstanding = getLumpsumOutstanding(financials);
+                const firstUnpaidCredit = (financials.credits || []).find(c => c.status !== 'Paid');
+                const initial: PaymentLinkTarget | null = outstanding > 0
+                    ? { type: 'lumpsum', amount: outstanding }
+                    : firstUnpaidCredit
+                        ? { type: 'credit', creditId: firstUnpaidCredit._id, amount: toMoney(firstUnpaidCredit.amount) }
+                        : null;
+                setPaymentLinkTarget(initial);
+                setPaymentAmount(initial?.amount || 0);
+            }
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: extractApiError(error, "Failed to load the order balance").message,
+                variant: "destructive",
+            });
+        } finally {
+            setLoadingPaymentLinkInfo(false);
+        }
+    };
+
+    // Payment link target picker value: 'lumpsum', 'lumpsum:<entryId>' or 'credit:<creditId>'
+    const paymentLinkTargetValue = !paymentLinkTarget
+        ? ''
+        : paymentLinkTarget.type === 'credit'
+            ? `credit:${paymentLinkTarget.creditId}`
+            : paymentLinkTarget.lumpsumEntryId ? `lumpsum:${paymentLinkTarget.lumpsumEntryId}` : 'lumpsum';
+
+    const handlePaymentLinkTargetChange = (value: string) => {
+        if (!paymentLinkFinancials) return;
+        const [kind, id] = value.split(':');
+        let next: PaymentLinkTarget | null = null;
+        if (kind === 'credit') {
+            const credit = paymentLinkFinancials.credits.find(c => c._id === id);
+            if (credit) next = { type: 'credit', creditId: credit._id, amount: toMoney(credit.amount) };
+        } else {
+            next = { type: 'lumpsum', lumpsumEntryId: id, amount: getLumpsumOutstanding(paymentLinkFinancials, id) };
+        }
+        setPaymentLinkTarget(next);
+        setPaymentAmount(next?.amount || 0);
     };
 
     const resetSubscriptionState = () => {
@@ -1008,33 +921,56 @@ const validateLoan = useCallback(() => {
         setSubscriptionAuthModalOpen(true);
     };
 
+    // Subscription action: an order can have several plans; each plan has its own Cashfree session.
     const handleSubscriptionAction = async (order: OrderType) => {
-        console.log(!!order.subscriptionDetails?.cashfreeSubscriptionId, "1")
-        if (!!order.subscriptionDetails?.cashfreeSubscriptionId) {
-            try {
-                setSubscriptionLoading(true);
+        try {
+            setSubscriptionLoading(true);
+            const financials: OrderFinancials = await getDataHandlerWithToken(ApiConfig.getOrderFinancials(order._id), null, null, true);
+            const entries = financials?.subscriptions || [];
+            setSubscriptionEntries(entries);
+
+            if (entries.length === 1 && entries[0].cashfreeSubscriptionId) {
+                setSubscriptionEntryId(entries[0]._id);
+                openSubscriptionAuthModal(order, entries[0].cashfreeSubscriptionId);
+                return;
+            }
+
+            if (entries.length === 0 && order.subscriptionDetails?.cashfreeSubscriptionId) {
+                // Legacy order without plan entries: fall back to the subscription record.
                 const response = await getDataHandlerWithToken(ApiConfig.getSubscriptionByOrderId(order._id), null, null, true);
                 const subscription = response?.data || response;
                 const sessionId = subscription?.cashfreeSubscriptionId;
-
                 if (!sessionId) {
                     throw new Error('Cashfree subscription ID was not found for this order.');
                 }
-
                 openSubscriptionAuthModal(order, sessionId);
-            } catch (error: any) {
-                toast({
-                    title: 'Error',
-                    description: error?.response?.data?.message || error?.message || 'Failed to load subscription details',
-                    variant: 'destructive',
-                });
-            } finally {
-                setSubscriptionLoading(false);
+                return;
             }
-            return;
-        }
 
-        openSubscriptionCreateModal(order);
+            // Preselect the first plan that is not linked to Cashfree yet.
+            const firstUnlinked = entries.find(e => !e.cashfreeSubscriptionId && !e.gatewaySubscriptionId) || entries[0];
+            setSubscriptionEntryId(firstUnlinked?._id || '');
+            openSubscriptionCreateModal(order);
+        } catch (error: any) {
+            toast({
+                title: 'Error',
+                description: extractApiError(error, 'Failed to load subscription details').message,
+                variant: 'destructive',
+            });
+        } finally {
+            setSubscriptionLoading(false);
+        }
+    };
+
+    // Selected plan in the subscription modal that already has a Cashfree session
+    const selectedLinkedSubscription = subscriptionEntries.find(
+        e => e._id === subscriptionEntryId && !!e.cashfreeSubscriptionId
+    );
+
+    // Open the payments & credits dialog
+    const handleOpenFinancials = (order: OrderType) => {
+        setSelectedOrder(order);
+        setFinancialsOrder(order);
     };
 
     const getCashfreeMode = () => {
@@ -1062,6 +998,11 @@ const validateLoan = useCallback(() => {
             const payload: Record<string, string> = {
                 orderId: selectedOrder._id,
             };
+
+            // Which of the order's subscription plans to link (required when there are several)
+            if (subscriptionEntryId) {
+                payload.subscriptionEntryId = subscriptionEntryId;
+            }
 
             if (subscriptionPlanId.trim()) {
                 payload.planId = subscriptionPlanId.trim();
@@ -1091,7 +1032,7 @@ const validateLoan = useCallback(() => {
         } catch (error: any) {
             toast({
                 title: 'Error',
-                description: error?.response?.data?.message || error?.message || 'Failed to create subscription',
+                description: extractApiError(error, 'Failed to create subscription').message,
                 variant: 'destructive',
             });
         } finally {
@@ -1165,7 +1106,12 @@ const validateLoan = useCallback(() => {
             case 'Partially Paid':
                 return <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">Partially Paid</Badge>;
             case 'Pending':
-                return <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200">Pending</Badge>;
+            case 'Pending Payment':
+                return <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200">{status}</Badge>;
+            case 'Loan Processing':
+                return <Badge variant="outline" className="bg-violet-100 text-violet-700 border-violet-200">Loan Processing</Badge>;
+            case 'Cancelled':
+                return <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-200">Cancelled</Badge>;
             default:
                 return <Badge variant="outline">{status}</Badge>;
         }
@@ -1209,6 +1155,16 @@ const validateLoan = useCallback(() => {
             >
                 <History className="w-4 h-4 mr-2" />
                 Payment History
+            </Button>
+        )}
+        {hasPermission(permissions, 'orders', 'read_pending_credits') && (
+            <Button
+                variant="outline"
+                onClick={() => navigate(`${window.location.pathname.startsWith('/admin') ? '/admin' : '/bd'}/pending-credits`)}
+                className="border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl"
+            >
+                <Clock className="w-4 h-4 mr-2" />
+                Pending Credits
             </Button>
         )}
         {hasPermission(permissions, 'orders', 'read_loans') && (
@@ -1301,9 +1257,9 @@ const validateLoan = useCallback(() => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All</SelectItem>
-            <SelectItem value="Lumpsum">Lumpsum</SelectItem>
-            <SelectItem value="Loan">Loan</SelectItem>
-            <SelectItem value="Subscription">Subscription</SelectItem>
+            {PAYMENT_MODE_FILTERS.map(mode => (
+              <SelectItem key={mode} value={mode}>{mode}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -1320,9 +1276,9 @@ const validateLoan = useCallback(() => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All</SelectItem>
-            <SelectItem value="Fully Paid">Fully Paid</SelectItem>
-            <SelectItem value="Partially Paid">Partially Paid</SelectItem>
-            <SelectItem value="Pending">Pending</SelectItem>
+            {ORDER_STATUS_FILTERS.map(status => (
+              <SelectItem key={status} value={status}>{status}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -1501,9 +1457,21 @@ const validateLoan = useCallback(() => {
                 )}
               </TableCell>
               <TableCell>
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700">
-                  {order.paymentMode}
-                </span>
+                <div className="flex flex-wrap gap-1 max-w-[180px]">
+                  {getOrderModes(order).map(mode => (
+                    <span
+                      key={mode}
+                      className={cn("inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-lg border", PAYMENT_MODE_BADGE[mode] || PAYMENT_MODE_BADGE.Mixed)}
+                    >
+                      {mode}
+                    </span>
+                  ))}
+                </div>
+                {!!order.paymentSummary?.pendingCreditCount && (
+                  <div className="mt-1 text-[11px] text-amber-600">
+                    {order.paymentSummary.pendingCreditCount} credit{order.paymentSummary.pendingCreditCount > 1 ? 's' : ''} · {formatCurrency(order.paymentSummary.pendingCreditAmount)} due
+                  </div>
+                )}
               </TableCell>
               <TableCell>
                 {getStatusBadge(order.status, order.Approved)}
@@ -1558,24 +1526,38 @@ const validateLoan = useCallback(() => {
                       <ShieldCheck className="w-4 h-4 text-green-500" />
                     </Button>
                   )}
-                  {order.Approved && order.paymentMode === 'Subscription' && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleSubscriptionAction(order)}
-                      className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100"
-                      title={order.subscriptionDetails?.cashfreeSubscriptionId?.trim() ? "Get Auth Link" : "Create Subscription"}
-                      disabled={subscriptionLoading}
-                    >
-                      {order.subscriptionDetails?.cashfreeSubscriptionId?.trim() ? (
-                        <ExternalLink className="w-4 h-4 text-blue-500" />
-                      ) : (
-                        <Receipt className="w-4 h-4 text-blue-500" />
-                      )}
-                    </Button>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleOpenFinancials(order)}
+                    className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100"
+                    title="Payments & Credits"
+                  >
+                    <Wallet className="w-4 h-4 text-orange-500" />
+                  </Button>
+                  {order.Approved && getOrderModes(order).includes('Subscription') && (() => {
+                    const linked = (order.subscriptions || []).some(s => !!s.cashfreeSubscriptionId?.trim())
+                      || !!order.subscriptionDetails?.cashfreeSubscriptionId?.trim();
+                    return (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleSubscriptionAction(order)}
+                        className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100"
+                        title={linked ? "Subscription: auth link / create" : "Create Subscription"}
+                        disabled={subscriptionLoading}
+                      >
+                        {linked ? (
+                          <ExternalLink className="w-4 h-4 text-blue-500" />
+                        ) : (
+                          <Receipt className="w-4 h-4 text-blue-500" />
+                        )}
+                      </Button>
+                    );
+                  })()}
                   {hasPermission(permissions, 'orders', 'payment_link_generator') &&
-                    order.paymentMode === 'Lumpsum' && order.Approved && order.status !== 'Fully Paid' && (
+                    order.Approved && order.status !== 'Fully Paid' &&
+                    (getOrderModes(order).includes('Lumpsum') || getOrderModes(order).includes('Credit')) && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1587,7 +1569,7 @@ const validateLoan = useCallback(() => {
                       </Button>
                   )}
                   {hasPermission(permissions, 'orders', 'read_payment_history') &&
-                    order.paymentMode === 'Lumpsum' && (
+                    (getOrderModes(order).includes('Lumpsum') || getOrderModes(order).includes('Credit')) && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1938,365 +1920,24 @@ const validateLoan = useCallback(() => {
 
       {/* Payment Information */}
       <div className="bg-white border-0 shadow-sm rounded-xl p-5">
-        <h3 className="text-base font-semibold text-slate-800 mb-4">Payment Information</h3>
-        <div>
-          <Label className="text-xs font-semibold text-slate-500 uppercase">Payment Mode *</Label>
-          <Select
-            value={orderForm.paymentMode}
-            onValueChange={(value) => setOrderForm({ ...orderForm, paymentMode: value })}
-          >
-            <SelectTrigger className="mt-1.5 rounded-xl">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Lumpsum">Lumpsum</SelectItem>
-              <SelectItem value="Loan">Loan</SelectItem>
-              <SelectItem value="Subscription">Subscription</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <h3 className="text-base font-semibold text-slate-800">Payment Information</h3>
+        <p className="text-xs text-slate-500 mb-4">
+          Combine any payment sources. Lumpsum + loans + subscriptions + credits must equal the final fee exactly.
+        </p>
+        <PaymentSourcesEditor
+          value={orderForm.payments}
+          onChange={(payments) => {
+            setOrderForm(prev => ({ ...prev, payments }));
+            if (paymentServerErrors.length) setPaymentServerErrors([]);
+          }}
+          finalFee={calculateFinalFee()}
+          loanPartners={loanPartners}
+          loadingLoanPartners={loadingLoanPartners}
+          disabled={addingOrder}
+          serverErrors={paymentServerErrors}
+        />
 
-        {orderForm.paymentMode === 'Lumpsum' && orderForm.lumpsumDetails && (
-    <div className="border-t border-slate-100 mt-4 pt-4">
-      <h4 className="text-sm font-medium text-slate-700 mb-3">Lumpsum Details</h4>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label className="text-xs font-semibold text-slate-500 uppercase">Registration Date</Label>
-          <Input
-            type="datetime-local"
-            value={orderForm.lumpsumDetails.registrationDate}
-            onChange={(e) => setOrderForm({
-              ...orderForm,
-              lumpsumDetails: { ...orderForm.lumpsumDetails!, registrationDate: e.target.value }
-            })}
-            className="mt-1.5 rounded-xl border-slate-200"
-          />
-        </div>
-        <div>
-          <Label className="text-xs font-semibold text-slate-500 uppercase">Registration Amount</Label>
-          <Input
-            type="number"
-            value={orderForm.lumpsumDetails.registrationAmount}
-            onChange={(e) => {
-              const registrationAmount = parseInt(e.target.value) || 0;
-              const finalFee = calculateFinalFee();
-              if (registrationAmount > finalFee) {
-                toast({
-                  title: 'Validation Error',
-                  description: 'Registration amount cannot exceed the final fee',
-                  variant: 'destructive',
-                });
-                return;
-              }
-              setOrderForm({
-                ...orderForm,
-                lumpsumDetails: { 
-                  ...orderForm.lumpsumDetails!, 
-                  registrationAmount: registrationAmount,
-                  totalReceived: registrationAmount > orderForm.lumpsumDetails!.totalReceived 
-                    ? registrationAmount 
-                    : orderForm.lumpsumDetails!.totalReceived
-                }
-              });
-            }}
-            className="mt-1.5 rounded-xl border-slate-200"
-          />
-          <p className="text-xs text-slate-400 mt-1">Cannot exceed final fee: {formatCurrency(calculateFinalFee())}</p>
-        </div>
-        <div className="md:col-span-2">
-          <Label className="text-xs font-semibold text-slate-500 uppercase">Total Received</Label>
-          <Input
-            type="number"
-            value={orderForm.lumpsumDetails.totalReceived}
-            onChange={(e) => {
-              const totalReceived = parseInt(e.target.value) || 0;
-              const finalFee = calculateFinalFee();
-              const registrationAmount = orderForm.lumpsumDetails?.registrationAmount || 0;
-              
-              // Validate total received doesn't exceed final fee
-              if (totalReceived > finalFee) {
-                toast({
-                  title: 'Validation Error',
-                  description: 'Total received cannot exceed the final fee',
-                  variant: 'destructive',
-                });
-                return;
-              }
-              
-            
-              
-              setOrderForm({
-                ...orderForm,
-                lumpsumDetails: { ...orderForm.lumpsumDetails!, totalReceived }
-              });
-            }}
-            className="mt-1.5 rounded-xl border-slate-200"
-          />
-          <p className="text-xs text-slate-400 mt-1">
-            Min: {formatCurrency(orderForm.lumpsumDetails?.registrationAmount || 0)} | 
-            Max: {formatCurrency(calculateFinalFee())}
-          </p>
-          {orderForm.lumpsumDetails.totalReceived > 0 && (
-            <p className={cn(
-              "text-xs mt-1",
-              orderForm.lumpsumDetails.totalReceived === calculateFinalFee() 
-                ? "text-emerald-600" 
-                : "text-amber-600"
-            )}>
-              {orderForm.lumpsumDetails.totalReceived === calculateFinalFee() 
-                ? "✓ Fully Paid" 
-                : `Pending Amount: ${formatCurrency(calculateFinalFee() - orderForm.lumpsumDetails.totalReceived)}`
-              }
-            </p>
-          )}
-        </div>
-        <div>
-          <Label className="text-xs font-semibold text-slate-500 uppercase">Payment Type</Label>
-          <Select
-            value={orderForm.lumpsumDetails.paymentType}
-            onValueChange={(value) => setOrderForm({
-              ...orderForm,
-              lumpsumDetails: { ...orderForm.lumpsumDetails!, paymentType: value }
-            })}
-          >
-            <SelectTrigger className="mt-1.5 rounded-xl">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="UPI">UPI</SelectItem>
-              <SelectItem value="Card">Card</SelectItem>
-              <SelectItem value="Net Banking">Net Banking</SelectItem>
-              <SelectItem value="Cash">Cash</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-    </div>
-  )}
-
-  {orderForm.paymentMode === 'Loan' && orderForm.loanDetails && (
-    <div className="border-t border-slate-100 mt-4 pt-4">
-      <h4 className="text-sm font-medium text-slate-700 mb-3">Loan Details</h4>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label className="text-xs font-semibold text-slate-500 uppercase">Loan Partner *</Label>
-          <Select
-            value={orderForm.loanDetails.loanPartner}
-            onValueChange={(value) => setOrderForm({
-              ...orderForm,
-              loanDetails: { ...orderForm.loanDetails!, loanPartner: value }
-            })}
-          >
-            <SelectTrigger className="mt-1.5 rounded-xl">
-              <SelectValue placeholder="Select loan partner" />
-            </SelectTrigger>
-            <SelectContent>
-              {loadingLoanPartners ? (
-                <div className="flex items-center justify-center py-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                </div>
-              ) : loanPartners.length === 0 ? (
-                <div className="px-2 py-2 text-sm text-slate-400">No loan partners available</div>
-              ) : (
-                loanPartners.filter(partner => partner.isActive).map((partner) => (
-                  <SelectItem key={partner._id} value={partner._id}>
-                    {partner.name}
-                    <span className="ml-2 text-xs text-slate-400">
-                      Type: {partner.type} | Charge: {partner.submissionCharge}%
-                    </span>
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className="text-xs font-semibold text-slate-500 uppercase">Loan Amount *</Label>
-          <Input
-            type="number"
-            value={orderForm.loanDetails.loanAmount}
-            onChange={(e) => {
-              const loanAmount = parseInt(e.target.value) || 0;
-              const finalFee = calculateFinalFee();
-              
-              // Validate loan amount doesn't exceed final fee
-              if (loanAmount > finalFee) {
-                toast({
-                  title: 'Validation Error',
-                  description: 'Loan amount cannot exceed the final fee',
-                  variant: 'destructive',
-                });
-                return;
-              }
-              
-              // If disbursement amount is greater than loan amount, adjust it
-              const disbursementAmount = orderForm.loanDetails?.disbursementAmount || 0;
-              const newDisbursementAmount = disbursementAmount > loanAmount ? loanAmount : disbursementAmount;
-              
-              setOrderForm({
-                ...orderForm,
-                loanDetails: { 
-                  ...orderForm.loanDetails!, 
-                  loanAmount,
-                  disbursementAmount: newDisbursementAmount
-                }
-              });
-            }}
-            placeholder="Enter loan amount"
-            className="mt-1.5 rounded-xl border-slate-200"
-          />
-          <p className="text-xs text-slate-400 mt-1">Cannot exceed final fee: {formatCurrency(calculateFinalFee())}</p>
-        </div>
-        <div>
-          <Label className="text-xs font-semibold text-slate-500 uppercase">Disbursement Amount *</Label>
-          <Input
-            type="number"
-            value={orderForm.loanDetails.disbursementAmount}
-            onChange={(e) => {
-              const disbursementAmount = parseInt(e.target.value) || 0;
-              const finalFee = calculateFinalFee();
-              const loanAmount = orderForm.loanDetails?.loanAmount || 0;
-              
-              // Validate disbursement amount doesn't exceed final fee
-              if (disbursementAmount > finalFee) {
-                toast({
-                  title: 'Validation Error',
-                  description: 'Disbursement amount cannot exceed the final fee',
-                  variant: 'destructive',
-                });
-                return;
-              }
-              
-              // Validate disbursement amount doesn't exceed loan amount
-              if (loanAmount > 0 && disbursementAmount > loanAmount) {
-                toast({
-                  title: 'Validation Error',
-                  description: 'Disbursement amount cannot exceed the loan amount',
-                  variant: 'destructive',
-                });
-                return;
-              }
-              
-              setOrderForm({
-                ...orderForm,
-                loanDetails: { ...orderForm.loanDetails!, disbursementAmount }
-              });
-            }}
-            placeholder="Enter disbursement amount"
-            className="mt-1.5 rounded-xl border-slate-200"
-            required
-          />
-          <p className="text-xs text-slate-400 mt-1">
-            Cannot exceed: {formatCurrency(Math.min(calculateFinalFee(), orderForm.loanDetails?.loanAmount || Infinity))}
-          </p>
-          {(!orderForm.loanDetails.disbursementAmount || orderForm.loanDetails.disbursementAmount === 0) && (
-            <p className="text-xs text-red-500 mt-1">Disbursement amount is required</p>
-          )}
-          {orderForm.loanDetails.disbursementAmount > 0 && orderForm.loanDetails.loanAmount > 0 && (
-            <p className={cn(
-              "text-xs mt-1",
-              orderForm.loanDetails.disbursementAmount === orderForm.loanDetails.loanAmount 
-                ? "text-emerald-600" 
-                : "text-amber-600"
-            )}>
-              {orderForm.loanDetails.disbursementAmount === orderForm.loanDetails.loanAmount 
-                ? "✓ Full disbursement" 
-                : `Remaining: ${formatCurrency(orderForm.loanDetails.loanAmount - orderForm.loanDetails.disbursementAmount)}`
-              }
-            </p>
-          )}
-        </div>
-        <div>
-          <Label className="text-xs font-semibold text-slate-500 uppercase">First EMI Date</Label>
-          <Input
-            type="datetime-local"
-            value={orderForm.loanDetails.firstEmiDate}
-            onChange={(e) => setOrderForm({
-              ...orderForm,
-              loanDetails: { ...orderForm.loanDetails!, firstEmiDate: e.target.value }
-            })}
-            className="mt-1.5 rounded-xl border-slate-200"
-          />
-        </div>
-      </div>
-    </div>
-  )}
-
-        {orderForm.paymentMode === 'Subscription' && orderForm.subscriptionDetails && (
-          <div className="border-t border-slate-100 mt-4 pt-4">
-            <h4 className="text-sm font-medium text-slate-700 mb-3">Subscription Details</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs font-semibold text-slate-500 uppercase">Gateway</Label>
-                <Select
-                  value={orderForm.subscriptionDetails.gateway}
-                  onValueChange={(value) => setOrderForm({
-                    ...orderForm,
-                    subscriptionDetails: { ...orderForm.subscriptionDetails!, gateway: value }
-                  })}
-                >
-                  <SelectTrigger className="mt-1.5 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Cashfree">Cashfree</SelectItem>
-                    <SelectItem value="Razorpay">Razorpay</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs font-semibold text-slate-500 uppercase">Installment Amount</Label>
-                <Input
-                  type="number"
-                  value={orderForm.subscriptionDetails.installmentAmount}
-                  onChange={(e) => setOrderForm({
-                    ...orderForm,
-                    subscriptionDetails: { ...orderForm.subscriptionDetails!, installmentAmount: parseInt(e.target.value) || 0 }
-                  })}
-                  className="mt-1.5 rounded-xl border-slate-200"
-                />
-              </div>
-              <div>
-                <Label className="text-xs font-semibold text-slate-500 uppercase">Number of Installments</Label>
-                <Input
-                  type="number"
-                  value={orderForm.subscriptionDetails.numberOfInstallments}
-                  onChange={(e) => setOrderForm({
-                    ...orderForm,
-                    subscriptionDetails: { ...orderForm.subscriptionDetails!, numberOfInstallments: parseInt(e.target.value) || 1 }
-                  })}
-                  className="mt-1.5 rounded-xl border-slate-200"
-                />
-              </div>
-              <div>
-                <Label className="text-xs font-semibold text-slate-500 uppercase">First Installment Date</Label>
-                <Input
-                  type="datetime-local"
-                  value={orderForm.subscriptionDetails.firstInstallmentDate}
-                  onChange={(e) => setOrderForm({
-                    ...orderForm,
-                    subscriptionDetails: { ...orderForm.subscriptionDetails!, firstInstallmentDate: e.target.value }
-                  })}
-                  className="mt-1.5 rounded-xl border-slate-200"
-                />
-              </div>
-              <div>
-                <Label className="text-xs font-semibold text-slate-500 uppercase">Last Installment Date</Label>
-                <Input
-                  type="datetime-local"
-                  value={orderForm.subscriptionDetails.lastInstallmentDate}
-                  onChange={(e) => setOrderForm({
-                    ...orderForm,
-                    subscriptionDetails: { ...orderForm.subscriptionDetails!, lastInstallmentDate: e.target.value }
-                  })}
-                  className="mt-1.5 rounded-xl border-slate-200"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
           <div>
             <Label className="text-xs font-semibold text-slate-500 uppercase">Order Date</Label>
             <Input
@@ -2321,29 +1962,19 @@ const validateLoan = useCallback(() => {
       </div>
     </div>
 
-    <DialogFooter className="pt-4 border-t border-slate-100">
+    <DialogFooter className="pt-4 border-t border-slate-100 gap-2">
+  {getPaymentErrors().length > 0 && (
+    <p className="mr-auto flex items-center gap-1 text-xs text-amber-700">
+      <AlertTriangle className="h-3.5 w-3.5" />
+      {getPaymentErrors()[0]}
+    </p>
+  )}
   <Button variant="outline" onClick={() => setCreateModalOpen(false)} disabled={addingOrder} className="rounded-xl">
-    Cancels
+    Cancel
   </Button>
-  <Button 
-    onClick={handleCreateOrder} 
-    disabled={
-      addingOrder || 
-      // Lumpsum validation
-      (orderForm.paymentMode === 'Lumpsum' && (
-        (orderForm.lumpsumDetails?.totalReceived || 0) > calculateFinalFee() ||
-        (orderForm.lumpsumDetails?.registrationAmount || 0) > calculateFinalFee() ||
-        (orderForm.lumpsumDetails?.totalReceived || 0) < (orderForm.lumpsumDetails?.registrationAmount || 0)
-      )) ||
-      // Loan validation
-      (orderForm.paymentMode === 'Loan' && (
-        (orderForm.loanDetails?.loanAmount || 0) > calculateFinalFee() ||
-        (orderForm.loanDetails?.disbursementAmount || 0) > calculateFinalFee() ||
-        (orderForm.loanDetails?.disbursementAmount || 0) > (orderForm.loanDetails?.loanAmount || 0) ||
-        !orderForm.loanDetails?.disbursementAmount ||
-        orderForm.loanDetails?.disbursementAmount === 0
-      ))
-    } 
+  <Button
+    onClick={handleCreateOrder}
+    disabled={addingOrder || getPaymentErrors().length > 0}
     className="bg-orange-600 hover:bg-orange-700 rounded-xl"
   >
     {addingOrder ? (
@@ -2506,85 +2137,72 @@ const validateLoan = useCallback(() => {
                 </div>
               </div>
 
-              {selectedOrder.lumpsumDetails && (
-                <div className="bg-slate-50 rounded-xl p-4">
-                  <p className="text-xs text-slate-500 uppercase font-semibold mb-2">Lumpsum Details</p>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-slate-500">Registration Date:</span>
-                      <span className="ml-1 text-slate-800">{formatDate(selectedOrder.lumpsumDetails.registrationDate)}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Registration Amount:</span>
-                      <span className="ml-1 text-slate-800">{formatCurrency(selectedOrder.lumpsumDetails.registrationAmount)}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Total Received:</span>
-                      <span className="ml-1 text-slate-800">{formatCurrency(selectedOrder.lumpsumDetails.totalReceived)}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Pending Amount:</span>
-                      <span className="ml-1 text-orange-600">{formatCurrency(selectedOrder.lumpsumDetails.pendingAmount)}</span>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-slate-500">Payment Type:</span>
-                      <span className="ml-1 text-slate-800">{selectedOrder.lumpsumDetails.paymentType}</span>
-                    </div>
+              <div className="flex flex-wrap gap-1.5">
+                {getOrderModes(selectedOrder).map(mode => (
+                  <span key={mode} className={cn("rounded-full border px-2 py-0.5 text-[11px] font-medium", PAYMENT_MODE_BADGE[mode] || PAYMENT_MODE_BADGE.Mixed)}>
+                    {mode}
+                  </span>
+                ))}
+              </div>
+
+              {selectedOrder.paymentSummary ? (
+                <div className="bg-slate-50 rounded-xl p-4 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Payment sources</span>
+                    <span className="text-slate-800">{formatCurrency(selectedOrder.paymentSummary.plannedPaymentCoverage)}</span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Credits</span>
+                    <span className="text-slate-800">{formatCurrency(selectedOrder.paymentSummary.totalCredits)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Received</span>
+                    <span className="text-emerald-600 font-medium">{formatCurrency(selectedOrder.paymentSummary.actualReceivedRevenue)}</span>
+                  </div>
+                  {selectedOrder.paymentSummary.reportedRevenue !== undefined &&
+                    selectedOrder.paymentSummary.reportedRevenue !== selectedOrder.paymentSummary.actualReceivedRevenue && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Revenue in reports (loans: disbursed)</span>
+                        <span className="text-slate-800">{formatCurrency(selectedOrder.paymentSummary.reportedRevenue)}</span>
+                      </div>
+                    )}
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Outstanding</span>
+                    <span className="text-orange-600 font-medium">{formatCurrency(selectedOrder.paymentSummary.outstandingAmount)}</span>
+                  </div>
+                  {selectedOrder.paymentSummary.pendingCreditCount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Pending credits</span>
+                      <span className="text-amber-600">
+                        {formatCurrency(selectedOrder.paymentSummary.pendingCreditAmount)} · {selectedOrder.paymentSummary.pendingCreditCount}
+                      </span>
+                    </div>
+                  )}
+                  {selectedOrder.paymentSummary.coverageStatus !== 'BALANCED' && (
+                    <p className="flex items-center gap-1 pt-1 text-xs text-amber-700">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      {formatCurrency(selectedOrder.paymentSummary.unallocatedAmount)} of the final fee is not allocated
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-slate-50 rounded-xl p-4 text-sm text-slate-500">
+                  Legacy order: open Payments &amp; Credits for its received amounts and payment sources.
                 </div>
               )}
 
-              {selectedOrder.loanDetails && (
-                <div className="bg-slate-50 rounded-xl p-4">
-                  <p className="text-xs text-slate-500 uppercase font-semibold mb-2">Loan Details</p>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Loan Partner:</span>
-                      <span className="text-slate-800">{selectedOrder.loanDetails.loanPartner?.name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Loan Amount:</span>
-                      <span className="text-slate-800">{formatCurrency(selectedOrder.loanDetails.loanAmount)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Disbursement Amount:</span>
-                      <span className="text-slate-800">{formatCurrency(selectedOrder.loanDetails.disbursementAmount)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">First EMI Date:</span>
-                      <span className="text-slate-800">{formatDate(selectedOrder.loanDetails.firstEmiDate)}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {selectedOrder.subscriptionDetails && (
-                <div className="bg-slate-50 rounded-xl p-4">
-                  <p className="text-xs text-slate-500 uppercase font-semibold mb-2">Subscription Details</p>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-slate-500">Gateway:</span>
-                      <span className="ml-1 text-slate-800">{selectedOrder.subscriptionDetails.gateway}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Installment Amount:</span>
-                      <span className="ml-1 text-slate-800">{formatCurrency(selectedOrder.subscriptionDetails.installmentAmount)}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">No. of Installments:</span>
-                      <span className="ml-1 text-slate-800">{selectedOrder.subscriptionDetails.numberOfInstallments}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">First Installment:</span>
-                      <span className="ml-1 text-slate-800">{formatDate(selectedOrder.subscriptionDetails.firstInstallmentDate)}</span>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-slate-500">Last Installment:</span>
-                      <span className="ml-1 text-slate-800">{formatDate(selectedOrder.subscriptionDetails.lastInstallmentDate)}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-xl w-full"
+                onClick={() => {
+                  setViewModalOpen(false);
+                  handleOpenFinancials(selectedOrder);
+                }}
+              >
+                <Wallet className="w-4 h-4 mr-2" />
+                Payments &amp; Credits
+              </Button>
             </div>
           </div>
 
@@ -2836,25 +2454,31 @@ const validateLoan = useCallback(() => {
 
       {/* Payment Information */}
       <div className="bg-white border-0 shadow-sm rounded-xl p-5">
-        <h3 className="text-base font-semibold text-slate-800 mb-4">Payment Information</h3>
-        <div>
-          <Label className="text-xs font-semibold text-slate-500 uppercase">Payment Mode *</Label>
-          <Select
-            value={orderForm.paymentMode}
-            onValueChange={(value) => setOrderForm({ ...orderForm, paymentMode: value })}
-          >
-            <SelectTrigger className="mt-1.5 rounded-xl">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Lumpsum">Lumpsum</SelectItem>
-              <SelectItem value="Loan">Loan</SelectItem>
-              <SelectItem value="Subscription">Subscription</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <h3 className="text-base font-semibold text-slate-800">Payment Information</h3>
+        <p className="text-xs text-slate-500 mb-4">
+          Lumpsum + loans + subscriptions + credits must equal the final fee. Removing an entry that has received money is refused.
+        </p>
+        {loadingEditPayments ? (
+          <div className="py-8 text-center text-sm text-slate-500">
+            <Loader2 className="mx-auto mb-2 h-6 w-6 animate-spin text-orange-400" />
+            Loading payment sources…
+          </div>
+        ) : (
+          <PaymentSourcesEditor
+            value={orderForm.payments}
+            onChange={(payments) => {
+              setOrderForm(prev => ({ ...prev, payments }));
+              if (paymentServerErrors.length) setPaymentServerErrors([]);
+            }}
+            finalFee={calculateFinalFee()}
+            loanPartners={loanPartners}
+            loadingLoanPartners={loadingLoanPartners}
+            disabled={updatingOrder}
+            serverErrors={paymentServerErrors}
+          />
+        )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
           <div>
             <Label className="text-xs font-semibold text-slate-500 uppercase">Order Date</Label>
             <Input
@@ -2887,11 +2511,21 @@ const validateLoan = useCallback(() => {
       </div>
     </div>
 
-    <DialogFooter className="pt-4 border-t border-slate-100">
+    <DialogFooter className="pt-4 border-t border-slate-100 gap-2">
+      {!loadingEditPayments && getPaymentErrors().length > 0 && (
+        <p className="mr-auto flex items-center gap-1 text-xs text-amber-700">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          {getPaymentErrors()[0]}
+        </p>
+      )}
       <Button variant="outline" onClick={() => setEditModalOpen(false)} disabled={updatingOrder} className="rounded-xl">
         Cancel
       </Button>
-      <Button onClick={handleUpdateOrder} disabled={updatingOrder} className="bg-orange-600 hover:bg-orange-700 rounded-xl">
+      <Button
+        onClick={handleUpdateOrder}
+        disabled={updatingOrder || loadingEditPayments || getPaymentErrors().length > 0}
+        className="bg-orange-600 hover:bg-orange-700 rounded-xl"
+      >
         {updatingOrder ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -2924,40 +2558,83 @@ const validateLoan = useCallback(() => {
           <div className="text-sm text-slate-700 space-y-1">
             <p><span className="font-medium">Student:</span> {selectedOrder.studentName}</p>
             <p><span className="font-medium">Order ID:</span> <span className="font-mono text-xs">{selectedOrder._id}</span></p>
-            <p><span className="font-medium">Payment Mode:</span> {selectedOrder.paymentMode}</p>
+            <p><span className="font-medium">Payment Mode:</span> {getOrderModes(selectedOrder).join(', ')}</p>
             <p><span className="font-medium">Total Amount:</span> {formatCurrency(selectedOrder.finalFee)}</p>
-            {selectedOrder.paymentMode === 'Lumpsum' && selectedOrder.lumpsumDetails && (
-              <p><span className="font-medium">Pending Amount:</span> {formatCurrency(selectedOrder.lumpsumDetails.pendingAmount)}</p>
-            )}
-            {selectedOrder.paymentMode === 'Subscription' && selectedOrder.subscriptionDetails && (
-              <>
-                <p><span className="font-medium">Installment Amount:</span> {formatCurrency(selectedOrder.subscriptionDetails.installmentAmount)}</p>
-                <p><span className="font-medium">No. of Installments:</span> {selectedOrder.subscriptionDetails.numberOfInstallments}</p>
-              </>
+            {paymentLinkFinancials && (
+              <p><span className="font-medium">Received:</span> {formatCurrency(paymentLinkFinancials.revenue?.total || 0)}</p>
             )}
           </div>
         </div>
 
-        {/* Payment Amount Input */}
-        <div>
-          <Label htmlFor="paymentAmount" className="text-xs font-semibold text-slate-500 uppercase">
-            Payment Amount *
-          </Label>
-          <Input
-            id="paymentAmount"
-            type="number"
-            value={paymentAmount}
-            onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
-            placeholder="Enter amount"
-            max={getMaxAmount()}
-            min={1}
-            step={1}
-            className="mt-1.5 rounded-xl border-slate-200"
-          />
-          <p className="text-xs text-slate-400 mt-1">
-            Max amount: {formatCurrency(getMaxAmount())}
-          </p>
-        </div>
+        {loadingPaymentLinkInfo ? (
+          <div className="py-6 text-center text-sm text-slate-500">
+            <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin text-orange-400" />
+            Loading balance…
+          </div>
+        ) : paymentLinkFinancials && !paymentLinkTarget ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            Nothing to collect by payment link: no lumpsum balance and no unpaid credit on this order.
+          </div>
+        ) : (
+          <>
+            {/* What the link collects */}
+            {paymentLinkFinancials && (
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 uppercase">Collect for *</Label>
+                <Select value={paymentLinkTargetValue} onValueChange={handlePaymentLinkTargetChange}>
+                  <SelectTrigger className="mt-1.5 rounded-xl">
+                    <SelectValue placeholder="Select what this link pays" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getLumpsumOutstanding(paymentLinkFinancials) > 0 && (
+                      <SelectItem value="lumpsum">
+                        Lumpsum balance · {formatCurrency(getLumpsumOutstanding(paymentLinkFinancials))}
+                      </SelectItem>
+                    )}
+                    {paymentLinkFinancials.lumpsumPayments
+                      .filter(e => !['Failed', 'Refunded'].includes(e.status) && getLumpsumOutstanding(paymentLinkFinancials, e._id) > 0)
+                      .map((e, i) => (
+                        <SelectItem key={e._id} value={`lumpsum:${e._id}`}>
+                          Lumpsum #{i + 1} · {formatCurrency(getLumpsumOutstanding(paymentLinkFinancials, e._id))} due
+                        </SelectItem>
+                      ))}
+                    {paymentLinkFinancials.credits
+                      .filter(c => c.status !== 'Paid')
+                      .map(c => (
+                        <SelectItem key={c._id} value={`credit:${c._id}`}>
+                          Credit · {formatCurrency(c.amount)} · due {formatDate(c.dueDate)}{c.status === 'Overdue' ? ' (overdue)' : ''}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Payment Amount Input */}
+            <div>
+              <Label htmlFor="paymentAmount" className="text-xs font-semibold text-slate-500 uppercase">
+                Payment Amount *
+              </Label>
+              <Input
+                id="paymentAmount"
+                type="number"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
+                placeholder="Enter amount"
+                max={getMaxAmount()}
+                min={1}
+                step={1}
+                disabled={paymentLinkTarget?.type === 'credit'}
+                className="mt-1.5 rounded-xl border-slate-200"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                {paymentLinkTarget?.type === 'credit'
+                  ? 'A credit is collected in full; the amount must equal the credit amount.'
+                  : `Max amount: ${formatCurrency(getMaxAmount())}`}
+              </p>
+            </div>
+          </>
+        )}
       </div>
     )}
 
@@ -2976,7 +2653,7 @@ const validateLoan = useCallback(() => {
       </Button>
       <Button
         onClick={handleCreatePaymentLink}
-        disabled={paymentLoading || paymentAmount <= 0 || paymentAmount > getMaxAmount()}
+        disabled={paymentLoading || loadingPaymentLinkInfo || !paymentLinkTarget || paymentAmount <= 0 || paymentAmount > getMaxAmount() + 0.01}
         className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl"
       >
         {paymentLoading ? (
@@ -3113,10 +2790,30 @@ const validateLoan = useCallback(() => {
           <div className="text-sm text-slate-700 space-y-1">
             <p><span className="font-medium">Student:</span> {selectedOrder.studentName}</p>
             <p><span className="font-medium">Order ID:</span> <span className="font-mono text-xs">{selectedOrder._id}</span></p>
-            <p><span className="font-medium">Payment Mode:</span> {selectedOrder.paymentMode}</p>
+            <p><span className="font-medium">Payment Mode:</span> {getOrderModes(selectedOrder).join(', ')}</p>
             <p><span className="font-medium">Total Amount:</span> {formatCurrency(selectedOrder.finalFee)}</p>
           </div>
         </div>
+
+        {/* Subscription plan of the order to link (an order can have several) */}
+        {subscriptionEntries.length > 0 && (
+          <div>
+            <Label className="text-xs font-semibold text-slate-500 uppercase">Subscription plan *</Label>
+            <Select value={subscriptionEntryId} onValueChange={setSubscriptionEntryId}>
+              <SelectTrigger className="mt-1.5 rounded-xl">
+                <SelectValue placeholder="Select plan" />
+              </SelectTrigger>
+              <SelectContent>
+                {subscriptionEntries.map((entry, i) => (
+                  <SelectItem key={entry._id} value={entry._id}>
+                    Plan #{i + 1} · {formatCurrency(entry.installmentAmount)} × {entry.numberOfInstallments}
+                    {entry.cashfreeSubscriptionId ? ' · linked' : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* Plan ID Input */}
         <div>
@@ -3146,9 +2843,21 @@ const validateLoan = useCallback(() => {
       >
         Cancel
       </Button>
+      {selectedLinkedSubscription ? (
+        <Button
+          onClick={() => {
+            setSubscriptionModalOpen(false);
+            if (selectedOrder) openSubscriptionAuthModal(selectedOrder, selectedLinkedSubscription.cashfreeSubscriptionId!);
+          }}
+          className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl"
+        >
+          <ExternalLink className="mr-2 h-4 w-4" />
+          Open Auth Link
+        </Button>
+      ) : (
       <Button
         onClick={handleCreateSubscription}
-        disabled={subscriptionCreating}
+        disabled={subscriptionCreating || (subscriptionEntries.length > 1 && !subscriptionEntryId)}
         className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl"
       >
         {subscriptionCreating ? (
@@ -3160,6 +2869,7 @@ const validateLoan = useCallback(() => {
           'Create Subscription'
         )}
       </Button>
+      )}
     </DialogFooter>
   </DialogContent>
 </Dialog>
@@ -3376,6 +3086,23 @@ const validateLoan = useCallback(() => {
     </DialogFooter>
   </DialogContent>
 </Dialog>
+
+            {/* Payments & Credits (sources, credits, received revenue, audit log) */}
+            <OrderFinancialsDialog
+                open={!!financialsOrder}
+                onOpenChange={(open) => { if (!open) setFinancialsOrder(null); }}
+                orderId={financialsOrder?._id || null}
+                studentName={financialsOrder?.studentName}
+                permissions={permissions}
+                loanPartners={loanPartners}
+                loadingLoanPartners={loadingLoanPartners}
+                onChanged={fetchOrders}
+                onCollectViaLink={(target) => {
+                    const order = financialsOrder;
+                    setFinancialsOrder(null);
+                    if (order) handlePaymentModal(order, target);
+                }}
+            />
         </div>
     );
 }

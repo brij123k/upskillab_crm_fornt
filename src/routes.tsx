@@ -30,6 +30,7 @@ import { MeetingLogsPage } from "./pages/bd/MeetingLogsPage";
 import { OrderManagementPage } from "./pages/bd/OrderManagementPage";
 import { PaymentHistoryPage } from "./pages/bd/PaymentHistoryPage";
 import { LoanManagementPage } from "./pages/bd/LoanManagementPage";
+import { PendingCreditsPage } from "./pages/orders/PendingCreditsPage";
 import { ReportsPage } from '@/pages/reports/ReportsPage';
 import { CashfreeSubscriptionAuthPage } from "./pages/CashfreeSubscriptionAuthPage";
 import { UserLogsPage } from "./pages/admin/UserLogsPage";
@@ -97,6 +98,7 @@ const AppRoutes = () => {
           <Route path="calls" element={<AdminCallLogsPage />} />
           <Route path="meetings" element={<AdminMeetingLogsPage />} />
           <Route path="orders" element={<AdminOrderManagementPage />} />
+          <Route path="pending-credits" element={<PendingCreditsPage panel="admin" />} />
           <Route path="payments" element={<AdminPaymentHistoryPage />} />
           <Route path="subscriptions" element={<PlaceholderPage title="Subscriptions" />} />
           <Route path="finance" element={<PlaceholderPage title="Finance" />} />
@@ -139,6 +141,7 @@ const AppRoutes = () => {
           <Route path="calls" element={<CallLogsPage/>} />
           <Route path="meetings" element={<MeetingLogsPage />} />
           <Route path="orders" element={<OrderManagementPage />} />
+          <Route path="pending-credits" element={<PendingCreditsPage panel="bd" />} />
           <Route path="payments" element={<PaymentHistoryPage />} />
           <Route path="loan-management" element={<LoanManagementPage />} />
           <Route path="subscriptions" element={<PlaceholderPage title="BD Subscriptions" />} />

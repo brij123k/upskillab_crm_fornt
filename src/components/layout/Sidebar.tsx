@@ -52,6 +52,7 @@ const adminNavItems = [
   { icon: PhoneCall, label: 'Call Logs', path: '/admin/calls', module: 'call_logs' },
   { icon: Video, label: 'Meeting Logs', path: '/admin/meetings', module: 'meeting_logs' },
   { icon: ListOrdered, label: 'Orders', path: '/admin/orders', module: 'orders' },
+  { icon: Clock, label: 'Pending Credits', path: '/admin/pending-credits', module: 'pending_credits' },
   { icon: CreditCard, label: 'Payments', path: '/admin/payments', module: 'payments' },
   { icon: DollarSign, label: 'Subscriptions', path: '/admin/subscriptions', module: 'subscriptions' },
   { icon: FileText, label: 'Task Management', path: '/admin/tasks', module: 'tasks' },
@@ -70,6 +71,7 @@ const bdNavItems = [
   { icon: Video, label: 'Meeting Logs', path: '/bd/meetings', module: 'meeting_logs' },
   { icon: FileText, label: 'Task Management', path: '/bd/tasks', module: 'task' },
   { icon: ListOrdered, label: 'Orders', path: '/bd/orders', module: 'orders' },
+  { icon: Clock, label: 'Pending Credits', path: '/bd/pending-credits', module: 'pending_credits' },
   { icon: CreditCard, label: 'Payments', path: '/bd/payments', module: 'payments' },
   { icon: CreditCard, label: 'Loan Management', path: '/bd/loan-management', module: 'loans' },
   { icon: CreditCard, label: 'Subscription', path: '/bd/subscriptions', module: 'subscriptions' },
@@ -162,6 +164,7 @@ export function Sidebar({ panel }: SidebarProps) {
       if (module === 'bd_settings') return true;
       if (module === 'payments') return hasPermission(permissions, 'orders', 'read_payment_history');
       if (module === 'loans') return hasPermission(permissions, 'orders', 'read_loans');
+      if (module === 'pending_credits') return hasPermission(permissions, 'orders', 'read_pending_credits');
       if (module) return hasModulePermission(permissions, module);
       return true;
     }

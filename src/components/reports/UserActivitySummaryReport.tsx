@@ -61,6 +61,7 @@ export function UserActivitySummaryReport({ data }: UserActivitySummaryReportPro
       totalTalkTime: summary.totalTalkTime + (row.totalTalkTime || 0),
       totalOrders: summary.totalOrders + (row.acceptedOrderCount || 0),
       totalRevenue: summary.totalRevenue + (row.acceptedRevenue || 0),
+      totalReceivedRevenue: summary.totalReceivedRevenue + (row.receivedRevenue || 0),
       totalPcatRegistered: summary.totalPcatRegistered + (row.pcatRegistered || 0),
       totalPcatDone: summary.totalPcatDone + (row.pcatDone || 0),
     }),
@@ -72,6 +73,7 @@ export function UserActivitySummaryReport({ data }: UserActivitySummaryReportPro
       totalTalkTime: 0,
       totalOrders: 0,
       totalRevenue: 0,
+      totalReceivedRevenue: 0,
       totalPcatRegistered: 0,
       totalPcatDone: 0,
     }
@@ -120,7 +122,9 @@ export function UserActivitySummaryReport({ data }: UserActivitySummaryReportPro
               <DollarSign className="h-4 w-4 text-slate-500" />
             </div>
             <p className="text-3xl font-semibold">{formatCurrency(totals.totalRevenue)}</p>
-            <p className="text-xs text-muted-foreground">Total orders revenue</p>
+            <p className="text-xs text-muted-foreground">
+              Booked (final fee) · received {formatCurrency(totals.totalReceivedRevenue)}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -157,7 +161,8 @@ export function UserActivitySummaryReport({ data }: UserActivitySummaryReportPro
               <TableHead className="text-xs text-right">Answered</TableHead>
               <TableHead className="text-xs text-right">Talk Time</TableHead>
               <TableHead className="text-xs text-right">Orders</TableHead>
-              <TableHead className="text-xs text-right">Revenue</TableHead>
+              <TableHead className="text-xs text-right">Booked Revenue</TableHead>
+              <TableHead className="text-xs text-right">Received</TableHead>
               <TableHead className="text-xs text-right">PCAT Reg</TableHead>
               <TableHead className="text-xs text-right">PCAT Done</TableHead>
               <TableHead className="text-xs">Sources</TableHead>
@@ -179,6 +184,7 @@ export function UserActivitySummaryReport({ data }: UserActivitySummaryReportPro
                 <TableCell className="text-xs text-right">{formatTalkTime(row.totalTalkTime)}</TableCell>
                 <TableCell className="text-xs text-right">{row.acceptedOrderCount}</TableCell>
                 <TableCell className="text-xs text-right">{formatCurrency(row.acceptedRevenue)}</TableCell>
+                <TableCell className="text-xs text-right text-emerald-700">{formatCurrency(row.receivedRevenue)}</TableCell>
                 <TableCell className="text-xs text-right">{row.pcatRegistered}</TableCell>
                 <TableCell className="text-xs text-right">{row.pcatDone}</TableCell>
                 <TableCell className="text-xs max-w-[200px]">

@@ -1113,7 +1113,7 @@ export function OrderManagementPage() {
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-foreground">Order Management</h1>
+                    <h1 className="text-2xl md:text-3xl font-bold text-foreground">Order Managements</h1>
                     <p className="text-sm md:text-base text-muted-foreground">Manage and track all orders</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
