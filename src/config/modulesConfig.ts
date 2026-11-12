@@ -10,6 +10,20 @@ export interface ModuleConfig {
 }
 
 export const modulesConfig: Record<string, ModuleConfig> = {
+  enrolled_leads: {
+    id: 'enrolled_leads',
+    label: 'Enrolled Leads (Upskillab students)',
+    actions: [
+      { id: 'read', label: 'View Enrolled Leads (assigned to them / their team)' },
+      { id: 'read_all', label: 'View All Enrolled Leads' },
+      { id: 'update', label: 'Log Activity / Change Stage' },
+      { id: 'assign', label: 'Assign Enrolled Leads' },
+      { id: 'sync', label: 'Fetch Students from Upskillab' },
+      { id: 'manage_stages', label: 'Manage Enrolled Lead Stages' },
+      { id: 'call', label: 'Click to Call + Fill Call Details' },
+      { id: 'full_access', label: 'Full Access (everything on the page, for leads assigned to them)' },
+    ]
+  },
   leads: {
     id: 'leads',
     label: 'Lead Management',

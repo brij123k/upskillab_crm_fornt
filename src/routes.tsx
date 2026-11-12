@@ -31,6 +31,7 @@ import { OrderManagementPage } from "./pages/bd/OrderManagementPage";
 import { PaymentHistoryPage } from "./pages/bd/PaymentHistoryPage";
 import { LoanManagementPage } from "./pages/bd/LoanManagementPage";
 import { PendingCreditsPage } from "./pages/orders/PendingCreditsPage";
+import { EnrolledLeadsPage } from "./pages/enrolled/EnrolledLeadsPage";
 import { ReportsPage } from '@/pages/reports/ReportsPage';
 import { CashfreeSubscriptionAuthPage } from "./pages/CashfreeSubscriptionAuthPage";
 import { UserLogsPage } from "./pages/admin/UserLogsPage";
@@ -93,6 +94,7 @@ const AppRoutes = () => {
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="leads" element={<LeadsPage />} />
+          <Route path="enrolled-leads" element={<EnrolledLeadsPage panel="admin" />} />
           <Route path="followup" element ={<FollowUpPage/>}/>
           <Route path="source-campaigns" element={<SourceCampaignsPage />} />
           <Route path="calls" element={<AdminCallLogsPage />} />
@@ -137,6 +139,7 @@ const AppRoutes = () => {
           <Route path="users" element={<BDUsersPage />} />
           <Route path="source-campaigns" element={<SourceCampaignsPage />} />
           <Route path="leads" element={<BDLeadsPage />} />
+          <Route path="enrolled-leads" element={<EnrolledLeadsPage panel="bd" />} />
           <Route path="followup" element ={<FollowUpPage/>}/>
           <Route path="calls" element={<CallLogsPage/>} />
           <Route path="meetings" element={<MeetingLogsPage />} />

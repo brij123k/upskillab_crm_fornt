@@ -1,5 +1,5 @@
-// const url = "http://localhost:3000"
-const url = "https://crm.upskillab.in"
+const url = "http://localhost:3000"
+// const url = "https://crm.upskillab.in"
 const ApiConfig = {
   url,
   login:`${url}/users/login`,
@@ -86,6 +86,24 @@ addNewLevel: `${url}/level`,
   pendingCreditsReport:`${url}/order/report/pending-credits`,
   pendingCreditNotificationRuns:`${url}/order/report/pending-credits/notifications`,
   runPendingCreditNotifications:`${url}/order/report/pending-credits/notifications/run`,
+
+  // enrolled leads (students imported from Upskillab)
+  enrolledLeads:`${url}/enrolled-leads`,
+  enrolledLeadsMeta:`${url}/enrolled-leads/meta`,
+  enrolledLead:(id:string)=>`${url}/enrolled-leads/${id}`,
+  enrolledLeadActivity:(id:string)=>`${url}/enrolled-leads/${id}/activity`,
+  enrolledLeadsAssign:`${url}/enrolled-leads/assign`,
+  enrolledLeadsBulkStage:`${url}/enrolled-leads/stage`,
+  enrolledLeadsSync:`${url}/enrolled-leads/sync`,
+  enrolledLeadsSyncRuns:`${url}/enrolled-leads/sync/runs`,
+  enrolledLeadStages:`${url}/enrolled-leads/stages`,
+  enrolledLeadStage:(id:string)=>`${url}/enrolled-leads/stages/${id}`,
+  enrolledCourses:`${url}/enrolled-leads/courses`,
+  enrolledBatches:`${url}/enrolled-leads/batches`,
+  enrolledLeadCall:(id:string)=>`${url}/enrolled-leads/${id}/call`,
+  enrolledLeadCalls:(id:string)=>`${url}/enrolled-leads/${id}/calls`,
+  enrolledPendingCalls:`${url}/enrolled-leads/calls/pending`,
+  enrolledCallFeedback:(callId:string)=>`${url}/enrolled-leads/calls/${callId}/feedback`,
 
   getLoanPartners:`${url}/loan-partner`,
   createLoanPartners:`${url}/loan-partner`,

@@ -26,6 +26,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  GraduationCap,
 } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import { getUser } from "@/auth";
@@ -34,6 +35,7 @@ import { hasPermission } from '@/utils/permissions';
 import { connectCallSocket, disconnectCallSocket } from '@/config/callSocket';
 import { useToast } from '@/components/ui/use-toast';
 import { CallFeedbackModal } from '../CallFeedbackModal';
+import { EnrolledCallFeedbackModal } from '../enrolled/EnrolledCallFeedbackModal';
 import { ReturnCallModal } from '../ReturnCallModal';
 import { postDataHandlerWithToken } from '@/config/services';
 import { useEffect, useState } from 'react';
@@ -48,6 +50,7 @@ const adminNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/admin', module: 'admin_dashboard' },
   { icon: Users, label: 'Users & Roles', path: '/admin/users', module: 'users' },
   { icon: FileText, label: 'Leads & Data', path: '/admin/leads', module: 'leads' },
+  { icon: GraduationCap, label: 'Enrolled Leads', path: '/admin/enrolled-leads', module: 'enrolled_leads' },
   { icon: Target, label: 'Source Campaigns', path: '/admin/source-campaigns', module: 'source_campaigns' },
   { icon: PhoneCall, label: 'Call Logs', path: '/admin/calls', module: 'call_logs' },
   { icon: Video, label: 'Meeting Logs', path: '/admin/meetings', module: 'meeting_logs' },
@@ -66,6 +69,7 @@ const bdNavItems = [
   { icon: User, label: 'Users', path: '/bd/users', module: 'user' },
   { icon: Target, label: 'Source Campaigns', path: '/bd/source-campaigns', module: 'source_campaigns' },
   { icon: Target, label: 'Leads', path: '/bd/leads', module: 'leads' },
+  { icon: GraduationCap, label: 'Enrolled Leads', path: '/bd/enrolled-leads', module: 'enrolled_leads' },
   { icon: CheckSquare, label: 'Tasks', path: '/bd/tasks', module: 'tasks' },
   { icon: PhoneCall, label: 'Call Logs', path: '/bd/calls', module: 'call_logs' },
   { icon: Video, label: 'Meeting Logs', path: '/bd/meetings', module: 'meeting_logs' },
@@ -87,6 +91,8 @@ export function Sidebar({ panel }: SidebarProps) {
   const { toast } = useToast();
   const { isExpanded, toggleSidebar } = useSidebar();
   const [isCallFeedbackModalOpen, setIsCallFeedbackModalOpen] = useState(false);
+  // Calls with enrolled students (Upskillab) use their own details form.
+  const [enrolledCallData, setEnrolledCallData] = useState<any>(null);
   const [currentCallData, setCurrentCallData] = useState<any>(null);
   const [isCallBackModalOpen, setIsCallBackModalOpen] = useState(false);
   const [currentCallBack, setCurrentCallBack] = useState<any>(null);
@@ -100,6 +106,10 @@ export function Sidebar({ panel }: SidebarProps) {
     setCurrentCallBack(null);
     setIsCallBackModalOpen(false);
     setCurrentCallData(data);
+    if (data?.type === 'enrolled' || data?.enrolledLeadId) {
+      setEnrolledCallData(data);
+      return;
+    }
     setIsCallFeedbackModalOpen(true);
   };
   const handleReturnCall = (data: any) => {
@@ -280,6 +290,12 @@ export function Sidebar({ panel }: SidebarProps) {
           display: none;
         }
       `}</style>
+
+      <EnrolledCallFeedbackModal
+        open={!!enrolledCallData}
+        onOpenChange={(open) => !open && setEnrolledCallData(null)}
+        callData={enrolledCallData}
+      />
 
       <CallFeedbackModal
         open={isCallFeedbackModalOpen}
