@@ -1,5 +1,5 @@
 // SourceCampaignRevenueReport.tsx - Updated with Lead Created & Order Created Date Filters
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Fragment, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,6 +60,7 @@ import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { KpiCard, KpiGrid, ChartCard, RankedBars, DonutWithLegend } from './ReportUI';
+import { defaultLevelForUser, fetchLevelsForUser, useReportColumns, RT, ReportTableHeader } from './ReportTable';
 
 /* -------------------------------------------------------------------------- */
 /*                               Constants & Helpers                          */
@@ -241,7 +242,7 @@ export function SourceCampaignRevenueReport() {
 
   // Level filter
   const [levels, setLevels] = useState<any[]>([]);
-  const [selectedLevel, setSelectedLevel] = useState('1');
+  const [selectedLevel, setSelectedLevel] = useState(() => defaultLevelForUser('1'));
 
   // Team filter (checkbox)
   const [showTeamOnly, setShowTeamOnly] = useState<boolean>(false);
@@ -269,7 +270,7 @@ export function SourceCampaignRevenueReport() {
   useEffect(() => {
     const fetchLevels = async () => {
       try {
-        const res = await getDataHandlerWithToken('getAllLevels', null, null);
+        const res = await fetchLevelsForUser();
         if (res) {
           setLevels(res);
           if (res.length) setSelectedLevel(extractLevelNumber(res[0].name).toString());
@@ -378,6 +379,13 @@ export function SourceCampaignRevenueReport() {
   // ─── Derived data from the report ───
   const rows = useMemo(() => report?.data || [], [report]);
   const campaigns = useMemo(() => report?.campaigns || [], [report]);
+  // Customisable columns: one per campaign + Total (Source stays first)
+  const columnsUi = useReportColumns('source-campaign-revenue', [
+    { key: 'source', label: 'Source', locked: true },
+    ...campaigns.map((c: string) => ({ key: `camp:${c}`, label: c })),
+    { key: '__total', label: 'Total' },
+  ]);
+  const dataColumns = columnsUi.visibleColumns.filter(c => !c.locked);
   const stats = report?.stats || { totalLead: 0, totalRevenue: 0, totalOrders: 0 };
   const startDate = report?.startDate || '';
   const endDate = report?.endDate || '';
@@ -878,43 +886,33 @@ export function SourceCampaignRevenueReport() {
           </div>
 
           {/* Main Table */}
-          <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
+          <ReportTableHeader title="Source × Campaign" chooser={columnsUi.chooser} />
+          <div className={RT.wrap}>
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50/80 border-b border-slate-200">
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase sticky left-0 bg-slate-50/80 z-10 min-w-[150px] px-5 py-3.5">
-                    <div className="flex items-center gap-2">
-                      <Layers className="w-3.5 h-3.5" />
-                      Source
-                    </div>
-                  </TableHead>
-                  {campaigns.map((campaign: string) => (
-                    <TableHead key={campaign} className="text-xs font-semibold text-slate-500 uppercase text-center min-w-[140px] px-4 py-3.5">
+                <TableRow className={RT.headRow}>
+                  <TableHead className={cn(RT.thLeft, RT.thSticky, 'min-w-[200px]')}>Source</TableHead>
+                  {dataColumns.map((c) => (
+                    <TableHead key={c.key} className={cn(RT.th, 'min-w-[140px]')}>
                       <div className="flex flex-col items-center">
-                        <span className="text-slate-700 text-xs">{campaign}</span>
-                        <span className="text-[10px] font-normal text-slate-400">Leads / Revenue</span>
+                        <span className={c.key === '__total' ? 'text-orange-700' : 'text-slate-600'}>{c.label}</span>
+                        <span className="text-[10px] font-normal normal-case tracking-normal text-slate-400">Leads / Revenue</span>
                       </div>
                     </TableHead>
                   ))}
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center min-w-[140px] px-4 py-3.5 bg-orange-50/50 border-l border-slate-200">
-                    <div className="flex flex-col items-center">
-                      <span className="text-orange-700">Total</span>
-                      <span className="text-[10px] font-normal text-slate-400">Leads / Revenue</span>
-                    </div>
-                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={campaigns.length + 2} className="text-center py-8 text-slate-500">
+                    <TableCell colSpan={dataColumns.length + 1} className="text-center py-8 text-slate-500">
                       No data found for selected filter
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredRows.map((item: any, idx: number) => (
-                    <TableRow key={item.source || idx} className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors group">
-                      <TableCell className="text-sm font-medium text-slate-800 sticky left-0 bg-white border-r border-slate-100 z-10 px-5 py-3.5">
+                    <TableRow key={item.source || idx} className={cn(RT.row, 'group')}>
+                      <TableCell className={cn(RT.tdLeft, RT.tdSticky, 'font-medium text-slate-800')}>
                         <div className="flex items-center gap-2">
                           <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-orange-50 text-[11px] font-bold text-orange-600 ring-1 ring-inset ring-orange-100">
                             {String(item.source || '?').slice(0, 2).toUpperCase()}
@@ -930,7 +928,29 @@ export function SourceCampaignRevenueReport() {
                           )}
                         </div>
                       </TableCell>
-                      {campaigns.map(campaign => {
+                      {dataColumns.map(c => {
+                        if (c.key === '__total') {
+                          return (
+                            <Fragment key="__total">
+<TableCell 
+                        className="text-sm text-center px-4 py-3.5 bg-orange-50/30 border-l border-slate-200"
+                      >
+                        <button
+                          onClick={() => handleCellClick(item.source, 'total', 'total')}
+                          className="mx-auto inline-flex min-w-[6rem] flex-col items-center gap-1 rounded-lg bg-slate-100 text-slate-900 ring-1 ring-inset ring-slate-200 px-3 py-1.5 transition-all hover:bg-slate-200"
+                        >
+                          <div className="text-[13px] font-bold leading-none text-slate-900 tabular-nums">
+                            {item.totalLead?.toLocaleString() || 0}
+                          </div>
+                          <div className="text-[11.5px] font-semibold leading-none text-emerald-700 tabular-nums">
+                            {formatCurrency(item.totalRevenue || 0)}
+                          </div>
+                        </button>
+                      </TableCell>
+                            </Fragment>
+                          );
+                        }
+                        const campaign = c.label;
                         const lead = item[`${campaign}_lead`] || 0;
                         const rev = item[`${campaign}_revenue`] || 0;
                         const hasData = lead > 0 || rev > 0;
@@ -951,13 +971,13 @@ export function SourceCampaignRevenueReport() {
                             >
                               <div className={cn(
                                 "text-[13px] font-bold leading-none tabular-nums",
-                                lead > 0 ? "text-slate-900" : "text-slate-300 font-normal"
+                                lead > 0 ? "text-slate-900" : "text-slate-400 font-normal"
                               )}>
                                 {lead.toLocaleString()}
                               </div>
                               <div className={cn(
                                 "text-[11.5px] font-semibold leading-none tabular-nums",
-                                rev > 0 ? "text-emerald-600" : "text-slate-300 font-normal"
+                                rev > 0 ? "text-emerald-600" : "text-slate-400 font-normal"
                               )}>
                                 {formatCurrency(rev)}
                               </div>
@@ -965,32 +985,38 @@ export function SourceCampaignRevenueReport() {
                           </TableCell>
                         );
                       })}
-                      <TableCell 
-                        className="text-sm text-center px-4 py-3.5 bg-orange-50/30 border-l border-slate-200"
-                      >
-                        <button
-                          onClick={() => handleCellClick(item.source, 'total', 'total')}
-                          className="mx-auto inline-flex min-w-[6rem] flex-col items-center gap-1 rounded-xl bg-slate-900 px-3 py-1.5 transition-all hover:bg-slate-800"
-                        >
-                          <div className="text-[13px] font-bold leading-none text-white tabular-nums">
-                            {item.totalLead?.toLocaleString() || 0}
-                          </div>
-                          <div className="text-[11.5px] font-semibold leading-none text-orange-300 tabular-nums">
-                            {formatCurrency(item.totalRevenue || 0)}
-                          </div>
-                        </button>
-                      </TableCell>
+                      
                     </TableRow>
                   ))
                 )}
 
                 {/* Totals Row */}
                 {filteredRows.length > 0 && (
-                  <TableRow className="bg-slate-50/80 border-t-2 border-slate-200">
-                    <TableCell className="text-xs font-semibold text-slate-800 sticky left-0 bg-slate-50/80 z-10 px-5 py-3.5">
+                  <TableRow className={RT.totalRow}>
+                    <TableCell className={cn(RT.tdLeft, 'sticky left-0 z-10 bg-slate-100 font-semibold text-slate-800')}>
                       Total
                     </TableCell>
-                    {campaigns.map(campaign => {
+                    {dataColumns.map(c => {
+                      if (c.key === '__total') {
+                        return (
+                          <Fragment key="__total">
+<TableCell className="text-sm text-center px-4 py-3.5 font-bold bg-orange-50/50 border-l border-slate-200">
+                      <button
+                        onClick={() => handleCellClick('All Sources', 'total', 'total')}
+                        className="flex flex-col items-center w-full hover:opacity-70 transition-opacity"
+                      >
+                        <div className="text-slate-800">
+                          {filteredTotals.totalLead.toLocaleString()}
+                        </div>
+                        <div className="text-xs text-orange-700">
+                          {formatCurrency(filteredTotals.totalRevenue)}
+                        </div>
+                      </button>
+                    </TableCell>
+                          </Fragment>
+                        );
+                      }
+                      const campaign = c.label;
                       const lead = columnTotals[campaign]?.lead || 0;
                       const rev = columnTotals[campaign]?.revenue || 0;
                       const orders = columnTotals[campaign]?.orders || [];
@@ -1015,19 +1041,7 @@ export function SourceCampaignRevenueReport() {
                         </TableCell>
                       );
                     })}
-                    <TableCell className="text-sm text-center px-4 py-3.5 font-bold bg-orange-50/50 border-l border-slate-200">
-                      <button
-                        onClick={() => handleCellClick('All Sources', 'total', 'total')}
-                        className="flex flex-col items-center w-full hover:opacity-70 transition-opacity"
-                      >
-                        <div className="text-slate-800">
-                          {filteredTotals.totalLead.toLocaleString()}
-                        </div>
-                        <div className="text-xs text-orange-700">
-                          {formatCurrency(filteredTotals.totalRevenue)}
-                        </div>
-                      </button>
-                    </TableCell>
+                    
                   </TableRow>
                 )}
               </TableBody>

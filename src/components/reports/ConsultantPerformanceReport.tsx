@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { Fragment, useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +51,7 @@ import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { KpiCard, KpiGrid, ChartCard, RankedBars, Avatar } from './ReportUI';
+import { defaultLevelForUser, fetchLevelsForUser, useReportColumns, useReportScope, RT, ReportTableHeader, type ReportColumn } from './ReportTable';
 
 /* -------------------------------------------------------------------------- */
 /*                                Types                                       */
@@ -170,6 +171,45 @@ const dateFilterOptions = [
 /*                          Sub-component: Team Member Table                   */
 /* -------------------------------------------------------------------------- */
 
+
+/* ── Column config (customisable via the Columns menu) ─────────────────── */
+const PERF_COLUMNS: ReportColumn[] = [
+  { key: 'employee', label: 'Employee', locked: true },
+  { key: 'leads', label: 'Leads Assigned' },
+  { key: 'admissions', label: 'Admissions' },
+  { key: 'revenue', label: 'Realised Revenue' },
+];
+
+function perfCell(
+  key: string,
+  c: ConsultantPerformance,
+  onMetricClick: (consultant: ConsultantPerformance, type: string) => void,
+) {
+  const pill = (value: number, label: React.ReactNode, type: string, tone: string) => (
+    <button
+      onClick={() => onMetricClick(c, type)}
+      disabled={!value}
+      className={cn(
+        "text-[13px] tabular-nums transition-all px-3 py-1 rounded-full min-w-[2.75rem]",
+        value > 0 ? `${tone} ring-1 ring-inset cursor-pointer font-semibold hover:-translate-y-px` : "text-slate-300 cursor-default",
+      )}
+      title={value > 0 ? 'Click to view details' : undefined}
+    >
+      {label}
+    </button>
+  );
+  switch (key) {
+    case 'leads':
+      return pill(c.totalLeadAssigned || 0, c.totalLeadAssigned || 0, 'assigned-leads', 'bg-blue-50 text-blue-700 ring-blue-200 hover:bg-blue-100');
+    case 'admissions':
+      return pill(c.admDone || 0, c.admDone || 0, 'admission-leads', 'bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100');
+    case 'revenue':
+      return pill(c.realisedRevenue || 0, formatCurrency(c.realisedRevenue || 0), 'orders', 'bg-orange-50 text-orange-700 ring-orange-200 hover:bg-orange-100');
+    default:
+      return null;
+  }
+}
+
 interface TeamMemberTableProps {
   teamMembers: ConsultantPerformance[];
   level: number;
@@ -177,6 +217,7 @@ interface TeamMemberTableProps {
   loadingHierarchy: Set<string>;
   toggleExpand: (consultantId: string, hasTeam: boolean) => void;
   onMetricClick: (consultant: ConsultantPerformance, type: string) => void;
+  columns: ReportColumn[];
 }
 
 function TeamMemberTable({
@@ -186,6 +227,7 @@ function TeamMemberTable({
   loadingHierarchy,
   toggleExpand,
   onMetricClick,
+  columns,
 }: TeamMemberTableProps) {
   return (
     <div className="mt-2 mb-1">
@@ -196,121 +238,61 @@ function TeamMemberTable({
       <div className="overflow-x-auto border border-slate-200 rounded-lg">
         <Table>
           <TableHeader>
-            <TableRow className="bg-orange-50/50 hover:bg-orange-50/50 border-b border-slate-200">
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase sticky left-0 bg-orange-50/50 z-10 min-w-[180px] py-2">
-                Employee
-              </TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[100px] py-2">
-                Leads Assigned
-              </TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[100px] py-2">
-                Admissions
-              </TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[120px] py-2 bg-orange-50/50">
-                Realised Revenue
-              </TableHead>
+            <TableRow className={RT.headRow}>
+              {columns.map((col) => (
+                <TableHead key={col.key} className={col.key === 'employee' ? cn(RT.thLeft, RT.thSticky, 'min-w-[220px]') : RT.th}>{col.label}</TableHead>
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
             {teamMembers.map((member) => {
-              const hasTeam = member.teamSize && member.teamSize > 1;
-              const isExpanded = expandedEmployees.has(member._id || member.consultantId || '');
-              const isLoading = loadingHierarchy.has(member._id || member.consultantId || '');
+              const hasTeam = !!(member.teamSize && member.teamSize > 1);
               const consultantId = member._id || member.consultantId || '';
+              const isExpanded = expandedEmployees.has(consultantId);
+              const isLoading = loadingHierarchy.has(consultantId);
 
               return (
-                <>
-                  <TableRow
-                    key={consultantId}
-                    className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
-                  >
-                    <TableCell className="sticky left-0 bg-white border-r z-10 py-2">
-                      <div className="flex flex-col min-w-[150px]">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <Avatar name={member.consultantName} className="w-7 h-7 text-[10px]" />
-                          <span className="text-xs font-semibold text-slate-900 truncate max-w-[120px]">
-                            {member.consultantName}
-                          </span>
-                          {hasTeam? (
-                            <button
-                              onClick={() => toggleExpand(consultantId, true)}
-                              disabled={isLoading}
-                              className={cn(
-                                "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
-                                "hover:bg-orange-100 text-orange-500 border border-orange-200",
-                                isExpanded && "bg-orange-100 border-orange-300",
-                                isLoading && "opacity-50 cursor-not-allowed"
-                              )}
-                            >
-                              {isLoading ? (
-                                <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                              ) : isExpanded ? (
-                                <Minus className="w-2.5 h-2.5" />
-                              ) : (
-                                <Plus className="w-2.5 h-2.5" />
-                              )}
-                            </button>
-                          ):(<></>)}
-                          {member.teamSize && member.teamSize > 1? (
-                            <span className="text-[7px] bg-orange-100 text-orange-700 px-1 py-0.5 rounded-full whitespace-nowrap">
-                              Team: {member.teamSize}
-                            </span>
-                          ):(<></>)}
-                        </div>
-                        {member.consultantEmail && (
-                          <span className="text-[8px] text-slate-400 truncate max-w-[130px]">
-                            {member.consultantEmail}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center py-2">
-                      <button
-                        onClick={() => onMetricClick(member, 'assigned-leads')}
-                        disabled={!member.totalLeadAssigned}
-                        className={cn(
-                          "text-[13px] font-medium tabular-nums transition-all hover:scale-105 px-3 py-1 rounded-full min-w-[2.75rem]",
-                          member.totalLeadAssigned > 0
-                            ? "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 hover:bg-blue-100 cursor-pointer font-semibold"
-                            : "text-slate-400 cursor-not-allowed"
-                        )}
-                      >
-                        {member.totalLeadAssigned || 0}
-                      </button>
-                    </TableCell>
-                    <TableCell className="text-center py-2">
-                      <button
-                        onClick={() => onMetricClick(member, 'admission-leads')}
-                        disabled={!member.admDone}
-                        className={cn(
-                          "text-[13px] font-medium tabular-nums transition-all hover:scale-105 px-3 py-1 rounded-full min-w-[2.75rem]",
-                          member.admDone > 0
-                            ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-100 cursor-pointer font-semibold"
-                            : "text-slate-400 cursor-not-allowed"
-                        )}
-                      >
-                        {member.admDone || 0}
-                      </button>
-                    </TableCell>
-                    <TableCell className="text-center py-2 bg-orange-50/30">
-                      <button
-                        onClick={() => onMetricClick(member, 'orders')}
-                        disabled={!member.realisedRevenue}
-                        className={cn(
-                          "text-[13px] font-medium tabular-nums transition-all hover:scale-105 px-3 py-1 rounded-full min-w-[2.75rem]",
-                          member.realisedRevenue > 0
-                            ? "bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200 hover:bg-orange-100 cursor-pointer font-bold"
-                            : "text-slate-400 cursor-not-allowed"
-                        )}
-                      >
-                        {formatCurrency(member.realisedRevenue || 0)}
-                      </button>
-                    </TableCell>
+                <Fragment key={consultantId}>
+                  <TableRow className={RT.row}>
+                    {columns.map((col) =>
+                      col.key === 'employee' ? (
+                        <TableCell key={col.key} className={cn(RT.tdLeft, RT.tdSticky)}>
+                          <div className="flex items-center gap-2.5 min-w-[200px]">
+                            <Avatar name={member.consultantName} />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-semibold text-slate-900 truncate max-w-[160px]">{member.consultantName}</span>
+                                {hasTeam && (
+                                  <button
+                                    onClick={() => toggleExpand(consultantId, true)}
+                                    disabled={isLoading}
+                                    title={isExpanded ? 'Hide team' : 'Show team'}
+                                    className={cn(
+                                      "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
+                                      "hover:bg-orange-100 text-orange-500 border border-orange-200",
+                                      isExpanded && "bg-orange-100 border-orange-300",
+                                      isLoading && "opacity-50 cursor-not-allowed"
+                                    )}
+                                  >
+                                    {isLoading ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : isExpanded ? <Minus className="w-2.5 h-2.5" /> : <Plus className="w-2.5 h-2.5" />}
+                                  </button>
+                                )}
+                                {hasTeam && (
+                                  <span className="text-[10px] bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">Team {member.teamSize}</span>
+                                )}
+                              </div>
+                              {member.consultantEmail && <div className="text-[12px] text-slate-500 truncate max-w-[180px]">{member.consultantEmail}</div>}
+                            </div>
+                          </div>
+                        </TableCell>
+                      ) : (
+                        <TableCell key={col.key} className={RT.td}>{perfCell(col.key, member, onMetricClick)}</TableCell>
+                      ),
+                    )}
                   </TableRow>
-                  {/* Nested team members */}
                   {isExpanded && member.children && member.children.length > 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="p-0">
+                      <TableCell colSpan={columns.length} className="p-0">
                         <div className="ml-6 pl-4 border-l-2 border-orange-200">
                           <TeamMemberTable
                             teamMembers={member.children}
@@ -319,12 +301,13 @@ function TeamMemberTable({
                             loadingHierarchy={loadingHierarchy}
                             toggleExpand={toggleExpand}
                             onMetricClick={onMetricClick}
+                            columns={columns}
                           />
                         </div>
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </TableBody>
@@ -338,6 +321,8 @@ function TeamMemberTable({
 /*                             Main Report Component                          */
 /* -------------------------------------------------------------------------- */
 export function ConsultantPerformanceReport() {
+  const columnsUi = useReportColumns('consultant-performance', PERF_COLUMNS);
+  const { filterRows } = useReportScope();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ConsultantPerformance[] | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -345,7 +330,7 @@ export function ConsultantPerformanceReport() {
 
   // Level filter
   const [levels, setLevels] = useState<any[]>([]);
-  const [selectedLevel, setSelectedLevel] = useState('1');
+  const [selectedLevel, setSelectedLevel] = useState(() => defaultLevelForUser('1'));
 
   // Team filter (checkbox)
   const [showTeamOnly, setShowTeamOnly] = useState<boolean>(false);
@@ -395,7 +380,7 @@ export function ConsultantPerformanceReport() {
   useEffect(() => {
     const fetchLevels = async () => {
       try {
-        const res = await getDataHandlerWithToken('getAllLevels', null, null);
+        const res = await fetchLevelsForUser();
         if (res) {
           setLevels(res);
           if (res.length) setSelectedLevel(extractLevelNumber(res[0].name).toString());
@@ -847,14 +832,14 @@ export function ConsultantPerformanceReport() {
   }, []);
 
   // ─── Client‑side search ───
-  const flattenedData = flattenHierarchy(hierarchicalData);
+  const flattenedData = flattenHierarchy(filterRows(hierarchicalData, (c: any) => c._id || c.consultantId));
   
   const filteredConsultants = flattenedData.filter(c =>
     searchTerm ? c.consultantName?.toLowerCase().includes(searchTerm.toLowerCase()) : true
   );
 
   // For pagination, use top-level only
-  const topLevelConsultants = hierarchicalData;
+  const topLevelConsultants = filterRows(hierarchicalData, (c: any) => c._id || c.consultantId); // BD: self + own team
   const filteredTopLevel = topLevelConsultants.filter(c =>
     searchTerm ? c.consultantName?.toLowerCase().includes(searchTerm.toLowerCase()) : true
   );
@@ -1379,56 +1364,39 @@ export function ConsultantPerformanceReport() {
           })()}
 
           {/* Table View */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+          <ReportTableHeader title="Employee Performance" subtitle={`${filteredTopLevel.length} employees`} chooser={columnsUi.chooser} />
+          <div className={RT.wrap}>
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50/80 border-b border-slate-200">
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50/80 z-10 min-w-[200px] py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <Award className="w-3.5 h-3.5" />
-                        Employee
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[130px] py-3 px-4">
-                      Leads Assigned
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[130px] py-3 px-4">
-                      Admissions
-                    </TableHead>
-                   
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[150px] py-3 px-4 bg-orange-50/50">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <TrendingUp className="w-3.5 h-3.5 text-orange-500" />
-                        <span className="text-orange-700">Realised Revenue</span>
-                      </div>
-                    </TableHead>
+                  <TableRow className={RT.headRow}>
+                    {columnsUi.visibleColumns.map((col) => (
+                      <TableHead key={col.key} className={col.key === 'employee' ? cn(RT.thLeft, RT.thSticky, 'min-w-[240px]') : RT.th}>{col.label}</TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredTopLevel.map((consultant, idx) => {
                     const consultantId = consultant._id || consultant.consultantId || '';
                     const isExpanded = expandedEmployees.has(consultantId);
-                    const hasTeam = consultant.teamSize && consultant.teamSize > 1;
+                    const hasTeam = !!(consultant.teamSize && consultant.teamSize > 1 && showTeamOnly);
                     const isLoading = loadingHierarchy.has(consultantId);
 
                     return (
-                      <>
-                        <TableRow
-                          key={consultantId || idx}
-                          className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
-                        >
-                          <TableCell className="text-sm sticky left-0 bg-white border-r border-slate-100 z-10 py-3 px-4">
-                            <div className="flex flex-col">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <Avatar name={consultant.consultantName} />
-                                <span className="font-semibold text-slate-900">
-                                  {consultant.consultantName}
-                                </span>
-                                {hasTeam && showTeamOnly ? (
+                      <Fragment key={consultantId || idx}>
+                        <TableRow className={RT.row}>
+                          {columnsUi.visibleColumns.map((col) =>
+                            col.key === 'employee' ? (
+                              <TableCell key={col.key} className={cn(RT.tdLeft, RT.tdSticky)}>
+                                <div className="flex items-center gap-2.5 min-w-[200px]">
+                            <Avatar name={consultant.consultantName} />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-semibold text-slate-900 truncate max-w-[160px]">{consultant.consultantName}</span>
+                                {hasTeam && (
                                   <button
                                     onClick={() => toggleExpand(consultantId, true)}
                                     disabled={isLoading}
+                                    title={isExpanded ? 'Hide team' : 'Show team'}
                                     className={cn(
                                       "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
                                       "hover:bg-orange-100 text-orange-500 border border-orange-200",
@@ -1436,75 +1404,26 @@ export function ConsultantPerformanceReport() {
                                       isLoading && "opacity-50 cursor-not-allowed"
                                     )}
                                   >
-                                    {isLoading ? (
-                                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                                    ) : isExpanded ? (
-                                      <Minus className="w-2.5 h-2.5" />
-                                    ) : (
-                                      <Plus className="w-2.5 h-2.5" />
-                                    )}
+                                    {isLoading ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : isExpanded ? <Minus className="w-2.5 h-2.5" /> : <Plus className="w-2.5 h-2.5" />}
                                   </button>
-                                ):(<></>)}
-                                {consultant.teamSize && consultant.teamSize > 1 && showTeamOnly ? (
-                                  <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                                    Team: {consultant.teamSize}
-                                  </span>
-                                ):(<></>)}
+                                )}
+                                {hasTeam && (
+                                  <span className="text-[10px] bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">Team {consultant.teamSize}</span>
+                                )}
                               </div>
-                              {consultant.consultantEmail && (
-                                <span className="text-xs text-slate-400">{consultant.consultantEmail}</span>
-                              )}
+                              {consultant.consultantEmail && <div className="text-[12px] text-slate-500 truncate max-w-[180px]">{consultant.consultantEmail}</div>}
                             </div>
-                          </TableCell>
-                          <TableCell className="text-center py-3 px-4">
-                            <button
-                              onClick={() => handleMetricClick(consultant, 'assigned-leads')}
-                              disabled={!consultant.totalLeadAssigned}
-                              className={cn(
-                                "text-[13px] font-medium tabular-nums transition-all hover:scale-105 px-3 py-1 rounded-full min-w-[2.75rem]",
-                                consultant.totalLeadAssigned > 0
-                                  ? "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 hover:bg-blue-100 cursor-pointer font-semibold"
-                                  : "text-slate-400 cursor-not-allowed"
-                              )}
-                            >
-                              {consultant.totalLeadAssigned || 0}
-                            </button>
-                          </TableCell>
-                          <TableCell className="text-center py-3 px-4">
-                            <button
-                              onClick={() => handleMetricClick(consultant, 'admission-leads')}
-                              disabled={!consultant.admDone}
-                              className={cn(
-                                "text-[13px] font-medium tabular-nums transition-all hover:scale-105 px-3 py-1 rounded-full min-w-[2.75rem]",
-                                consultant.admDone > 0
-                                  ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-100 cursor-pointer font-semibold"
-                                  : "text-slate-400 cursor-not-allowed"
-                              )}
-                            >
-                              {consultant.admDone || 0}
-                            </button>
-                          </TableCell>
-                         
-                          <TableCell className="text-center py-3 px-4 bg-orange-50/30">
-                            <button
-                              onClick={() => handleMetricClick(consultant, 'orders')}
-                              disabled={!consultant.realisedRevenue}
-                              className={cn(
-                                "text-[13px] font-medium tabular-nums transition-all hover:scale-105 px-3 py-1 rounded-full min-w-[2.75rem]",
-                                consultant.realisedRevenue > 0
-                                  ? "bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200 hover:bg-orange-100 cursor-pointer font-bold"
-                                  : "text-slate-400 cursor-not-allowed"
-                              )}
-                            >
-                              {formatCurrency(consultant.realisedRevenue || 0)}
-                            </button>
-                          </TableCell>
+                          </div>
+                              </TableCell>
+                            ) : (
+                              <TableCell key={col.key} className={RT.td}>{perfCell(col.key, consultant, handleMetricClick)}</TableCell>
+                            ),
+                          )}
                         </TableRow>
 
-                        {/* Nested Team Members */}
                         {isExpanded && consultant.children && consultant.children.length > 0 && (
                           <TableRow>
-                            <TableCell colSpan={5} className="p-0 bg-slate-50/30">
+                            <TableCell colSpan={columnsUi.colCount} className="p-0 bg-slate-50/30">
                               <div className="px-4 py-2">
                                 <TeamMemberTable
                                   teamMembers={consultant.children}
@@ -1513,16 +1432,16 @@ export function ConsultantPerformanceReport() {
                                   loadingHierarchy={loadingHierarchy}
                                   toggleExpand={toggleExpand}
                                   onMetricClick={handleMetricClick}
+                                  columns={columnsUi.visibleColumns}
                                 />
                               </div>
                             </TableCell>
                           </TableRow>
                         )}
 
-                        {/* Show message if expanded but no team members */}
                         {isExpanded && (!consultant.children || consultant.children.length === 0) && (
                           <TableRow>
-                            <TableCell colSpan={5} className="p-0">
+                            <TableCell colSpan={columnsUi.colCount} className="p-0">
                               <div className="px-4 py-2">
                                 <div className="text-xs text-slate-400 py-2 px-4 bg-slate-50 rounded-lg border border-slate-200">
                                   No team members found
@@ -1531,20 +1450,19 @@ export function ConsultantPerformanceReport() {
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </Fragment>
                     );
                   })}
 
                   {filteredTopLevel.length === 0 && searchTerm && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-sm text-slate-400">
+                      <TableCell colSpan={columnsUi.colCount} className="text-center py-8 text-sm text-slate-400">
                         No consultants match "{searchTerm}"
                       </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
               </Table>
-            </div>
           </div>
         </div>
       )}

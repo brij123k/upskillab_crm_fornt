@@ -515,6 +515,9 @@ export function BDUsersPage() {
 
         poolIds: data.poolIds || [],
 
+        // Personal details (also filled by employee via onboarding link)
+        ...(data.personalDetails ? { personalDetails: data.personalDetails } : {}),
+
 
         // Profile image
 

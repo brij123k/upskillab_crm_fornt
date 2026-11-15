@@ -39,6 +39,8 @@ import { UserType, RoleType, DepartmentType, PoolType } from '@/types/user';
 import { CreateProfileModal } from './CreateProfileModal';
 import { ViewUserProfileModal } from './ViewUserProfileModal';
 import { EditUserModal } from './EditUserModal';
+import { OnboardingLinkModal, OnboardingReviewModal, OnboardingBadge } from './OnboardingModals';
+import { Link2, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
@@ -93,19 +95,31 @@ export function UsersTab({
   const [togglingBlock, setTogglingBlock] = useState<string | null>(null);
   const [creatingProfile, setCreatingProfile] = useState(false);
 
+  const [onboardingLinkOpen, setOnboardingLinkOpen] = useState(false);
+  const [onboardingReviewOpen, setOnboardingReviewOpen] = useState(false);
+
   const [ivrModalOpen, setIvrModalOpen] = useState(false);
   const [selectedIVRUser, setSelectedIVRUser] = useState<UserType | null>(null);
   const hasMountedRef = useRef(false);
   const navigate = useNavigate();
 
   // Filter users
-  const filteredUsers = users.filter(user => {
-    const searchMatch =
-      user.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-      user.email.toLowerCase().includes(filters.search.toLowerCase()) ||
-      user.number.includes(filters.search);
+  const matchesText = (user: UserType, raw: string) => {
+    const q = raw.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (user.name || '').toLowerCase().includes(q) ||
+      (user.email || '').toLowerCase().includes(q) ||
+      (user.number || '').includes(q) ||
+      String(user.employeeId ?? '').includes(q)
+    );
+  };
 
-    const roleMatch = filters.role === 'all' || user.role._id === filters.role;
+  const filteredUsers = users.filter(user => {
+    // both the filter-panel search and the header "Quick search" apply
+    const searchMatch = matchesText(user, filters.search) && matchesText(user, searchQuery);
+
+    const roleMatch = filters.role === 'all' || user.role?._id === filters.role;
     const statusMatch = filters.status === 'all' || user.status === filters.status;
 
     let poolMatch = true;
@@ -463,6 +477,18 @@ const formatJoinedDate = (dateString: string) => {
                       <span className="text-[11px] font-semibold text-red-600 ml-1">Blocked</span>
                     )}
                   </div>
+                  {user.onboarding?.status && user.onboarding.status !== 'not_shared' && (
+                    <button
+                      type="button"
+                      className="mt-1 block"
+                      onClick={() => {
+                        setSelectedUser(user);
+                        user.onboarding?.status === 'submitted' ? setOnboardingReviewOpen(true) : setOnboardingLinkOpen(true);
+                      }}
+                    >
+                      <OnboardingBadge onboarding={user.onboarding} />
+                    </button>
+                  )}
                 </td>
                 {/* Last Login column */}
                 <td className="px-3 py-2">
@@ -488,6 +514,16 @@ const formatJoinedDate = (dateString: string) => {
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleEditClick(user)} className="text-sm">
                         <Edit className="mr-2 h-3.5 w-3.5" /> Edit User
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setSelectedUser(user); setOnboardingLinkOpen(true); }} className="text-sm">
+                        <Link2 className="mr-2 h-3.5 w-3.5" /> Onboarding Link
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => { setSelectedUser(user); setOnboardingReviewOpen(true); }}
+                        className={cn("text-sm", user.onboarding?.status === 'submitted' && "text-amber-700 font-medium")}
+                      >
+                        <ClipboardCheck className="mr-2 h-3.5 w-3.5" />
+                        {user.onboarding?.status === 'submitted' ? 'Review Onboarding' : 'Onboarding Details'}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => navigate(`/admin/user-activity/${user._id}`)} className="text-sm">
                         <Activity className="mr-2 h-3.5 w-3.5" /> View Activity
@@ -640,6 +676,20 @@ const formatJoinedDate = (dateString: string) => {
         loadingPools={loadingPools}
         creatingProfile={creatingProfile}
         onSubmit={handleCreateProfile}
+      />
+
+      {/* Onboarding */}
+      <OnboardingLinkModal
+        open={onboardingLinkOpen}
+        onOpenChange={setOnboardingLinkOpen}
+        user={selectedUser}
+        onChanged={() => onRefresh({ status: filters.status })}
+      />
+      <OnboardingReviewModal
+        open={onboardingReviewOpen}
+        onOpenChange={setOnboardingReviewOpen}
+        user={selectedUser}
+        onChanged={() => onRefresh({ status: filters.status })}
       />
 
       {/* Assign IVR Modal */}

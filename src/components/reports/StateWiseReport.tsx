@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { Fragment, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -49,6 +49,7 @@ import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { KpiCard, KpiGrid, ChartCard, RankedBars, DonutWithLegend, MetricPill } from './ReportUI';
+import { useReportColumns, RT, Num, ReportTableHeader, type ReportColumn } from './ReportTable';
 
 /* -------------------------------------------------------------------------- */
 /*                               Type Definitions                              */
@@ -241,7 +242,42 @@ function StateDetailsModal({
 /* -------------------------------------------------------------------------- */
 /*                               Main Component                                */
 /* -------------------------------------------------------------------------- */
+
+/* ── Column config (customisable via the Columns menu) ─────────────────── */
+const CAMPAIGN_COLUMNS: ReportColumn[] = [
+  { key: 'campaign', label: 'Campaign', locked: true },
+  { key: 'totalLeads', label: 'Total Leads' },
+  { key: 'registrations', label: 'Registrations' },
+  { key: 'admissions', label: 'Admissions' },
+  { key: 'revenue', label: 'Revenue' },
+  { key: 'states', label: 'States' },
+];
+const STATE_COLUMNS: ReportColumn[] = [
+  { key: 'state', label: 'State', locked: true },
+  { key: 'totalLeads', label: 'Leads' },
+  { key: 'pcatScheduled', label: 'PCAT S.' },
+  { key: 'pcatDone', label: 'PCAT D.' },
+  { key: 'registrationDone', label: 'Reg. D.' },
+  { key: 'admissionDone', label: 'Adm. D.' },
+  { key: 'revenue', label: 'Revenue' },
+  { key: 'conversionPercentage', label: 'Conv. %' },
+  { key: 'registrationPercentage', label: 'Reg. %' },
+];
+
+function pctPill(value: number, high: string, mid: string) {
+  return (
+    <span className={cn(
+      "px-2.5 py-1 rounded-full font-semibold text-[11.5px] tabular-nums ring-1 ring-inset ring-black/5",
+      value > 50 ? high : value > 25 ? mid : "bg-slate-100 text-slate-600"
+    )}>
+      {value || 0}%
+    </span>
+  );
+}
+
 export function StateWiseReport() {
+  const columnsUi = useReportColumns('state-wise', CAMPAIGN_COLUMNS);
+  const stateColumnsUi = useReportColumns('state-wise:states', STATE_COLUMNS);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -598,32 +634,17 @@ export function StateWiseReport() {
           })()}
 
           {/* Main Table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+          <ReportTableHeader title="Campaign Performance" subtitle="Click a campaign to see its states" chooser={columnsUi.chooser}>
+            {stateColumnsUi.chooser && <span className="text-xs text-slate-400 hidden md:inline">State columns:</span>}
+            {stateColumnsUi.chooser}
+          </ReportTableHeader>
+          <div className={RT.wrap}>
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50/80 border-b border-slate-200">
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50/80 z-10 min-w-[180px] py-3 px-4">
-                      Campaign
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[100px] py-3 px-4">
-                      Total Leads
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[100px] py-3 px-4">
-                      Registrations
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[100px] py-3 px-4">
-                      Admissions
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[130px] py-3 px-4 bg-orange-50/50">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <IndianRupee className="w-3.5 h-3.5 text-orange-500" />
-                        <span className="text-orange-700">Revenue</span>
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[80px] py-3 px-4">
-                      States
-                    </TableHead>
+                  <TableRow className={RT.headRow}>
+                    {columnsUi.visibleColumns.map((c) => (
+                      <TableHead key={c.key} className={c.key === 'campaign' ? cn(RT.thLeft, RT.thSticky, 'min-w-[220px]') : RT.th}>{c.label}</TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -632,142 +653,91 @@ export function StateWiseReport() {
                     const totalStates = campaign.states.length;
 
                     return (
-                      <>
-                        {/* Campaign Row */}
+                      <Fragment key={campaign.campaignName}>
                         <TableRow
-                          key={campaign.campaignName}
-                          className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors cursor-pointer"
+                          className={cn(RT.row, 'cursor-pointer')}
                           onClick={() => toggleCampaign(campaign.campaignName)}
                         >
-                          <TableCell className="text-sm sticky left-0 bg-white border-r border-slate-100 z-10 py-3 px-4">
-                            <div className="flex items-center gap-2">
-                              <button className="p-0.5 hover:bg-slate-100 rounded">
-                                {isExpanded ? (
-                                  <ChevronDownIcon className="w-4 h-4 text-slate-400" />
-                                ) : (
-                                  <ChevronRightIcon className="w-4 h-4 text-slate-400" />
-                                )}
-                              </button>
-                              <span className="font-medium text-slate-800">{campaign.campaignName}</span>
-                              <Badge variant="outline" className="text-[10px] bg-slate-50">
-                                {totalStates} states
-                              </Badge>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-sm text-center py-3 px-4">
-                            <span className="font-medium text-slate-700">{campaign.totalLeads}</span>
-                          </TableCell>
-                          <TableCell className="text-sm text-center py-3 px-4">
-                            <MetricPill value={campaign.totalRegistrationDone} tone="violet" />
-                          </TableCell>
-                          <TableCell className="text-sm text-center py-3 px-4">
-                            <MetricPill value={campaign.totalAdmissionDone} tone="green" />
-                          </TableCell>
-                          <TableCell className="text-sm text-center py-3 px-4 bg-orange-50/30">
-                            <span className="inline-flex justify-center rounded-lg bg-slate-900 px-2.5 py-1 text-[13px] font-bold text-white tabular-nums">₹{campaign.totalRevenue.toLocaleString()}</span>
-                          </TableCell>
-                          <TableCell className="text-sm text-center py-3 px-4">
-                            <span className="text-sm text-slate-500">{totalStates}</span>
-                          </TableCell>
+                          {columnsUi.visibleColumns.map((c) => {
+                            switch (c.key) {
+                              case 'campaign':
+                                return (
+                                  <TableCell key={c.key} className={cn(RT.tdLeft, RT.tdSticky)}>
+                                    <div className="flex items-center gap-2">
+                                      {isExpanded ? <ChevronDownIcon className="w-4 h-4 text-slate-400" /> : <ChevronRightIcon className="w-4 h-4 text-slate-400" />}
+                                      <span className="font-semibold text-slate-900">{campaign.campaignName}</span>
+                                      <Badge variant="outline" className="text-[10px] bg-slate-50">{totalStates} states</Badge>
+                                    </div>
+                                  </TableCell>
+                                );
+                              case 'totalLeads':
+                                return <TableCell key={c.key} className={RT.td}><Num value={campaign.totalLeads} bold /></TableCell>;
+                              case 'registrations':
+                                return <TableCell key={c.key} className={RT.td}><MetricPill value={campaign.totalRegistrationDone} tone="violet" /></TableCell>;
+                              case 'admissions':
+                                return <TableCell key={c.key} className={RT.td}><MetricPill value={campaign.totalAdmissionDone} tone="green" /></TableCell>;
+                              case 'revenue':
+                                return (
+                                  <TableCell key={c.key} className={RT.td}>
+                                    {campaign.totalRevenue > 0
+                                      ? <span className="inline-flex justify-center rounded-md bg-slate-100 text-slate-900 ring-1 ring-inset ring-slate-200 px-2.5 py-1 text-[13px] font-bold tabular-nums">₹{campaign.totalRevenue.toLocaleString('en-IN')}</span>
+                                      : <span className="text-slate-400">₹0</span>}
+                                  </TableCell>
+                                );
+                              default:
+                                return <TableCell key={c.key} className={RT.td}><Num value={totalStates} /></TableCell>;
+                            }
+                          })}
                         </TableRow>
 
-                        {/* States Sub-table (expanded) */}
                         {isExpanded && (
                           <TableRow>
-                            <TableCell colSpan={6} className="p-0 bg-slate-50/30">
+                            <TableCell colSpan={columnsUi.colCount} className="p-0 bg-slate-50/30">
                               <div className="px-4 py-3">
                                 <div className="flex items-center gap-2 mb-3">
                                   <MapPin className="w-4 h-4 text-orange-500" />
-                                  <span className="text-xs font-medium text-slate-600 uppercase tracking-wider">
-                                    States Breakdown
-                                  </span>
-                                  <Badge variant="outline" className="text-[10px]">
-                                    {totalStates} states
-                                  </Badge>
+                                  <span className="text-xs font-medium text-slate-600 uppercase tracking-wider">States Breakdown</span>
+                                  <Badge variant="outline" className="text-[10px]">{totalStates} states</Badge>
                                 </div>
-                                <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                                <div className={RT.wrap}>
                                   <Table>
                                     <TableHeader>
-                                      <TableRow className="bg-orange-50/50 border-b border-slate-200">
-                                        <TableHead className="text-[10px] font-semibold text-slate-500 uppercase min-w-[140px] py-2 px-3">
-                                          State
-                                        </TableHead>
-                                        <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[80px] py-2 px-3">
-                                          Leads
-                                        </TableHead>
-                                        <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[80px] py-2 px-3">
-                                          PCAT S.
-                                        </TableHead>
-                                        <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[80px] py-2 px-3">
-                                          PCAT D.
-                                        </TableHead>
-                                        <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[80px] py-2 px-3">
-                                          Reg. D.
-                                        </TableHead>
-                                        <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[80px] py-2 px-3">
-                                          Adm. D.
-                                        </TableHead>
-                                        <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[110px] py-2 px-3">
-                                          Revenue
-                                        </TableHead>
-                                        <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[80px] py-2 px-3">
-                                          Conv. %
-                                        </TableHead>
-                                        <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[80px] py-2 px-3">
-                                          Reg. %
-                                        </TableHead>
+                                      <TableRow className={RT.headRow}>
+                                        {stateColumnsUi.visibleColumns.map((c) => (
+                                          <TableHead key={c.key} className={c.key === 'state' ? cn(RT.thLeft, 'min-w-[180px]') : RT.th}>{c.label}</TableHead>
+                                        ))}
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                       {campaign.states.map((state) => (
                                         <TableRow
                                           key={state.state}
-                                          className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors cursor-pointer"
+                                          className={cn(RT.row, 'cursor-pointer')}
                                           onClick={() => handleStateClick(campaign.campaignName, state)}
+                                          title="Click for details"
                                         >
-                                          <TableCell className="text-xs font-medium text-slate-800 py-2 px-3">
-                                            <div className="flex items-center gap-2">
-                                              <MapPin className="w-3 h-3 text-slate-400" />
-                                              {state.state}
-                                              <Badge variant="outline" className="text-[8px] px-1 py-0 bg-orange-50 border-orange-200 text-orange-600">
-                                                Click for details
-                                              </Badge>
-                                            </div>
-                                          </TableCell>
-                                          <TableCell className="text-xs text-center py-2 px-3 text-slate-600">
-                                            {state.totalLeads}
-                                          </TableCell>
-                                          <TableCell className="text-xs text-center py-2 px-3 text-slate-600">
-                                            {state.pcatScheduled}
-                                          </TableCell>
-                                          <TableCell className="text-xs text-center py-2 px-3 text-slate-600">
-                                            {state.pcatDone}
-                                          </TableCell>
-                                          <TableCell className="text-xs text-center py-2 px-3 "><MetricPill value={state.registrationDone} tone="violet" /></TableCell>
-                                          <TableCell className="text-xs text-center py-2 px-3 "><MetricPill value={state.admissionDone} tone="green" /></TableCell>
-                                          <TableCell className="text-xs text-center py-2 px-3 font-medium text-orange-600">
-                                            ₹{state.revenue.toLocaleString()}
-                                          </TableCell>
-                                          <TableCell className="text-xs text-center py-2 px-3">
-                                            <span className={cn(
-                                              "px-2.5 py-1 rounded-full font-semibold text-[11.5px] tabular-nums ring-1 ring-inset ring-black/5",
-                                              state.conversionPercentage > 50 ? "bg-emerald-100 text-emerald-700" :
-                                              state.conversionPercentage > 25 ? "bg-amber-100 text-amber-700" :
-                                              "bg-slate-100 text-slate-600"
-                                            )}>
-                                              {state.conversionPercentage || 0}%
-                                            </span>
-                                          </TableCell>
-                                          <TableCell className="text-xs text-center py-2 px-3">
-                                            <span className={cn(
-                                              "px-2.5 py-1 rounded-full font-semibold text-[11.5px] tabular-nums ring-1 ring-inset ring-black/5",
-                                              state.registrationPercentage > 50 ? "bg-purple-100 text-purple-700" :
-                                              state.registrationPercentage > 25 ? "bg-indigo-100 text-indigo-700" :
-                                              "bg-slate-100 text-slate-600"
-                                            )}>
-                                              {state.registrationPercentage || 0}%
-                                            </span>
-                                          </TableCell>
+                                          {stateColumnsUi.visibleColumns.map((c) => {
+                                            switch (c.key) {
+                                              case 'state':
+                                                return (
+                                                  <TableCell key={c.key} className={cn(RT.tdLeft, 'font-medium text-slate-800')}>
+                                                    <span className="inline-flex items-center gap-2"><MapPin className="w-3 h-3 text-slate-400" />{state.state}</span>
+                                                  </TableCell>
+                                                );
+                                              case 'registrationDone':
+                                                return <TableCell key={c.key} className={RT.td}><MetricPill value={state.registrationDone} tone="violet" /></TableCell>;
+                                              case 'admissionDone':
+                                                return <TableCell key={c.key} className={RT.td}><MetricPill value={state.admissionDone} tone="green" /></TableCell>;
+                                              case 'revenue':
+                                                return <TableCell key={c.key} className={RT.td}>{state.revenue > 0 ? <span className="font-semibold text-orange-600">₹{state.revenue.toLocaleString('en-IN')}</span> : <span className="text-slate-400">₹0</span>}</TableCell>;
+                                              case 'conversionPercentage':
+                                                return <TableCell key={c.key} className={RT.td}>{pctPill(state.conversionPercentage, 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700')}</TableCell>;
+                                              case 'registrationPercentage':
+                                                return <TableCell key={c.key} className={RT.td}>{pctPill(state.registrationPercentage, 'bg-purple-100 text-purple-700', 'bg-indigo-100 text-indigo-700')}</TableCell>;
+                                              default:
+                                                return <TableCell key={c.key} className={RT.td}><Num value={(state as any)[c.key]} bold={c.key === 'totalLeads'} /></TableCell>;
+                                            }
+                                          })}
                                         </TableRow>
                                       ))}
                                     </TableBody>
@@ -777,12 +747,11 @@ export function StateWiseReport() {
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </TableBody>
               </Table>
-            </div>
           </div>
 
           {/* Pagination */}

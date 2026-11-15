@@ -536,7 +536,7 @@ export function EnrolledLeadDetailDialog({
                           <SelectContent>
                             <SelectItem value={KEEP_STAGE}>Keep "{lead.stageName}"</SelectItem>
                             {stages.filter((s) => s.name !== lead.stageName).map((s) => (
-                              <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>
+                              <SelectItem key={s._id} value={s._id} title={(s as any).description || s.name}>{s.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>

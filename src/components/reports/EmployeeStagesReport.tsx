@@ -53,6 +53,7 @@ import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { KpiCard, KpiGrid, ChartCard, DonutWithLegend, RankedBars, Avatar, sumStages, HeatChip } from './ReportUI';
+import { defaultLevelForUser, fetchLevelsForUser, useReportColumns, useReportScope, RT, ReportTableHeader, type ReportColumn } from './ReportTable';
 import { Trophy, Layers, BarChart3 } from 'lucide-react';
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -158,7 +159,8 @@ const extractLevelNumber = (levelName: string): number => {
 
 interface TeamMemberTableProps {
   teamMembers: EmployeeData[];
-  stages: string[];
+  /** visible, non-locked columns in display order (stage:<name> | __total) */
+  columns: ReportColumn[];
   level: number;
   expandedEmployees: Set<string>;
   loadingHierarchy: Set<string>;
@@ -169,7 +171,7 @@ interface TeamMemberTableProps {
 
 function TeamMemberTable({
   teamMembers,
-  stages,
+  columns,
   level,
   expandedEmployees,
   loadingHierarchy,
@@ -186,21 +188,13 @@ function TeamMemberTable({
       <div className="overflow-x-auto border border-slate-200 rounded-lg">
         <Table>
           <TableHeader>
-            <TableRow className="bg-orange-50/50 hover:bg-orange-50/50 border-b border-slate-200">
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase sticky left-0 bg-orange-50/50 z-10 min-w-[160px]">
+            <TableRow className={RT.headRow}>
+              <TableHead className={cn(RT.thLeft, RT.thSticky, 'min-w-[200px]')}>
                 Member
               </TableHead>
-              {stages.map(stage => (
-                <TableHead
-                  key={stage}
-                  className="text-[10px] text-center min-w-[60px] py-1.5 font-semibold text-slate-600 whitespace-nowrap"
-                >
-                  {stage}
-                </TableHead>
+              {columns.map(c => (
+                <TableHead key={c.key} className={RT.th}>{c.label}</TableHead>
               ))}
-              <TableHead className="text-[10px] text-center min-w-[50px] py-1.5 font-semibold text-slate-600">
-                Total
-              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -215,14 +209,14 @@ function TeamMemberTable({
                 <>
                   <TableRow
                     key={member.employeeId}
-                    className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
+                    className={RT.row}
                   >
-                    <TableCell className="sticky left-0 bg-white border-r z-10 py-2">
+                    <TableCell className={cn(RT.tdLeft, RT.tdSticky)}>
                       <div className="flex items-center gap-2.5 min-w-[160px]">
                         <Avatar name={member.employeeName} className="w-7 h-7 text-[10px]" />
                         <div className="flex flex-col">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-xs font-medium text-slate-800 truncate max-w-[100px]">
+                            <span className="font-semibold text-slate-900 truncate max-w-[150px]">
                               {member.employeeName}
                             </span>
                             {hasTeam ? (
@@ -246,7 +240,7 @@ function TeamMemberTable({
                               </button>
                             ):(<span></span>)}
                           </div>
-                          <div className="flex items-center gap-2 text-[9px] text-slate-400 flex-wrap">
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400 flex-wrap">
                             <span>ID: {member.employeeEmployeeId || member.employeeId}</span>
                             {member.teamSize && member.teamSize > 1 ? (
                               <span className="text-orange-500 font-medium">
@@ -257,7 +251,15 @@ function TeamMemberTable({
                         </div>
                       </div>
                     </TableCell>
-                    {stages.map(stage => {
+                    {columns.map(c => {
+                      if (c.key === '__total') {
+                        return (
+                          <TableCell key="__total" className={RT.td}>
+                            <span className="inline-flex min-w-[2.75rem] justify-center rounded-md bg-slate-100 text-slate-900 ring-1 ring-inset ring-slate-200 px-2.5 py-1 text-[13px] font-bold tabular-nums">{member.totalLead}</span>
+                          </TableCell>
+                        );
+                      }
+                      const stage = c.label;
                       const count = stageMap.get(stage) || 0;
                       const total = member.totalLead || 1;
                       const pct = ((count / total) * 100).toFixed(1);
@@ -266,7 +268,7 @@ function TeamMemberTable({
                       return (
                         <TableCell
                           key={stage}
-                          className="text-xs text-center py-2"
+                          className={RT.td}
                         >
                           <button
                             onClick={() => count > 0 && onStageClick(member.employeeId, stage)}
@@ -288,18 +290,15 @@ function TeamMemberTable({
                         </TableCell>
                       );
                     })}
-                    <TableCell className="text-center py-2">
-                      <span className="inline-flex min-w-[2.75rem] justify-center rounded-lg bg-slate-800 px-2.5 py-1 text-[13px] font-bold text-white tabular-nums">{member.totalLead}</span>
-                    </TableCell>
                   </TableRow>
                   {/* Nested team members for this member */}
                   {isExpanded && member.children && member.children.length > 0 && (
                     <TableRow>
-                      <TableCell colSpan={stages.length + 2} className="p-0">
+                      <TableCell colSpan={columns.length + 1} className="p-0">
                         <div className="ml-6 pl-4 border-l-2 border-orange-200">
                           <TeamMemberTable
                             teamMembers={member.children}
-                            stages={stages}
+                            columns={columns}
                             level={level + 1}
                             expandedEmployees={expandedEmployees}
                             loadingHierarchy={loadingHierarchy}
@@ -525,6 +524,7 @@ function StageDetailModal({
 // ───────────────────────────────────────────────────────────────────────────────
 
 export function EmployeeStagesReport() {
+  const { filterRows } = useReportScope();
   // ─── State ──────────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ReportData | null>(null);
@@ -536,7 +536,7 @@ export function EmployeeStagesReport() {
 
   // Level filter
   const [levels, setLevels] = useState<LevelType[]>([]);
-  const [selectedLevel, setSelectedLevel] = useState<string>('1');
+  const [selectedLevel, setSelectedLevel] = useState<string>(() => defaultLevelForUser('1'));
 
   // Team filter
   const [showTeamOnly, setShowTeamOnly] = useState<boolean>(false);
@@ -574,7 +574,7 @@ export function EmployeeStagesReport() {
   useEffect(() => {
     const fetchLevels = async () => {
       try {
-        const response = await getDataHandlerWithToken('getAllLevels', null, null);
+        const response = await fetchLevelsForUser();
         if (response && Array.isArray(response)) {
           setLevels(response);
           if (response.length > 0) {
@@ -1004,7 +1004,7 @@ export function EmployeeStagesReport() {
   }, []);
 
   // ─── Client-side filtering ──────────────────────────────────────────────
-  const topLevelEmployees = hierarchicalData;
+  const topLevelEmployees = filterRows(hierarchicalData, (e: any) => e.employeeId); // BD: self + own team
   const filteredTopLevel = topLevelEmployees.filter(emp =>
     emp.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (emp.employeeEmail?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -1033,6 +1033,14 @@ export function EmployeeStagesReport() {
     const extra = Array.from(stageSet).filter(s => !ordered.includes(s));
     return [...ordered, ...extra];
   })();
+
+  // Customisable columns: one per stage + Total (Employee stays first)
+  const columnsUi = useReportColumns('employee-stages', [
+    { key: 'employee', label: 'Employee', locked: true },
+    ...relevantStages.map(stage => ({ key: `stage:${stage}`, label: stage })),
+    { key: '__total', label: 'Total' },
+  ]);
+  const dataColumns = columnsUi.visibleColumns.filter(c => !c.locked);
 
   const defaultLevel = levels.length > 0 ? extractLevelNumber(levels[0].name).toString() : '1';
   const hasActiveFilters =
@@ -1352,24 +1360,18 @@ export function EmployeeStagesReport() {
               <p className="ml-2 text-sm text-slate-500">Loading stage headers...</p>
             </div>
           ) : (
-            <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
+            <div className="space-y-3">
+            <ReportTableHeader title="Employee Stage Breakdown" subtitle={`${filteredTopLevel.length} employees`} chooser={columnsUi.chooser} />
+            <div className={RT.wrap}>
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50 hover:bg-slate-50 border-b border-slate-100">
-                    <TableHead className="text-[10px] font-semibold text-slate-500 uppercase sticky left-0 bg-slate-50 z-10 min-w-[160px]">
+                  <TableRow className={RT.headRow}>
+                    <TableHead className={cn(RT.thLeft, RT.thSticky, 'min-w-[220px]')}>
                       Employee
                     </TableHead>
-                    {relevantStages.map(stage => (
-                      <TableHead
-                        key={stage}
-                        className="text-[10px] text-center min-w-[60px] py-2 font-semibold text-slate-600 whitespace-nowrap"
-                      >
-                        {stage}
-                      </TableHead>
+                    {dataColumns.map(c => (
+                      <TableHead key={c.key} className={RT.th}>{c.label}</TableHead>
                     ))}
-                    <TableHead className="text-[10px] text-center min-w-[50px] py-2 font-semibold text-slate-600">
-                      Total
-                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1384,14 +1386,14 @@ export function EmployeeStagesReport() {
                       <>
                         <TableRow
                           key={emp.employeeId}
-                          className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
+                          className={RT.row}
                         >
-                          <TableCell className="sticky left-0 bg-white border-r z-10 py-2.5">
+                          <TableCell className={cn(RT.tdLeft, RT.tdSticky)}>
                             <div className="flex items-center gap-2.5 min-w-[170px]">
                               <Avatar name={emp.employeeName} />
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-xs font-medium text-slate-800 truncate max-w-[120px]">
+                                  <span className="font-semibold text-slate-900 truncate max-w-[160px]">
                                     {emp.employeeName}
                                   </span>
                                   {hasTeamMembers && (
@@ -1415,7 +1417,7 @@ export function EmployeeStagesReport() {
                                     </button>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2 text-[9px] text-slate-400 flex-wrap">
+                                <div className="flex items-center gap-2 text-[11px] text-slate-400 flex-wrap">
                                   <span>ID: {emp.employeeEmployeeId || emp.employeeId}</span>
                                   {emp.employeeLevel && <span>• L{emp.employeeLevel}</span>}
                                   {emp.teamSize && emp.teamSize > 1 && (
@@ -1427,7 +1429,15 @@ export function EmployeeStagesReport() {
                               </div>
                             </div>
                           </TableCell>
-                          {relevantStages.map(stage => {
+                          {dataColumns.map(c => {
+                            if (c.key === '__total') {
+                              return (
+                                <TableCell key="__total" className={RT.td}>
+                                  <span className="inline-flex min-w-[2.75rem] justify-center rounded-md bg-slate-100 text-slate-900 ring-1 ring-inset ring-slate-200 px-2.5 py-1 text-[13px] font-bold tabular-nums">{emp.totalLead}</span>
+                                </TableCell>
+                              );
+                            }
+                            const stage = c.label;
                             const count = stageMap.get(stage) || 0;
                             const total = emp.totalLead || 1;
                             const pct = ((count / total) * 100).toFixed(1);
@@ -1436,7 +1446,7 @@ export function EmployeeStagesReport() {
                             return (
                               <TableCell
                                 key={stage}
-                                className="text-xs text-center py-2.5"
+                                className={RT.td}
                               >
                                 <button
                                   onClick={() => count > 0 && handleStageClick(emp.employeeId, stage)}
@@ -1458,19 +1468,16 @@ export function EmployeeStagesReport() {
                               </TableCell>
                             );
                           })}
-                          <TableCell className="text-center py-2.5">
-                            <span className="inline-flex min-w-[2.75rem] justify-center rounded-lg bg-slate-900 px-2.5 py-1 text-[13px] font-bold text-white tabular-nums">{emp.totalLead}</span>
-                          </TableCell>
                         </TableRow>
 
                         {/* Nested Team Members Table */}
                         {isExpanded && emp.children && emp.children.length > 0 && (
                           <TableRow>
-                            <TableCell colSpan={relevantStages.length + 2} className="p-0 bg-slate-50/30">
+                            <TableCell colSpan={columnsUi.colCount} className="p-0 bg-slate-50/30">
                               <div className="px-4 py-2">
                                 <TeamMemberTable
                                   teamMembers={emp.children}
-                                  stages={relevantStages}
+                                  columns={dataColumns}
                                   level={1}
                                   expandedEmployees={expandedEmployees}
                                   loadingHierarchy={loadingHierarchy}
@@ -1486,7 +1493,7 @@ export function EmployeeStagesReport() {
                         {/* Show message if expanded but no team members */}
                         {isExpanded && (!emp.children || emp.children.length === 0) && (
                           <TableRow>
-                            <TableCell colSpan={relevantStages.length + 2} className="p-0">
+                            <TableCell colSpan={columnsUi.colCount} className="p-0">
                               <div className="px-4 py-2">
                                 <div className="text-xs text-slate-400 py-2 px-4 bg-slate-50 rounded-lg border border-slate-200">
                                   No team members found
@@ -1500,6 +1507,7 @@ export function EmployeeStagesReport() {
                   })}
                 </TableBody>
               </Table>
+            </div>
             </div>
           )}
 

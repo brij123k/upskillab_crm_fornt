@@ -8,6 +8,8 @@ export interface EnrolledStage {
   order: number;
   isDefault: boolean;
   isActive: boolean;
+  /** explanation of the feedback outcome */
+  description?: string;
 }
 
 export interface EnrolledLead {

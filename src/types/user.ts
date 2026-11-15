@@ -13,6 +13,27 @@ export interface UserType {
   lastLoginAt?: string;
   IVREnabled?: boolean;
   profile?: ProfileType;
+  onboarding?: OnboardingInfo;
+}
+
+export type OnboardingStatus = 'not_shared' | 'pending' | 'submitted' | 'approved';
+
+export interface OnboardingInfo {
+  status: OnboardingStatus;
+  linkActive: boolean;
+  sharedAt?: string;
+  submittedAt?: string;
+  approvedAt?: string;
+  submissionCount?: number;
+  token?: string;
+  link?: string | null;
+}
+
+export interface PersonalDetails {
+  dateOfBirth?: string;
+  gender?: string;
+  aadhaarNumber?: string;
+  panNumber?: string;
 }
 
 export interface Address {
@@ -67,6 +88,7 @@ poolIds?: string[] | PoolType[];
     _id: string;
   }>;
 
+  personalDetails?: PersonalDetails;
    address?: Address;
   bankDetails?: BankDetails;
   educationalDetails?: EducationalDetail[];

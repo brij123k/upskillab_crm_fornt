@@ -40,6 +40,7 @@ import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { KpiCard, KpiGrid, ChartCard, RankedBars, DonutWithLegend, HeatChip } from './ReportUI';
+import { useReportColumns, RT, ReportTableHeader } from './ReportTable';
 
 /* -------------------------------------------------------------------------- */
 /*                               Type Definitions                              */
@@ -166,6 +167,14 @@ export function SourceCampaignReport() {
   const sourceCampaigns = useMemo(() => {
     return data?.sourceCampaigns || [];
   }, [data]);
+
+  // Customisable columns: one per campaign + Total (Lead Stage stays first)
+  const columnsUi = useReportColumns('source-campaign', [
+    { key: 'stage', label: 'Lead Stage / Campaign', locked: true },
+    ...sourceCampaigns.map((c: string) => ({ key: `camp:${c}`, label: c })),
+    { key: '__total', label: 'Total' },
+  ]);
+  const dataColumns = columnsUi.visibleColumns.filter(c => !c.locked);
 
   const totalsByCampaign = data?.totalsByCampaign || {};
   const admissionByCampaign = data?.admissionDoneByCampaign || {};
@@ -420,91 +429,80 @@ export function SourceCampaignReport() {
 
 
           {/* Main Table */}
-          <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
+          <ReportTableHeader title="Lead Stage × Campaign" chooser={columnsUi.chooser} />
+          <div className={RT.wrap}>
             <Table>
               <TableHeader>
-                <TableRow className="bg-gradient-to-r from-slate-50 to-slate-100/50 hover:bg-slate-50 border-b border-slate-100">
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase sticky left-0 bg-slate-50 z-10 min-w-[160px]">
-                    Lead Stage / Campaign
-                  </TableHead>
-                  {sourceCampaigns.map((campaign: string) => (
-                    <TableHead key={campaign} className="text-xs text-right min-w-[100px] py-3 font-semibold text-slate-500 uppercase">
-                      <div className="flex flex-col items-end">
-                        <span>{campaign}</span>
-                        {conversionData[campaign] !== undefined && (
-                          <span className="text-[8px] font-normal text-slate-400 mt-0.5">
-                            {conversionData[campaign]}% conv.
-                          </span>
+                <TableRow className={RT.headRow}>
+                  <TableHead className={cn(RT.thLeft, RT.thSticky, 'min-w-[200px]')}>Lead Stage / Campaign</TableHead>
+                  {dataColumns.map((c) => (
+                    <TableHead key={c.key} className={cn(RT.th, 'min-w-[110px]')}>
+                      <div className="flex flex-col items-center">
+                        <span>{c.label}</span>
+                        {c.key !== '__total' && conversionData[c.label] !== undefined && (
+                          <span className="text-[10px] font-normal normal-case tracking-normal text-slate-400">{conversionData[c.label]}% conv.</span>
                         )}
                       </div>
                     </TableHead>
                   ))}
-                  <TableHead className="text-xs text-right font-semibold text-slate-500 uppercase bg-slate-50 min-w-[80px] py-3">
-                    Total
-                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredRows.map((item: any, idx: number) => (
-                  <TableRow key={item.sourceCampaignName || idx} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
-                    <TableCell className="text-xs font-medium text-slate-800 sticky left-0 bg-white border-r z-10 py-3">
+                  <TableRow key={item.sourceCampaignName || idx} className={RT.row}>
+                    <TableCell className={cn(RT.tdLeft, RT.tdSticky, 'font-medium text-slate-800')}>
                       <div className="flex items-center gap-2">
                         <span>{item.sourceCampaignName}</span>
                         {item.sourceCampaignName === 'New Lead' && (
-                          <Badge variant="outline" className="text-[8px] px-1 py-0 bg-blue-50 text-blue-600 border-blue-200">
-                            Incoming
-                          </Badge>
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-blue-50 text-blue-600 border-blue-200">Incoming</Badge>
                         )}
                         {item.sourceCampaignName === 'Admission Done' && (
-                          <Badge variant="outline" className="text-[8px] px-1 py-0 bg-emerald-50 text-emerald-600 border-emerald-200">
-                            Converted
-                          </Badge>
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-emerald-50 text-emerald-600 border-emerald-200">Converted</Badge>
                         )}
                       </div>
                     </TableCell>
-                    {sourceCampaigns.map((campaign: string) => (
-                      <TableCell key={campaign} className="text-right py-3">
-                        <HeatChip
-                          count={Number(item[campaign] || 0)}
-                          pct={columnTotals[campaign] ? (Number(item[campaign] || 0) / Number(columnTotals[campaign])) * 100 : 0}
-                        />
-                      </TableCell>
-                    ))}
-                    <TableCell className="text-right py-3">
-                      <span className="inline-flex min-w-[2.75rem] justify-center rounded-lg bg-slate-900 px-2.5 py-1 text-[13px] font-bold text-white tabular-nums">
-                        {(item.total || 0).toLocaleString()}
-                      </span>
-                    </TableCell>
+                    {dataColumns.map((c) =>
+                      c.key === '__total' ? (
+                        <TableCell key={c.key} className={RT.td}>
+                          <span className="inline-flex min-w-[2.75rem] justify-center rounded-md bg-slate-100 text-slate-900 ring-1 ring-inset ring-slate-200 px-2.5 py-1 text-[13px] font-bold tabular-nums">
+                            {(item.total || 0).toLocaleString('en-IN')}
+                          </span>
+                        </TableCell>
+                      ) : (
+                        <TableCell key={c.key} className={RT.td}>
+                          <HeatChip
+                            count={Number(item[c.label] || 0)}
+                            pct={columnTotals[c.label] ? (Number(item[c.label] || 0) / Number(columnTotals[c.label])) * 100 : 0}
+                          />
+                        </TableCell>
+                      ),
+                    )}
                   </TableRow>
                 ))}
 
                 {/* Totals Row */}
-                <TableRow className="bg-slate-50 font-semibold border-t-2 border-slate-200">
-                  <TableCell className="text-xs font-semibold text-slate-800 sticky left-0 bg-slate-50 z-10 py-3">
-                    Total
-                  </TableCell>
-                  {sourceCampaigns.map((campaign: string) => (
-                    <TableCell key={campaign} className="text-xs text-right font-semibold text-slate-800 py-3">
-                      {(columnTotals[campaign] || 0).toLocaleString()}
+                <TableRow className={RT.totalRow}>
+                  <TableCell className={cn(RT.tdLeft, 'sticky left-0 z-10 bg-slate-100 font-semibold text-slate-800')}>Total</TableCell>
+                  {dataColumns.map((c) => (
+                    <TableCell key={c.key} className={RT.tdTotal}>
+                      {(c.key === '__total' ? columnTotals.total || 0 : columnTotals[c.label] || 0).toLocaleString('en-IN')}
                     </TableCell>
                   ))}
-                  <TableCell className="text-xs text-right font-bold text-slate-800 py-3">
-                    {(columnTotals.total || 0).toLocaleString()}
-                  </TableCell>
                 </TableRow>
 
                 {/* Conversion Row */}
                 {Object.keys(conversionData).length > 0 && (
-                  <TableRow className="bg-orange-50/50 border-t border-slate-200">
-                    <TableCell className="text-xs font-semibold text-slate-700 sticky left-0 bg-orange-50/50 z-10 py-2">
-                      Conversion %
-                    </TableCell>
-                    {sourceCampaigns.map((campaign: string) => {
-                      const rate = conversionData[campaign] || 0;
+                  <TableRow className="bg-orange-50/50 hover:bg-orange-50/50 border-t border-slate-200">
+                    <TableCell className={cn(RT.tdLeft, 'sticky left-0 z-10 bg-orange-50 font-semibold text-slate-700')}>Conversion %</TableCell>
+                    {dataColumns.map((c) => {
+                      if (c.key === '__total') {
+                        return <TableCell key={c.key} className={cn(RT.td, 'text-slate-400')}>—</TableCell>;
+                      }
+                      const rate = conversionData[c.label] || 0;
                       return (
-                        <TableCell key={campaign} className="text-xs text-right font-semibold py-2">
+                        <TableCell key={c.key} className={RT.td}>
                           <span className={cn(
-                            "px-2 py-0.5 rounded-full",
+                            "px-2 py-0.5 rounded-full text-[12px] font-semibold",
                             rate > 20 ? "bg-emerald-100 text-emerald-700" :
                             rate > 10 ? "bg-amber-100 text-amber-700" :
                             rate > 0 ? "bg-orange-100 text-orange-700" :
@@ -515,9 +513,6 @@ export function SourceCampaignReport() {
                         </TableCell>
                       );
                     })}
-                    <TableCell className="text-xs text-right text-slate-500 py-2">
-                      —
-                    </TableCell>
                   </TableRow>
                 )}
               </TableBody>

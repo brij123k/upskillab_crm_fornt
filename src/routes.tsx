@@ -50,6 +50,7 @@ import { MyTasksPage } from "@/pages/bd/MyTasksPage";
 import { EmployeeAttendanceLeavePage } from "@/pages/bd/AttendanceLeavePage";
 import { LeaveRequestsPage } from "@/pages/bd/LeaveRequestsPage";
 import { LeadEntryPage } from "@/pages/public/LeadEntryPage";
+import { EmployeeOnboardingPage } from "@/pages/public/EmployeeOnboardingPage";
 import { TargetsPage } from "@/pages/targets/TargetsPage";
 import { FollowUpPage } from "./pages/FollowUpPage";
 // Placeholder
@@ -81,6 +82,7 @@ const AppRoutes = () => {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/cashfree/subscription-auth" element={<CashfreeSubscriptionAuthPage />} />
         <Route path="/lead-entry/:campaignId" element={<LeadEntryPage />} />
+        <Route path="/onboarding/:token" element={<EmployeeOnboardingPage />} />
         
 
 

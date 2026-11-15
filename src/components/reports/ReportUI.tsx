@@ -434,36 +434,36 @@ export function Gauge({ value, label, sub }: { value: number; label: string; sub
 
 /* ── Heat-map chip for matrix cells (count + share) ──────────────────────── */
 export function HeatChip({ count, pct }: { count: number; pct?: number }) {
-  if (!count) return <span className="text-slate-300 font-normal">–</span>;
+  if (!count) return <span className="text-slate-400 font-normal">–</span>;
   const p = Math.max(0, Math.min(100, pct ?? 0));
-  // 4 intensity steps keep the table calm but scannable
+  // soft tints only – the number stays the strongest thing in the cell
   const tone =
-    p >= 40 ? 'bg-orange-500 text-white ring-orange-500'
-    : p >= 20 ? 'bg-orange-200/80 text-orange-900 ring-orange-300'
-    : p >= 8 ? 'bg-orange-100 text-orange-800 ring-orange-200'
-    : 'bg-slate-50 text-slate-700 ring-slate-200';
+    p >= 40 ? 'bg-orange-100 text-slate-900 ring-orange-200'
+    : p >= 20 ? 'bg-orange-50 text-slate-900 ring-orange-200'
+    : p >= 8 ? 'bg-amber-50/70 text-slate-900 ring-amber-100'
+    : 'bg-white text-slate-900 ring-slate-200';
   return (
     <span className="inline-flex flex-col items-center gap-0.5">
-      <span className={cn('min-w-[2.25rem] px-2 py-1 rounded-lg text-[13px] font-semibold leading-none ring-1 ring-inset tabular-nums', tone)}>
+      <span className={cn('min-w-[2.25rem] px-2 py-1 rounded-md text-[13px] font-semibold leading-none ring-1 ring-inset tabular-nums', tone)}>
         {count.toLocaleString('en-IN')}
       </span>
-      {pct !== undefined && <span className="text-[10.5px] font-medium text-slate-400 tabular-nums">{p.toFixed(1)}%</span>}
+      {pct !== undefined && <span className="text-[11px] font-medium text-slate-500 tabular-nums">{p.toFixed(1)}%</span>}
     </span>
   );
 }
 
 /* ── Metric pill for highlighted numeric columns ─────────────────────────── */
 const PILL_TONES = {
-  green: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-  violet: 'bg-violet-50 text-violet-700 ring-violet-200',
-  orange: 'bg-orange-50 text-orange-700 ring-orange-200',
-  blue: 'bg-blue-50 text-blue-700 ring-blue-200',
-  slate: 'bg-slate-50 text-slate-700 ring-slate-200',
+  green: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+  violet: 'bg-violet-50 text-violet-800 ring-violet-200',
+  orange: 'bg-orange-50 text-orange-800 ring-orange-200',
+  blue: 'bg-blue-50 text-blue-800 ring-blue-200',
+  slate: 'bg-slate-50 text-slate-800 ring-slate-200',
 } as const;
 
 export function MetricPill({ value, tone = 'slate' }: { value: ReactNode; tone?: keyof typeof PILL_TONES }) {
   const empty = value === 0 || value === '0' || value === null || value === undefined || value === '';
-  if (empty) return <span className="text-slate-300 font-normal">0</span>;
+  if (empty) return <span className="text-slate-400 font-normal">0</span>;
   return (
     <span className={cn('inline-flex items-center justify-center min-w-[2.25rem] px-2.5 py-1 rounded-full text-[12.5px] font-semibold ring-1 ring-inset tabular-nums', PILL_TONES[tone])}>
       {value}
@@ -481,7 +481,7 @@ export function PersonCell({ name, sub, children }: { name: string; sub?: ReactN
           <span className="font-semibold text-slate-900 truncate">{name}</span>
           {children}
         </div>
-        {sub && <div className="text-[11px] font-normal text-slate-400 truncate">{sub}</div>}
+        {sub && <div className="text-[12px] font-normal text-slate-500 truncate">{sub}</div>}
       </div>
     </div>
   );

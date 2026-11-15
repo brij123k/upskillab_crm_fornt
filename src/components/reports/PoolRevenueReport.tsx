@@ -53,6 +53,7 @@ import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { KpiCard, KpiGrid, ChartCard, DonutWithLegend, RankedBars, Avatar } from './ReportUI';
+import { defaultLevelForUser, fetchLevelsForUser, useReportColumns, useReportScope, RT, ReportTableHeader, type ReportColumn } from './ReportTable';
 
 // ───────────────────────────────────────────────────────────────────────────────
 // Types
@@ -197,7 +198,8 @@ const extractLevelNumber = (name: string): number => {
 
 interface TeamMemberTableProps {
   teamMembers: EmployeeRevenue[];
-  pools: { poolId: string; poolName: string }[];
+  /** visible, non-locked columns in display order (pool:<id> | __total) */
+  columns: ReportColumn[];
   level: number;
   expandedEmployees: Set<string>;
   loadingHierarchy: Set<string>;
@@ -207,7 +209,7 @@ interface TeamMemberTableProps {
 
 function TeamMemberTable({
   teamMembers,
-  pools,
+  columns,
   level,
   expandedEmployees,
   loadingHierarchy,
@@ -223,21 +225,11 @@ function TeamMemberTable({
       <div className="overflow-x-auto border border-slate-200 rounded-lg">
         <Table>
           <TableHeader>
-            <TableRow className="bg-orange-50/50 hover:bg-orange-50/50 border-b border-slate-200">
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase sticky left-0 bg-orange-50/50 z-10 min-w-[180px]">
-                Employee
-              </TableHead>
-              {pools.map(pool => (
-                <TableHead
-                  key={pool.poolId}
-                  className="text-[10px] text-center min-w-[90px] py-1.5 font-semibold text-slate-600 whitespace-nowrap"
-                >
-                  {pool.poolName}
-                </TableHead>
+            <TableRow className={RT.headRow}>
+              <TableHead className={cn(RT.thLeft, RT.thSticky, 'min-w-[220px]')}>Employee</TableHead>
+              {columns.map(c => (
+                <TableHead key={c.key} className={RT.th}>{c.label}</TableHead>
               ))}
-              <TableHead className="text-[10px] text-center min-w-[80px] py-1.5 font-semibold text-slate-600 bg-orange-50/50">
-                Total
-              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -257,9 +249,9 @@ function TeamMemberTable({
                 <>
                   <TableRow
                     key={member.employeeId}
-                    className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
+                    className={RT.row}
                   >
-                    <TableCell className="sticky left-0 bg-white border-r z-10 py-2">
+                    <TableCell className={cn(RT.tdLeft, RT.tdSticky)}>
                       <div className="flex items-center gap-2 min-w-[150px]">
                         <div className="flex flex-col">
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -293,7 +285,7 @@ function TeamMemberTable({
                               </span>
                             ):(<></>)}
                           </div>
-                          <span className="text-[9px] text-slate-400 truncate max-w-[120px]">
+                          <span className="text-[12px] text-slate-500 truncate max-w-[170px]">
                             {member.employeeEmail}
                           </span>
                           {member.employeeLevel && (
@@ -302,13 +294,23 @@ function TeamMemberTable({
                         </div>
                       </div>
                     </TableCell>
-                    {pools.map(pool => {
+                    {columns.map(c => {
+                      if (c.key === '__total') {
+                        return (
+                          <TableCell key="__total" className={RT.td}>
+                            <span className={cn("inline-flex justify-center rounded-lg px-2.5 py-1 text-[12.5px] font-bold tabular-nums", memberTotal > 0 ? "bg-slate-100 text-slate-900 ring-1 ring-inset ring-slate-200" : "text-slate-400 font-normal")}>
+                              {formatCurrency(memberTotal)}
+                            </span>
+                          </TableCell>
+                        );
+                      }
+                      const pool = { poolId: c.key.slice(5), poolName: c.label };
                       const poolData = poolMap.get(pool.poolName);
                       const amount = poolData?.amount || 0;
                       const orders = poolData?.orders || [];
 
                       return (
-                        <TableCell key={pool.poolId} className="text-xs text-center py-2">
+                        <TableCell key={pool.poolId} className={RT.td}>
                           {amount > 0 ? (
                             <button
                               onClick={() => onRevenueClick(member, pool.poolName, orders)}
@@ -322,27 +324,22 @@ function TeamMemberTable({
                               <Eye className="w-2.5 h-2.5 opacity-60" />
                             </button>
                           ) : (
-                            <span className="text-slate-300 font-normal">
+                            <span className="text-slate-400 font-normal">
                               {formatCurrency(0)}
                             </span>
                           )}
                         </TableCell>
                       );
                     })}
-                    <TableCell className="text-xs text-center font-semibold py-2 bg-orange-50/30">
-                      <span className={cn("inline-flex justify-center rounded-lg px-2.5 py-1 text-[12.5px] font-bold tabular-nums", memberTotal > 0 ? "bg-slate-800 text-white" : "text-slate-300 font-normal")}>
-                        {formatCurrency(memberTotal)}
-                      </span>
-                    </TableCell>
                   </TableRow>
                   {/* Nested team members */}
                   {isExpanded && member.children && member.children.length > 0 && (
                     <TableRow>
-                      <TableCell colSpan={pools.length + 2} className="p-0">
+                      <TableCell colSpan={columns.length + 1} className="p-0">
                         <div className="ml-6 pl-4 border-l-2 border-orange-200">
                           <TeamMemberTable
                             teamMembers={member.children}
-                            pools={pools}
+                            columns={columns}
                             level={level + 1}
                             expandedEmployees={expandedEmployees}
                             loadingHierarchy={loadingHierarchy}
@@ -368,6 +365,7 @@ function TeamMemberTable({
 // ───────────────────────────────────────────────────────────────────────────────
 
 export function PoolRevenueReport() {
+  const { filterRows } = useReportScope();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ReportData | null>(null);
   const [levels, setLevels] = useState<LevelType[]>([]);
@@ -397,7 +395,7 @@ export function PoolRevenueReport() {
   useEffect(() => {
     const fetchLevels = async () => {
       try {
-        const res = await getDataHandlerWithToken('getAllLevels', null, null);
+        const res = await fetchLevelsForUser();
         if (res && res.length > 0) {
           setLevels(res);
           const num = extractLevelNumber(res[0].name);
@@ -705,7 +703,7 @@ export function PoolRevenueReport() {
   });
 
   // For pagination, use top-level employees only
-  const topLevelEmployees = hierarchicalData;
+  const topLevelEmployees = filterRows(hierarchicalData, (e: any) => e.employeeId); // BD: self + own team
   const filteredTopLevel = topLevelEmployees.filter(emp => {
     if (employeeSearch && !emp.employeeName.toLowerCase().includes(employeeSearch.toLowerCase())) return false;
     return true;
@@ -720,6 +718,14 @@ export function PoolRevenueReport() {
   const filteredPools = allPools.filter(p => 
     !poolSearch || p.poolName.toLowerCase().includes(poolSearch.toLowerCase())
   );
+
+  // Customisable columns: one per pool + Total (Employee stays first)
+  const columnsUi = useReportColumns('pool-revenue', [
+    { key: 'employee', label: 'Employee', locked: true },
+    ...filteredPools.map(pool => ({ key: `pool:${pool.poolId}`, label: pool.poolName })),
+    { key: '__total', label: 'Total' },
+  ]);
+  const dataColumns = columnsUi.visibleColumns.filter(c => !c.locked);
 
   const totalRevenue = data?.totalRevenue || 0;
 
@@ -1004,30 +1010,16 @@ export function PoolRevenueReport() {
           })()}
 
           {/* Table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+          <ReportTableHeader title="Revenue by Pool" subtitle={`${filteredTopLevel.length} employees`} chooser={columnsUi.chooser} />
+          <div className={RT.wrap}>
+            <div>
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50/80 border-b border-slate-200">
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50/80 z-10 min-w-[200px] px-5 py-3.5">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-3.5 h-3.5" />
-                        Employee
-                      </div>
-                    </TableHead>
-                    {filteredPools.map(pool => (
-                      <TableHead key={pool.poolId} className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[110px] px-4 py-3.5">
-                        <div className="flex flex-col items-center">
-                          <span className="text-slate-700">{pool.poolName}</span>
-                        </div>
-                      </TableHead>
+                  <TableRow className={RT.headRow}>
+                    <TableHead className={cn(RT.thLeft, RT.thSticky, 'min-w-[240px]')}>Employee</TableHead>
+                    {dataColumns.map(c => (
+                      <TableHead key={c.key} className={RT.th}>{c.label}</TableHead>
                     ))}
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[100px] px-4 py-3.5 bg-orange-50/50 border-l border-slate-200">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <TrendingUp className="w-3.5 h-3.5 text-orange-500" />
-                        <span className="text-orange-700">Total</span>
-                      </div>
-                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1089,13 +1081,23 @@ export function PoolRevenueReport() {
                               )}
                             </div>
                           </TableCell>
-                          {filteredPools.map(pool => {
+                          {dataColumns.map(c => {
+                            if (c.key === '__total') {
+                              return (
+                                <TableCell key="__total" className={RT.td}>
+                                  <span className={cn("inline-flex justify-center rounded-lg px-3 py-1 text-[13px] font-bold tabular-nums", empTotal > 0 ? "bg-slate-100 text-slate-900 ring-1 ring-inset ring-slate-200" : "text-slate-400 font-normal")}>
+                                    {formatCurrency(empTotal)}
+                                  </span>
+                                </TableCell>
+                              );
+                            }
+                            const pool = { poolId: c.key.slice(5), poolName: c.label };
                             const poolData = poolMap.get(pool.poolName);
                             const amount = poolData?.amount || 0;
                             const orders = poolData?.orders || [];
 
                             return (
-                              <TableCell key={pool.poolId} className="text-sm text-center px-4 py-3.5">
+                              <TableCell key={pool.poolId} className={RT.td}>
                                 {amount > 0 ? (
                                   <button
                                     onClick={() => handleRevenueClick(emp, pool.poolName, orders)}
@@ -1109,31 +1111,23 @@ export function PoolRevenueReport() {
                                     <Eye className="w-3 h-3 opacity-60" />
                                   </button>
                                 ) : (
-                                  <span className="text-slate-300 font-normal">
+                                  <span className="text-slate-400 font-normal">
                                     {formatCurrency(0)}
                                   </span>
                                 )}
                               </TableCell>
                             );
                           })}
-                          <TableCell className="text-sm text-center font-semibold px-4 py-3.5 bg-orange-50/30 border-l border-slate-200">
-                            <span className={cn(
-                              "inline-flex justify-center rounded-lg px-3 py-1 text-[13px] font-bold tabular-nums",
-                              empTotal > 0 ? "bg-slate-900 text-white" : "text-slate-300 font-normal"
-                            )}>
-                              {formatCurrency(empTotal)}
-                            </span>
-                          </TableCell>
                         </TableRow>
 
                         {/* Nested Team Members */}
                         {isExpanded && emp.children && emp.children.length > 0 && (
                           <TableRow>
-                            <TableCell colSpan={filteredPools.length + 2} className="p-0 bg-slate-50/30">
+                            <TableCell colSpan={columnsUi.colCount} className="p-0 bg-slate-50/30">
                               <div className="px-4 py-2">
                                 <TeamMemberTable
                                   teamMembers={emp.children}
-                                  pools={filteredPools}
+                                  columns={dataColumns}
                                   level={1}
                                   expandedEmployees={expandedEmployees}
                                   loadingHierarchy={loadingHierarchy}
@@ -1148,7 +1142,7 @@ export function PoolRevenueReport() {
                         {/* Show message if expanded but no team members */}
                         {isExpanded && (!emp.children || emp.children.length === 0) && (
                           <TableRow>
-                            <TableCell colSpan={filteredPools.length + 2} className="p-0">
+                            <TableCell colSpan={columnsUi.colCount} className="p-0">
                               <div className="px-4 py-2">
                                 <div className="text-xs text-slate-400 py-2 px-4 bg-slate-50 rounded-lg border border-slate-200">
                                   No team members found

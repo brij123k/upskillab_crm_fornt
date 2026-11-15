@@ -190,8 +190,10 @@ export function TaskManagementPagebd() {
   const fetchLeads = async () => {
     try {
       setLoadingLeads(true);
-      const response = await getDataHandlerWithToken(ApiConfig.getLeads, null, null, true);
-      if (response && Array.isArray(response)) setLeads(response);
+      // ApiConfig.getLeads never existed – use the paginated leads list
+      const response = await getDataHandlerWithToken(ApiConfig.getAllLeads, { page: 1, limit: 50 }, null, true);
+      const list = Array.isArray(response) ? response : response?.data;
+      if (Array.isArray(list)) setLeads(list);
     } catch (error) {
       console.error('Failed to fetch leads:', error);
     } finally {
@@ -236,32 +238,32 @@ export function TaskManagementPagebd() {
   // Due date filter handler (unchanged)
   const handleDueDateFilterChange = (value: typeof filters.dueDateFilter) => {
     if (value === 'custom') {
-      setFilters({ ...filters, dueDateFilter: value });
+      setFilters({ ...filters, page: 1, dueDateFilter: value });
       return;
     }
     if (value !== 'all') {
       const range = DUE_DATE_FILTERS[value].getRange();
       const toDate = new Date(range.to);
       toDate.setHours(23, 59, 59, 999);
-      setFilters({ ...filters, dueDateFilter: value, dueDateFrom: range.from, dueDateTo: toDate });
+      setFilters({ ...filters, page: 1, dueDateFilter: value, dueDateFrom: range.from, dueDateTo: toDate });
     } else {
-      setFilters({ ...filters, dueDateFilter: value, dueDateFrom: undefined, dueDateTo: undefined });
+      setFilters({ ...filters, page: 1, dueDateFilter: value, dueDateFrom: undefined, dueDateTo: undefined });
     }
   };
 
   // Created date filter handler (unchanged)
   const handleCreatedDateFilterChange = (value: typeof filters.createdDateFilter) => {
     if (value === 'custom') {
-      setFilters({ ...filters, createdDateFilter: value });
+      setFilters({ ...filters, page: 1, createdDateFilter: value });
       return;
     }
     if (value !== 'all') {
       const range = CREATED_DATE_FILTERS[value].getRange();
       const toDate = new Date(range.to);
       toDate.setHours(23, 59, 59, 999);
-      setFilters({ ...filters, createdDateFilter: value, createdDateFrom: range.from, createdDateTo: toDate });
+      setFilters({ ...filters, page: 1, createdDateFilter: value, createdDateFrom: range.from, createdDateTo: toDate });
     } else {
-      setFilters({ ...filters, createdDateFilter: value, createdDateFrom: undefined, createdDateTo: undefined });
+      setFilters({ ...filters, page: 1, createdDateFilter: value, createdDateFrom: undefined, createdDateTo: undefined });
     }
   };
 

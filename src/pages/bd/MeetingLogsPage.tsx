@@ -186,15 +186,20 @@ export function MeetingLogsPage() {
     if (filters.search) params.search = filters.search;
     if (filters.leadId !== 'all') params.leadId = filters.leadId;
     if (filters.stageId !== 'all') params.stageId = filters.stageId;
-    if (filters.userId !== 'all') params.byUserId = filters.userId;
     if (filters.meetingType !== 'all') params.meetingType = filters.meetingType;
     if (filters.outcome) params.outcome = filters.outcome;
-    if (filters.dateFilter !== 'all') params.dateFilter = filters.dateFilter;
-    if (filters.fromDate) params.fromDate = filters.fromDate;
-    if (filters.toDate) params.toDate = filters.toDate;
+    // custom inputs are hidden unless "custom" is picked – don't send stale values
+    if (filters.dateFilter === 'custom') {
+      if (filters.fromDate) params.fromDate = filters.fromDate;
+      if (filters.toDate) params.toDate = filters.toDate;
+    } else if (filters.dateFilter !== 'all') params.dateFilter = filters.dateFilter;
     if (filters.sort) params.sort = filters.sort;
     if (filters.status !== 'all') params.status = filters.status;
-    if (filters.group === 'true') params.group = true;
+    // user picker is only shown in Group mode
+    if (filters.group === 'true') {
+      params.group = true;
+      if (filters.userId !== 'all') params.byUserId = filters.userId;
+    }
     return params;
   }, [filters, page, limit]);
 
@@ -247,6 +252,13 @@ export function MeetingLogsPage() {
     } finally {
       setAddingMeeting(false);
     }
+  };
+
+  // Opens the "Add Feedback" dialog for a meeting (was referenced but missing)
+  const handleOpenAddFeedback = (log: any) => {
+    if (!log) return;
+    setFeedbackForm({ meetingId: log._id, leadId: Number(log.leadId) || 0, feedback: '' });
+    setAddFeedbackModalOpen(true);
   };
 
   const handleAddFeedback = async () => {

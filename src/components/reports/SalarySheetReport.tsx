@@ -36,7 +36,8 @@ import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { KpiCard, KpiGrid, ChartCard, RankedBars, DonutWithLegend, Avatar, MetricPill } from './ReportUI';
+import { KpiCard, KpiGrid, ChartCard, RankedBars, DonutWithLegend, Avatar, MetricPill, PersonCell } from './ReportUI';
+import { defaultLevelForUser, fetchLevelsForUser, useReportColumns, useReportScope, RT, Num, ReportTableHeader, type ReportColumn } from './ReportTable';
 import { UserCheck } from 'lucide-react';
 
 /* -------------------------------------------------------------------------- */
@@ -55,14 +56,35 @@ const formatNumber = (value: number) => numberFormatter.format(Number(value || 0
 
 const ROWS_PER_PAGE = 8;
 
+
+/* ── Column config (customisable via the Columns menu) ─────────────────── */
+const SALARY_COLUMNS: ReportColumn[] = [
+  { key: 'empName', label: 'Emp Name', locked: true },
+  { key: 'empId', label: 'Emp ID' },
+  { key: 'designation', label: 'Designation' },
+  { key: 'vintage', label: 'Vintage' },
+  { key: 'salary', label: 'Salary' },
+  { key: 'totalWorkingDays', label: 'Total Days' },
+  { key: 'totalPresent', label: 'Present' },
+  { key: 'totalHalfDay', label: 'Half Day' },
+  { key: 'totalLeave', label: 'Leave' },
+  { key: 'wo', label: 'WO' },
+  { key: 'totalAbsent', label: 'Absent' },
+  { key: 'totalPayableDays', label: 'Pay Days' },
+  { key: 'basicSalary', label: 'Basic Salary' },
+  { key: 'finalSalary', label: 'Final Salary' },
+];
+
 export function SalarySheetReport() {
+  const columnsUi = useReportColumns('salary-sheet', SALARY_COLUMNS);
+  const { filterRows } = useReportScope();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [showFilters, setShowFilters] = useState(false);
 
   // Level filter
   const [levels, setLevels] = useState<any[]>([]);
-  const [selectedLevel, setSelectedLevel] = useState('1');
+  const [selectedLevel, setSelectedLevel] = useState(() => defaultLevelForUser('1'));
 
   // Date filter
   const [dateFilter, setDateFilter] = useState('month');
@@ -79,7 +101,7 @@ export function SalarySheetReport() {
   useEffect(() => {
     const fetchLevels = async () => {
       try {
-        const res = await getDataHandlerWithToken('getAllLevels', null, null);
+        const res = await fetchLevelsForUser();
         if (res) {
           setLevels(res);
           if (res.length) setSelectedLevel(extractLevelNumber(res[0].name).toString());
@@ -144,7 +166,7 @@ export function SalarySheetReport() {
   }, [fetchData]);
 
   // ─── Derived data ───
-  const employees = useMemo(() => (data?.employees ? data.employees : []), [data]);
+  const employees = useMemo(() => filterRows(data?.employees ? data.employees : [], (e: any) => e.userId), [data, filterRows]); // BD: self + own team
   const summary = data?.summary || {};
   const periodLabel = data?.period?.label || 'Current Month';
 
@@ -394,43 +416,53 @@ export function SalarySheetReport() {
           </div>
 
           {/* Table */}
-          <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
-            <Table className="min-w-[1450px]">
+          <ReportTableHeader title="Salary Sheet" subtitle={periodLabel} chooser={columnsUi.chooser} />
+          <div className={RT.wrap}>
+            <Table className="min-w-[1100px]">
               <TableHeader>
-                <TableRow className="bg-amber-50 hover:bg-amber-50 border-b border-amber-200">
-                  <TableHead className="text-xs font-semibold text-amber-900 uppercase">Emp ID</TableHead>
-                  <TableHead className="text-xs font-semibold text-amber-900 uppercase">Emp Name</TableHead>
-                  <TableHead className="text-xs font-semibold text-amber-900 uppercase">Designation</TableHead>
-                  <TableHead className="text-xs font-semibold text-amber-900 uppercase">Vintage</TableHead>
-                  <TableHead className="text-xs font-semibold text-amber-900 uppercase text-right">Salary</TableHead>
-                  <TableHead className="text-xs font-semibold text-amber-900 uppercase text-right">Total Days</TableHead>
-                  <TableHead className="text-xs font-semibold text-amber-900 uppercase text-right">Present</TableHead>
-                  <TableHead className="text-xs font-semibold text-amber-900 uppercase text-right">Half Day</TableHead>
-                  <TableHead className="text-xs font-semibold text-amber-900 uppercase text-right">Leave</TableHead>
-                  <TableHead className="text-xs font-semibold text-amber-900 uppercase text-right">WO</TableHead>
-                  <TableHead className="text-xs font-semibold text-amber-900 uppercase text-right">Absent</TableHead>
-                  <TableHead className="text-xs font-semibold text-amber-900 uppercase text-right">Pay Days</TableHead>
-                  <TableHead className="text-xs font-semibold text-amber-900 uppercase text-right">Basic Salary</TableHead>
-                  <TableHead className="text-xs font-semibold text-amber-900 uppercase text-right">Final Salary</TableHead>
+                <TableRow className={RT.headRow}>
+                  {columnsUi.visibleColumns.map((c) => (
+                    <TableHead key={c.key} className={c.key === 'empName' ? cn(RT.thLeft, RT.thSticky, 'min-w-[220px]') : RT.th}>{c.label}</TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedEmployees.map((emp: any) => (
-                  <TableRow key={emp.userId || `${emp.empId}-${emp.empName}`} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
-                    <TableCell><span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[11.5px] font-semibold text-slate-700">{emp.empId}</span></TableCell>
-                    <TableCell className="text-xs text-slate-700"><span className="inline-flex items-center gap-2"><Avatar name={emp.empName} className="w-7 h-7 text-[10px]" />{emp.empName}</span></TableCell>
-                    <TableCell className="text-slate-600">{emp.designation ? <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-0.5 text-[11.5px] font-medium text-blue-700 ring-1 ring-inset ring-blue-100">{emp.designation}</span> : '-'}</TableCell>
-                    <TableCell className="text-xs text-slate-600">{emp.vintage || '-'}</TableCell>
-                    <TableCell className="text-right font-medium text-slate-800">₹{formatMoney(emp.salary)}</TableCell>
-                    <TableCell className="text-xs text-right text-slate-600">{formatNumber(emp.totalWorkingDays)}</TableCell>
-                    <TableCell className="text-right"><MetricPill value={formatNumber(emp.totalPresent)} tone="green" /></TableCell>
-                    <TableCell className="text-right"><MetricPill value={formatNumber(emp.totalHalfDay)} tone="orange" /></TableCell>
-                    <TableCell className="text-right"><MetricPill value={formatNumber(emp.totalLeave)} tone="blue" /></TableCell>
-                    <TableCell className="text-xs text-right text-slate-600">{formatNumber(emp.wo)}</TableCell>
-                    <TableCell className="text-right">{Number(emp.totalAbsent) > 0 ? <span className="inline-flex justify-center min-w-[2.25rem] rounded-full bg-rose-50 px-2.5 py-1 text-[12.5px] font-semibold text-rose-700 ring-1 ring-inset ring-rose-200 tabular-nums">{formatNumber(emp.totalAbsent)}</span> : <span className="text-slate-300 font-normal">0</span>}</TableCell>
-                    <TableCell className="text-right font-bold text-slate-900">{formatNumber(emp.totalPayableDays)}</TableCell>
-                    <TableCell className="text-right text-slate-700">₹{formatMoney(emp.basicSalary)}</TableCell>
-                    <TableCell className="text-right"><span className="inline-flex rounded-lg bg-slate-900 px-2.5 py-1 text-[13px] font-bold text-white tabular-nums">₹{formatMoney(emp.finalSalary)}</span></TableCell>
+                  <TableRow key={emp.userId || `${emp.empId}-${emp.empName}`} className={RT.row}>
+                    {columnsUi.visibleColumns.map((c) => {
+                      switch (c.key) {
+                        case 'empName':
+                          return (
+                            <TableCell key={c.key} className={cn(RT.tdLeft, RT.tdSticky)}>
+                              <PersonCell name={emp.empName} sub={emp.email || (emp.empId ? `ID: ${emp.empId}` : undefined)} />
+                            </TableCell>
+                          );
+                        case 'empId':
+                          return <TableCell key={c.key} className={RT.td}><span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[11.5px] font-semibold text-slate-700">{emp.empId}</span></TableCell>;
+                        case 'designation':
+                          return <TableCell key={c.key} className={RT.td}>{emp.designation ? <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-0.5 text-[11.5px] font-medium text-blue-700 ring-1 ring-inset ring-blue-100">{emp.designation}</span> : '–'}</TableCell>;
+                        case 'vintage':
+                          return <TableCell key={c.key} className={RT.td}>{emp.vintage || '–'}</TableCell>;
+                        case 'salary':
+                          return <TableCell key={c.key} className={RT.td}><span className="font-medium text-slate-800">₹{formatMoney(emp.salary)}</span></TableCell>;
+                        case 'totalPresent':
+                          return <TableCell key={c.key} className={RT.td}><MetricPill value={formatNumber(emp.totalPresent)} tone="green" /></TableCell>;
+                        case 'totalHalfDay':
+                          return <TableCell key={c.key} className={RT.td}><MetricPill value={formatNumber(emp.totalHalfDay)} tone="orange" /></TableCell>;
+                        case 'totalLeave':
+                          return <TableCell key={c.key} className={RT.td}><MetricPill value={formatNumber(emp.totalLeave)} tone="blue" /></TableCell>;
+                        case 'totalAbsent':
+                          return <TableCell key={c.key} className={RT.td}>{Number(emp.totalAbsent) > 0 ? <span className="inline-flex justify-center min-w-[2.25rem] rounded-full bg-rose-50 px-2.5 py-1 text-[12.5px] font-semibold text-rose-700 ring-1 ring-inset ring-rose-200 tabular-nums">{formatNumber(emp.totalAbsent)}</span> : <span className="text-slate-400">0</span>}</TableCell>;
+                        case 'totalPayableDays':
+                          return <TableCell key={c.key} className={RT.td}><span className="font-bold text-slate-900">{formatNumber(emp.totalPayableDays)}</span></TableCell>;
+                        case 'basicSalary':
+                          return <TableCell key={c.key} className={RT.td}>₹{formatMoney(emp.basicSalary)}</TableCell>;
+                        case 'finalSalary':
+                          return <TableCell key={c.key} className={RT.td}><span className="inline-flex rounded-md bg-slate-100 text-slate-900 ring-1 ring-inset ring-slate-200 px-2.5 py-1 text-[13px] font-bold tabular-nums">₹{formatMoney(emp.finalSalary)}</span></TableCell>;
+                        default:
+                          return <TableCell key={c.key} className={RT.td}><Num value={emp[c.key]} format={(v) => formatNumber(v)} /></TableCell>;
+                      }
+                    })}
                   </TableRow>
                 ))}
               </TableBody>

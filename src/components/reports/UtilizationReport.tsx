@@ -1,5 +1,5 @@
 // UtilizationReport.tsx - with Hierarchical Team Expansion
-import { useState, useEffect, useCallback } from 'react';
+import { Fragment, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -55,6 +55,7 @@ import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { KpiCard, KpiGrid, ChartCard, Funnel, RankedBars, Avatar, MetricPill } from './ReportUI';
+import { defaultLevelForUser, fetchLevelsForUser, useReportColumns, useReportScope, RT, Num, ReportTableHeader, type ReportColumn } from './ReportTable';
 import { PhoneCall, Activity } from 'lucide-react';
 
 /* -------------------------------------------------------------------------- */
@@ -273,6 +274,43 @@ function StageModal({
 /*                          Sub-component: Team Member Table                   */
 /* -------------------------------------------------------------------------- */
 
+
+/* ── Column config (customisable via the Columns menu) ─────────────────── */
+const UTIL_COLUMNS: ReportColumn[] = [
+  { key: 'employee', label: 'Employee', locked: true },
+  { key: 'designation', label: 'Designation' },
+  { key: 'vintage', label: 'Vintage' },
+  { key: 'leadAssigned', label: 'Leads' },
+  { key: 'newLead', label: 'New Leads' },
+  { key: 'totalDial', label: 'Total Dials' },
+  { key: 'uniqDial', label: 'Uniq Dials' },
+  { key: 'answeredCall', label: 'Answered' },
+  { key: 'answeredTalkTime', label: 'Talk Time' },
+  { key: 'pcatScheduled', label: 'PCAT S.' },
+  { key: 'pcatDone', label: 'PCAT D.' },
+  { key: 'registrationDone', label: 'Reg.' },
+  { key: 'admissionDone', label: 'Ad.' },
+];
+
+function utilCell(key: string, e: any, formatTime: (s: number) => string, isTotal = false) {
+  switch (key) {
+    case 'designation':
+      return isTotal ? '–' : <span className="text-slate-800">{e.designation || '–'}</span>;
+    case 'vintage':
+      return isTotal ? '–' : <span className="text-slate-800">{e.vintage || '–'}</span>;
+    case 'leadAssigned':
+      return <Num value={e.leadAssigned || 0} bold />;
+    case 'answeredTalkTime':
+      return e.answeredTalkTime ? formatTime(e.answeredTalkTime) : <span className="text-slate-400">{formatTime(0)}</span>;
+    case 'registrationDone':
+      return isTotal ? <Num value={e.registrationDone || 0} bold /> : <MetricPill value={e.registrationDone || 0} tone="violet" />;
+    case 'admissionDone':
+      return isTotal ? <Num value={e.admissionDone || 0} bold /> : <MetricPill value={e.admissionDone || 0} tone="green" />;
+    default:
+      return <Num value={e[key] || 0} bold={isTotal} />;
+  }
+}
+
 interface TeamMemberTableProps {
   teamMembers: any[];
   level: number;
@@ -281,6 +319,7 @@ interface TeamMemberTableProps {
   toggleExpand: (employeeId: string, hasTeam: boolean) => void;
   onEmployeeClick: (emp: any) => void;
   formatTime: (seconds: number) => string;
+  columns: ReportColumn[];
 }
 
 function TeamMemberTable({
@@ -291,6 +330,7 @@ function TeamMemberTable({
   toggleExpand,
   onEmployeeClick,
   formatTime,
+  columns,
 }: TeamMemberTableProps) {
   return (
     <div className="mt-2 mb-1">
@@ -301,22 +341,14 @@ function TeamMemberTable({
       <div className="overflow-x-auto border border-slate-200 rounded-lg">
         <Table>
           <TableHeader>
-            <TableRow className="bg-orange-50/50 hover:bg-orange-50/50 border-b border-slate-200">
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase sticky left-0 bg-orange-50/50 z-10 min-w-[120px]">
-                Employee
-              </TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Desig.</TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Vintage</TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Leads</TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">New</TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Dials</TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Uniq</TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Ans.</TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Talk</TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">PCAT S.</TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">PCAT D.</TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Reg.</TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center">Ad.</TableHead>
+            <TableRow className={RT.headRow}>
+              {columns.map((c) =>
+                c.key === 'employee' ? (
+                  <TableHead key={c.key} className={cn(RT.thLeft, RT.thSticky, 'min-w-[200px]')}>{c.label}</TableHead>
+                ) : (
+                  <TableHead key={c.key} className={cn(RT.th, c.key === 'admissionDone' && 'bg-emerald-50 text-emerald-800')}>{c.label}</TableHead>
+                ),
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -326,69 +358,52 @@ function TeamMemberTable({
               const isLoading = loadingHierarchy.has(member.employeeId);
 
               return (
-                <>
-                  <TableRow
-                    key={member.employeeId}
-                    className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
-                  >
-                    <TableCell className="sticky left-0 bg-white border-r z-10 py-2">
-                      <div className="flex flex-col min-w-[110px]">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <Avatar name={member.employeeName} className="w-7 h-7 text-[10px]" />
-                          <span 
-                            className="text-xs font-semibold text-slate-900 truncate max-w-[110px] cursor-pointer hover:text-orange-600"
-                            onClick={() => onEmployeeClick(member)}
-                          >
-                            {member.employeeName}
-                          </span>
-                          {hasTeam ? (
-                            <button
-                              onClick={() => toggleExpand(member.employeeId, true)}
-                              disabled={isLoading}
-                              className={cn(
-                                "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
-                                "hover:bg-orange-100 text-orange-500 border border-orange-200",
-                                isExpanded && "bg-orange-100 border-orange-300",
-                                isLoading && "opacity-50 cursor-not-allowed"
-                              )}
-                            >
-                              {isLoading ? (
-                                <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                              ) : isExpanded ? (
-                                <Minus className="w-2.5 h-2.5" />
-                              ) : (
-                                <Plus className="w-2.5 h-2.5" />
-                              )}
-                            </button>
-                          ):(<></>)}
-                          {member.teamSize && member.teamSize > 1? (
-                            <span className="text-[7px] bg-orange-100 text-orange-700 px-1 py-0.5 rounded-full whitespace-nowrap">
-                              Team: {member.teamSize}
-                            </span>
-                          ):(<></>)}
-                        </div>
-                        <span className="text-[8px] text-slate-400 truncate max-w-[90px]">
-                          {member.employeeEmail}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.designation || '-'}</TableCell>
-                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.vintage || '-'}</TableCell>
-                    <TableCell className="text-center py-3 font-bold text-slate-900">{member.leadAssigned || 0}</TableCell>
-                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.newLead || 0}</TableCell>
-                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.totalDial || 0}</TableCell>
-                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.uniqDial || 0}</TableCell>
-                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.answeredCall || 0}</TableCell>
-                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{formatTime(member.answeredTalkTime)}</TableCell>
-                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.pcatScheduled || 0}</TableCell>
-                    <TableCell className="text-[10px] text-center py-2 text-slate-600">{member.pcatDone || 0}</TableCell>
-                    <TableCell className="text-center py-3"><MetricPill value={member.registrationDone || 0} tone="violet" /></TableCell>
-                    <TableCell className="text-center py-3"><MetricPill value={member.admissionDone || 0} tone="green" /></TableCell>
+                <Fragment key={member.employeeId}>
+                  <TableRow className={RT.row}>
+                    {columns.map((c) =>
+                      c.key === 'employee' ? (
+                        <TableCell key={c.key} className={cn(RT.tdLeft, RT.tdSticky)}>
+                          <div className="flex items-center gap-2.5 min-w-[180px]">
+                            <Avatar name={member.employeeName} />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className="font-semibold text-slate-900 truncate max-w-[150px] cursor-pointer hover:text-orange-600"
+                                  onClick={() => onEmployeeClick(member)}
+                                >
+                                  {member.employeeName}
+                                </span>
+                                {hasTeam ? (
+                                  <button
+                                    onClick={() => toggleExpand(member.employeeId, true)}
+                                    disabled={isLoading}
+                                    title={isExpanded ? 'Hide team' : 'Show team'}
+                                    className={cn(
+                                      "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
+                                      "hover:bg-orange-100 text-orange-500 border border-orange-200",
+                                      isExpanded && "bg-orange-100 border-orange-300",
+                                      isLoading && "opacity-50 cursor-not-allowed"
+                                    )}
+                                  >
+                                    {isLoading ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : isExpanded ? <Minus className="w-2.5 h-2.5" /> : <Plus className="w-2.5 h-2.5" />}
+                                  </button>
+                                ) : null}
+                                {hasTeam ? (
+                                  <span className="text-[10px] bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">Team {member.teamSize}</span>
+                                ) : null}
+                              </div>
+                              <div className="text-[12px] text-slate-500 truncate max-w-[170px]">{member.employeeEmail}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                      ) : (
+                        <TableCell key={c.key} className={cn(RT.td, c.key === 'admissionDone' && 'bg-emerald-50/60')}>{utilCell(c.key, member, formatTime)}</TableCell>
+                      ),
+                    )}
                   </TableRow>
-                  {/* Nested team members */}
                   {isExpanded && member.children && member.children.length > 0 && (
                     <TableRow>
-                      <TableCell colSpan={13} className="p-0">
+                      <TableCell colSpan={columns.length} className="p-0">
                         <div className="ml-6 pl-4 border-l-2 border-orange-200">
                           <TeamMemberTable
                             teamMembers={member.children}
@@ -398,12 +413,13 @@ function TeamMemberTable({
                             toggleExpand={toggleExpand}
                             onEmployeeClick={onEmployeeClick}
                             formatTime={formatTime}
+                            columns={columns}
                           />
                         </div>
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </TableBody>
@@ -432,7 +448,9 @@ export function UtilizationReport() {
 
   // Level filter
   const [levels, setLevels] = useState<any[]>([]);
-  const [selectedLevel, setSelectedLevel] = useState('1');
+  const [selectedLevel, setSelectedLevel] = useState(() => defaultLevelForUser('1'));
+  const columnsUi = useReportColumns('utilization', UTIL_COLUMNS);
+  const { filterRows } = useReportScope();
 
   // Team filter (checkbox)
   const [showTeamOnly, setShowTeamOnly] = useState<boolean>(false);
@@ -493,7 +511,7 @@ export function UtilizationReport() {
   useEffect(() => {
     const fetchLevels = async () => {
       try {
-        const res = await getDataHandlerWithToken('getAllLevels', null, null);
+        const res = await fetchLevelsForUser();
         if (res) {
           setLevels(res);
           if (res.length) setSelectedLevel(extractLevelNumber(res[0].name).toString());
@@ -932,14 +950,14 @@ export function UtilizationReport() {
   }, []);
 
   // ─── Derived data & pagination ───
-  const flattenedData = flattenHierarchy(hierarchicalData);
+  const flattenedData = flattenHierarchy(filterRows(hierarchicalData, (e: any) => e.employeeId));
   
   const filteredEmployees = flattenedData.filter((emp: any) =>
     searchTerm ? emp.employeeName?.toLowerCase().includes(searchTerm.toLowerCase()) : true
   );
 
   // For pagination, use top-level employees only
-  const topLevelEmployees = hierarchicalData;
+  const topLevelEmployees = filterRows(hierarchicalData, (e: any) => e.employeeId); // BD: self + own team only
   const filteredTopLevel = topLevelEmployees.filter((emp: any) =>
     searchTerm ? emp.employeeName?.toLowerCase().includes(searchTerm.toLowerCase()) : true
   );
@@ -1408,23 +1426,22 @@ export function UtilizationReport() {
           </div>
 
           {/* Table */}
-          <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
+          <ReportTableHeader
+            title="Employee Efforts"
+            subtitle={`${filteredTopLevel.length} employee${filteredTopLevel.length === 1 ? '' : 's'}`}
+            chooser={columnsUi.chooser}
+          />
+          <div className={RT.wrap}>
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50 hover:bg-slate-50 border-b border-slate-100">
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase sticky left-0 bg-slate-50 min-w-[120px] z-10">Employee</TableHead>
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">Designation</TableHead>
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">Vintage</TableHead>
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">Leads</TableHead>
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">New Leads</TableHead>
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">Total Dials</TableHead>
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">Uniq Dials</TableHead>
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">Answered</TableHead>
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">Talk Time</TableHead>
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">PCAT S.</TableHead>
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">PCAT D.</TableHead>
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">Reg.</TableHead>
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase text-center">Ad.</TableHead>
+                <TableRow className={RT.headRow}>
+                  {columnsUi.visibleColumns.map((c) =>
+                    c.key === 'employee' ? (
+                      <TableHead key={c.key} className={cn(RT.thLeft, RT.thSticky, 'min-w-[220px]')}>{c.label}</TableHead>
+                    ) : (
+                      <TableHead key={c.key} className={cn(RT.th, c.key === 'admissionDone' && 'bg-emerald-50 text-emerald-800')}>{c.label}</TableHead>
+                    ),
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1434,70 +1451,53 @@ export function UtilizationReport() {
                   const isLoading = loadingHierarchy.has(emp.employeeId);
 
                   return (
-                    <>
-                      <TableRow
-                        key={emp.employeeId || idx}
-                        className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors"
-                      >
-                        <TableCell className="text-xs sticky left-0 bg-white border-r z-10 py-3">
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <Avatar name={emp.employeeName} />
-                              <span 
-                                className="font-semibold text-slate-900 cursor-pointer hover:text-orange-600"
-                                onClick={() => handleEmployeeClick(emp)}
-                              >
-                                {emp.employeeName}
-                              </span>
-                              {hasTeam && showTeamOnly && (
-                                <button
-                                  onClick={() => toggleExpand(emp.employeeId, true)}
-                                  disabled={isLoading}
-                                  className={cn(
-                                    "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
-                                    "hover:bg-orange-100 text-orange-500 border border-orange-200",
-                                    isExpanded && "bg-orange-100 border-orange-300",
-                                    isLoading && "opacity-50 cursor-not-allowed"
-                                  )}
-                                >
-                                  {isLoading ? (
-                                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                                  ) : isExpanded ? (
-                                    <Minus className="w-2.5 h-2.5" />
-                                  ) : (
-                                    <Plus className="w-2.5 h-2.5" />
-                                  )}
-                                </button>
-                              )}
-                              {emp.teamSize && emp.teamSize > 1 && showTeamOnly && (
-                                <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                                  Team: {emp.teamSize}
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-slate-400 truncate max-w-[110px]">
-                              {emp.employeeEmail}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs text-center py-3 text-slate-600">{emp.designation || '-'}</TableCell>
-                        <TableCell className="text-xs text-center py-3 text-slate-600">{emp.vintage || '-'}</TableCell>
-                        <TableCell className="text-center py-3 font-bold text-slate-900">{emp.leadAssigned || 0}</TableCell>
-                        <TableCell className="text-xs text-center py-3 text-slate-600">{emp.newLead || 0}</TableCell>
-                        <TableCell className="text-xs text-center py-3 text-slate-600">{emp.totalDial || 0}</TableCell>
-                        <TableCell className="text-xs text-center py-3 text-slate-600">{emp.uniqDial || 0}</TableCell>
-                        <TableCell className="text-xs text-center py-3 text-slate-600">{emp.answeredCall || 0}</TableCell>
-                        <TableCell className="text-xs text-center py-3 text-slate-600">{formatTime(emp.answeredTalkTime)}</TableCell>
-                        <TableCell className="text-xs text-center py-3 text-slate-600">{emp.pcatScheduled || 0}</TableCell>
-                        <TableCell className="text-xs text-center py-3 text-slate-600">{emp.pcatDone || 0}</TableCell>
-                        <TableCell className="text-center py-3"><MetricPill value={emp.registrationDone || 0} tone="violet" /></TableCell>
-                        <TableCell className="text-center py-3"><MetricPill value={emp.admissionDone || 0} tone="green" /></TableCell>
+                    <Fragment key={emp.employeeId || idx}>
+                      <TableRow className={RT.row}>
+                        {columnsUi.visibleColumns.map((c) =>
+                          c.key === 'employee' ? (
+                            <TableCell key={c.key} className={cn(RT.tdLeft, RT.tdSticky)}>
+                              <div className="flex items-center gap-2.5 min-w-[200px]">
+                                <Avatar name={emp.employeeName} />
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span
+                                      className="font-semibold text-slate-900 truncate max-w-[160px] cursor-pointer hover:text-orange-600"
+                                      onClick={() => handleEmployeeClick(emp)}
+                                    >
+                                      {emp.employeeName}
+                                    </span>
+                                    {hasTeam && showTeamOnly && (
+                                      <button
+                                        onClick={() => toggleExpand(emp.employeeId, true)}
+                                        disabled={isLoading}
+                                        title={isExpanded ? 'Hide team' : 'Show team'}
+                                        className={cn(
+                                          "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
+                                          "hover:bg-orange-100 text-orange-500 border border-orange-200",
+                                          isExpanded && "bg-orange-100 border-orange-300",
+                                          isLoading && "opacity-50 cursor-not-allowed"
+                                        )}
+                                      >
+                                        {isLoading ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : isExpanded ? <Minus className="w-2.5 h-2.5" /> : <Plus className="w-2.5 h-2.5" />}
+                                      </button>
+                                    )}
+                                    {hasTeam && showTeamOnly && (
+                                      <span className="text-[10px] bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">Team {emp.teamSize}</span>
+                                    )}
+                                  </div>
+                                  <div className="text-[12px] text-slate-500 truncate max-w-[180px]">{emp.employeeEmail}</div>
+                                </div>
+                              </div>
+                            </TableCell>
+                          ) : (
+                            <TableCell key={c.key} className={cn(RT.td, c.key === 'admissionDone' && 'bg-emerald-50/60')}>{utilCell(c.key, emp, formatTime)}</TableCell>
+                          ),
+                        )}
                       </TableRow>
 
-                      {/* Nested Team Members */}
                       {isExpanded && emp.children && emp.children.length > 0 && (
                         <TableRow>
-                          <TableCell colSpan={13} className="p-0 bg-slate-50/30">
+                          <TableCell colSpan={columnsUi.colCount} className="p-0 bg-slate-50/30">
                             <div className="px-4 py-2">
                               <TeamMemberTable
                                 teamMembers={emp.children}
@@ -1507,16 +1507,16 @@ export function UtilizationReport() {
                                 toggleExpand={toggleExpand}
                                 onEmployeeClick={handleEmployeeClick}
                                 formatTime={formatTime}
+                                columns={columnsUi.visibleColumns}
                               />
                             </div>
                           </TableCell>
                         </TableRow>
                       )}
 
-                      {/* Show message if expanded but no team members */}
                       {isExpanded && (!emp.children || emp.children.length === 0) && (
                         <TableRow>
-                          <TableCell colSpan={13} className="p-0">
+                          <TableCell colSpan={columnsUi.colCount} className="p-0">
                             <div className="px-4 py-2">
                               <div className="text-xs text-slate-400 py-2 px-4 bg-slate-50 rounded-lg border border-slate-200">
                                 No team members found
@@ -1525,24 +1525,19 @@ export function UtilizationReport() {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
 
                 {/* Totals Row */}
-                <TableRow className="bg-slate-50 font-semibold border-t-2 border-slate-200">
-                  <TableCell className="text-xs sticky left-0 bg-slate-50 font-semibold text-slate-800 py-3">Total</TableCell>
-                  <TableCell className="text-xs text-center py-3" colSpan={2}>-</TableCell>
-                  <TableCell className="text-xs text-center font-bold text-slate-800 py-3">{totals.leadAssigned}</TableCell>
-                  <TableCell className="text-xs text-center font-bold text-slate-800 py-3">{totals.newLead}</TableCell>
-                  <TableCell className="text-xs text-center font-bold text-slate-800 py-3">{totals.totalDial}</TableCell>
-                  <TableCell className="text-xs text-center font-bold text-slate-800 py-3">{totals.uniqDial}</TableCell>
-                  <TableCell className="text-xs text-center font-bold text-slate-800 py-3">{totals.answeredCall}</TableCell>
-                  <TableCell className="text-xs text-center font-bold text-slate-800 py-3">{formatTime(totals.answeredTalkTime)}</TableCell>
-                  <TableCell className="text-xs text-center font-bold text-slate-800 py-3">{totals.pcatScheduled}</TableCell>
-                  <TableCell className="text-xs text-center font-bold text-slate-800 py-3">{totals.pcatDone}</TableCell>
-                  <TableCell className="text-xs text-center font-bold text-slate-800 py-3">{totals.registrationDone}</TableCell>
-                  <TableCell className="text-xs text-center font-bold text-slate-800 py-3">{totals.admissionDone}</TableCell>
+                <TableRow className={RT.totalRow}>
+                  {columnsUi.visibleColumns.map((c) =>
+                    c.key === 'employee' ? (
+                      <TableCell key={c.key} className={cn(RT.tdLeft, 'sticky left-0 z-10 bg-slate-100 font-semibold text-slate-800')}>Total</TableCell>
+                    ) : (
+                      <TableCell key={c.key} className={cn(RT.tdTotal, c.key === 'admissionDone' && 'bg-emerald-50')}>{utilCell(c.key, totals, formatTime, true)}</TableCell>
+                    ),
+                  )}
                 </TableRow>
               </TableBody>
             </Table>

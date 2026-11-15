@@ -19,7 +19,6 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'update', label: 'Log Activity / Change Stage' },
       { id: 'assign', label: 'Assign Enrolled Leads' },
       { id: 'sync', label: 'Fetch Students from Upskillab' },
-      { id: 'manage_stages', label: 'Manage Enrolled Lead Stages' },
       { id: 'call', label: 'Click to Call + Fill Call Details' },
       { id: 'full_access', label: 'Full Access (everything on the page, for leads assigned to them)' },
     ]
@@ -157,7 +156,20 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'export', label: 'Export Reports' },
       { id: 'generate', label: 'Generate Reports' },
       { id: 'share', label: 'Share Reports' },
-      { id: 'salary_sheet', label: 'Employee Salary Sheet' }
+      // one permission per report tab (see pages/reports/ReportsPage.tsx)
+      { id: 'stage-summary', label: 'Report: Stages' },
+      { id: 'employee-stages', label: 'Report: Employees' },
+      { id: 'pool-stages', label: 'Report: Pools' },
+      { id: 'pool-revenue', label: 'Report: Revenue' },
+      { id: 'revenue-target-report', label: 'Report: Employee Tgt vs Ach' },
+      { id: 'utilization', label: 'Report: Employee Efforts' },
+      { id: 'consultant-performance', label: 'Report: Employee Performance' },
+      { id: 'daily-utilization', label: 'Report: Emp Inputs' },
+      { id: 'source-campaign', label: 'Report: Campaign – Lead Stage' },
+      { id: 'source-campaign-revenue', label: 'Report: Campaign – Performance' },
+      { id: 'salary_sheet', label: 'Report: Salary Sheet' },
+      { id: 'state-wise', label: 'Report: State Campaign Performance' },
+      { id: 'state-wise-employee', label: 'Report: Employee Performance – State-wise' },
     ]
   },
   targets: {

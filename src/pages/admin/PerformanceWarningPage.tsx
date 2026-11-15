@@ -211,7 +211,7 @@ export function PerformanceWarningPage() {
   // Handle date filter change
   const handleDateFilterChange = (value: typeof filters.dateFilter) => {
     if (value === 'custom') {
-      setFilters({ ...filters, dateFilter: value });
+      setFilters({ ...filters, page: 1, dateFilter: value });
       return;
     }
     
@@ -221,16 +221,12 @@ export function PerformanceWarningPage() {
       const toDate = new Date(range.to);
       toDate.setHours(23, 59, 59, 999);
       
-      setFilters({
-        ...filters,
-        dateFilter: value,
+      setFilters({ ...filters, page: 1, dateFilter: value,
         fromDate: range.from,
         toDate: toDate
       });
     } else {
-      setFilters({
-        ...filters,
-        dateFilter: value,
+      setFilters({ ...filters, page: 1, dateFilter: value,
         fromDate: undefined,
         toDate: undefined
       });

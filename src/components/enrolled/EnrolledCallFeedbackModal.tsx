@@ -135,7 +135,7 @@ export function EnrolledCallFeedbackModal({ open, onOpenChange, callData, onSave
             <Select value={stageId} onValueChange={setStageId} disabled={submitting || loadingStages}>
               <SelectTrigger className="rounded-xl"><SelectValue placeholder={loadingStages ? 'Loading…' : 'Select a stage'} /></SelectTrigger>
               <SelectContent>
-                {stages.map((s) => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}
+                {stages.map((s) => <SelectItem key={s._id} value={s._id} title={(s as any).description || s.name}>{s.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

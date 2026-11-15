@@ -151,14 +151,19 @@ export function CallLogsPage() {
     if (filters.search) params.search = filters.search;
     if (filters.leadId !== 'all') params.leadId = filters.leadId;
     if (filters.stageId !== 'all') params.stageId = filters.stageId;
-    if (filters.userId !== 'all') params.byUserId = filters.userId;
-    if (filters.dateFilter !== 'all') params.dateFilter = filters.dateFilter;
-    if (filters.fromDate) params.fromDate = filters.fromDate;
-    if (filters.toDate) params.toDate = filters.toDate;
+    // custom inputs are hidden unless "custom" is picked – don't send stale values
+    if (filters.dateFilter === 'custom') {
+      if (filters.fromDate) params.fromDate = filters.fromDate;
+      if (filters.toDate) params.toDate = filters.toDate;
+    } else if (filters.dateFilter !== 'all') params.dateFilter = filters.dateFilter;
     if (filters.sort) params.sort = filters.sort;
     if (filters.answered !== 'all') params.answered = filters.answered;
-    if (filters.group === 'true') params.group = true;
-    if (filters.team === 'true') params.team = true;
+    // user / team pickers are only shown in Group mode
+    if (filters.group === 'true') {
+      params.group = true;
+      if (filters.team === 'true') params.team = true;
+      if (filters.userId !== 'all') params.byUserId = filters.userId;
+    }
     if (filters.logType !== 'all') params.logType = filters.logType;
     if (filters.viewType !== 'all') params.type = filters.viewType;
     return params;

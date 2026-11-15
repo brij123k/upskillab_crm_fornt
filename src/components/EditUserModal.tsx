@@ -15,6 +15,8 @@ import { AddressForm } from './AddressForm';
 import { BankDetailsForm } from './BankDetailsForm';
 import { EducationalDetailsForm } from './EducationalDetailsForm';
 import { DocumentsUpload } from './DocumentUpload';
+import { PersonalDetailsForm, EMPTY_PERSONAL_DETAILS, toPersonalDetails, validatePersonalDetails } from './PersonalDetailsForm';
+import type { PersonalDetails } from '@/types/user';
 import { getDataHandlerWithToken, postDataHandlerWithTokenFormData } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
@@ -72,6 +74,7 @@ export function EditUserModal({
     education: '',
     salary: '',
     reportingSeniorId: '',
+    personalDetails: { ...EMPTY_PERSONAL_DETAILS } as PersonalDetails,
     address: {
       addressLine1: '',
       addressLine2: '',
@@ -193,6 +196,7 @@ export function EditUserModal({
         reportingSeniorId: selectedUser.profile?.reportingSeniorId?._id || '',
         poolIds: getPoolIds(selectedUser.profile?.poolIds),
         profileImage: selectedUser.profile?.profileImage || '',
+        personalDetails: toPersonalDetails(selectedUser.profile?.personalDetails),
         address: selectedUser.profile?.address || {
           addressLine1: '', addressLine2: '', city: '', state: '', country: '', pincode: ''
         },
@@ -214,6 +218,12 @@ export function EditUserModal({
 
   const handleSubmit = async () => {
     if (!selectedUser) return;
+    const personalError = validatePersonalDetails(editUserForm.personalDetails);
+    if (personalError) {
+      setActiveTab('personal');
+      toast({ title: "Invalid personal details", description: personalError, variant: "destructive" });
+      return;
+    }
     await onUpdateUser(selectedUser._id, editUserForm);
     if (!updatingUser) {
       onOpenChange(false);
@@ -243,6 +253,13 @@ export function EditUserModal({
               >
                 <UserCircle className="w-3 h-3" />
                 Basic
+              </TabsTrigger>
+              <TabsTrigger 
+                value="personal" 
+                className="flex items-center gap-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+              >
+                <UserCircle className="w-3 h-3" />
+                Personal
               </TabsTrigger>
               <TabsTrigger 
                 value="address" 
@@ -492,6 +509,14 @@ export function EditUserModal({
                     </div>
                   </div>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="personal">
+                <PersonalDetailsForm
+                  value={editUserForm.personalDetails}
+                  onChange={(personalDetails) => setEditUserForm({ ...editUserForm, personalDetails })}
+                  disabled={updatingUser}
+                />
               </TabsContent>
 
               <TabsContent value="address">

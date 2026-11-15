@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -61,6 +61,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { FilterMultiSelect } from '@/components/ui/filter-multi-select';
 import { Label } from '@/components/ui/label';
 import { getDataHandlerWithToken, postDataHandlerWithToken, patchTokenDataHandler } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
@@ -191,13 +192,13 @@ interface BulkLead {
 
 interface Filters {
   search: string;
-  status: string;
-  source: string;
+  status: string[];
+  source: string[];
   source_compain: string;
-  stageId: string;
-  poolId: string;
+  stageId: string[];
+  poolId: string[];
   location: string;
-  assignedTo: string;
+  assignedTo: string[];
   modifiedBy: string;
   isActive: string;
   sort: string;
@@ -245,12 +246,12 @@ const [followUpDateTime, setFollowUpDateTime] = useState('');
 const [addingFollowUp, setAddingFollowUp] = useState(false);
   const [filters, setFilters] = useState<Filters>({
     search: '',
-    status: 'all',
-    source: 'all',
+    status: [],
+    source: [],
     source_compain: '',
-    stageId: 'all',
-    assignedTo: 'all',
-    poolId: 'all',
+    stageId: [],
+    assignedTo: [],
+    poolId: [],
     location: '',
     modifiedBy: 'all',
     isActive: 'all',
@@ -283,7 +284,6 @@ const [bulkStageChangeReason, setBulkStageChangeReason] = useState('');
 const [changingBulkStage, setChangingBulkStage] = useState(false);
   // Selection states
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
-  const [selectAll, setSelectAll] = useState(false);
   const [isAssignmentMode, setIsAssignmentMode] = useState(false);
   
   //whatsapp
@@ -446,10 +446,10 @@ const handleBulkStageChange = async () => {
       };
 
       // Apply other active filters (optional - you can decide to keep or ignore other filters)
-      if (filters.status && filters.status !== "all") queryParams.status = filters.status;
-      if (filters.source && filters.source !== "all") queryParams.source = filters.source;
-      if (filters.stageId && filters.stageId !== "all") queryParams.stageId = filters.stageId;
-      if (filters.poolId && filters.poolId !== "all") queryParams.poolId = filters.poolId;
+      if (filters.status.length) queryParams.status = filters.status.join(',');
+      if (filters.source.length) queryParams.source = filters.source.join(',');
+      if (filters.stageId.length) queryParams.stageId = filters.stageId.join(',');
+      if (filters.poolId.length) queryParams.poolId = filters.poolId.join(',');
 
       const response = await getDataHandlerWithToken("getAllLeads", queryParams, null);
 
@@ -488,13 +488,13 @@ const handleBulkStageChange = async () => {
     params.page = page;
     params.limit = limit;
     if (filters.search && filters.search !== "all") params.search = filters.search;
-    if (filters.status && filters.status !== "all") params.status = filters.status;
-    if (filters.source && filters.source !== "all") params.source = filters.source;
+    if (filters.status.length) params.status = filters.status.join(',');
+    if (filters.source.length) params.source = filters.source.join(',');
     if (filters.source_compain && filters.source_compain !== "all") params.source_compain = filters.source_compain;
-    if (filters.stageId && filters.stageId !== "all") params.stageId = filters.stageId;
-    if (filters.poolId && filters.poolId !== "all") params.poolId = filters.poolId;
+    if (filters.stageId.length) params.stageId = filters.stageId.join(',');
+    if (filters.poolId.length) params.poolId = filters.poolId.join(',');
     if (filters.location) params.location = filters.location;
-    if (filters.assignedTo && filters.assignedTo !== "all") params.assignedTo = filters.assignedTo;
+    if (filters.assignedTo.length) params.assignedTo = filters.assignedTo.join(',');
     if (filters.modifiedBy && filters.modifiedBy !== "all") params.modifiedBy = filters.modifiedBy;
 
     if (filters.isActive && filters.isActive !== "all") {
@@ -504,25 +504,36 @@ const handleBulkStageChange = async () => {
 
     if (filters.sort && filters.sort !== "all") params.sort = filters.sort;
 
-    if (filters.dateFilter && filters.dateFilter !== "all") {
+
+    // Created date: preset OR custom range (hidden custom inputs must not leak)
+    if (filters.dateFilter === "custom") {
+      if (filters.fromDate) params.fromDate = filters.fromDate;
+      if (filters.toDate) params.toDate = filters.toDate;
+    } else if (filters.dateFilter && filters.dateFilter !== "all") {
       params.dateFilter = filters.dateFilter;
     }
 
-    if (filters.fromDate && filters.fromDate !== "all") params.fromDate = filters.fromDate;
-    if (filters.toDate && filters.toDate !== "all") params.toDate = filters.toDate;
-    if (filters.assignedDateFilter && filters.assignedDateFilter !== "all") params.assignedDateFilter = filters.assignedDateFilter;
-    if (filters.assignedDateFrom && filters.assignedDateFrom !== "all") params.assignedDateFrom = filters.assignedDateFrom;
-    if (filters.assignedDateTo && filters.assignedDateTo !== "all") params.assignedDateTo = filters.assignedDateTo;
+    // Assigned date: preset OR custom range
+    if (filters.assignedDateFilter === "custom") {
+      if (filters.assignedDateFrom) params.assignedDateFrom = filters.assignedDateFrom;
+      if (filters.assignedDateTo) params.assignedDateTo = filters.assignedDateTo;
+    } else if (filters.assignedDateFilter && filters.assignedDateFilter !== "all") {
+      params.assignedDateFilter = filters.assignedDateFilter;
+    }
 
     return params;
   };
 
   // Fetch leads with filters
+  const leadsRequestRef = useRef(0);
   const fetchLeads = async () => {
+    const requestId = ++leadsRequestRef.current;
     try {
       setLoading(true);
       const queryParams = buildQueryParams();
       const response = await getDataHandlerWithToken("getAllLeads", queryParams, null);
+      // ignore responses for an older filter/page (out-of-order network replies)
+      if (requestId !== leadsRequestRef.current) return;
 
       if (response?.data) {
         setLeads(response.data);
@@ -536,7 +547,7 @@ const handleBulkStageChange = async () => {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      if (requestId === leadsRequestRef.current) setLoading(false);
     }
   };
 
@@ -644,41 +655,49 @@ const handleBulkStageChange = async () => {
 };
 
   // Initialize data
+  // Lookup data (doesn't depend on filters) – load once
   useEffect(() => {
-    fetchLeads();
-    fetchStages();
     fetchUsers();
+    fetchStages();
     fetchPools();
-  }, [page, limit, filters]);
+  }, []);
 
-  // Reset selection when leads change
+  // Leads: refetch on page/limit/filters. Filter changes are debounced
+  // (typing in search/location) and always jump back to page 1.
+  const filtersKey = JSON.stringify(filters);
+  const prevFiltersKeyRef = useRef(filtersKey);
+  useEffect(() => {
+    const filtersChanged = prevFiltersKeyRef.current !== filtersKey;
+    prevFiltersKeyRef.current = filtersKey;
+    if (filtersChanged && page !== 1) {
+      setPage(1); // effect re-runs with page 1
+      return;
+    }
+    const t = setTimeout(() => { fetchLeads(); }, filtersChanged ? 400 : 0);
+    return () => clearTimeout(t);
+  }, [page, limit, filtersKey]);
+
+  // Reset selection when leads change (assignment mode keeps picks across pages)
   useEffect(() => {
     if (!isAssignmentMode) {
       setSelectedLeads([]);
-      setSelectAll(false);
     }
   }, [leads]);
 
-  const handleSelectAll = () => {
+  // Header checkbox state is derived from the real selection:
+  // ticked when every lead on this page is selected.
+  const selectAll = leads.length > 0 && leads.every(lead => selectedLeads.includes(lead._id));
+  const someSelectedOnPage = !selectAll && leads.some(lead => selectedLeads.includes(lead._id));
+
+  // Tick → select every lead on this page. Untick → clear ALL selected leads.
+  const toggleSelectAll = () => {
     if (selectAll) {
-      // Uncheck: remove current page leads from selection
-      const currentPageIds = new Set(leads.map(l => l._id));
-      setSelectedLeads(prev => prev.filter(id => !currentPageIds.has(id)));
-      setSelectAll(false);
+      setSelectedLeads([]);
     } else {
-      setSelectAll(true);
+      const pageIds = leads.map(lead => lead._id);
+      setSelectedLeads(prev => Array.from(new Set([...prev, ...pageIds])));
     }
   };
-
-  // Handle select all
-  useEffect(() => {
-    if (selectAll) {
-      const currentPageIds = leads.map(lead => lead._id);
-      // Add current page leads to existing selections
-      setSelectedLeads(prev => Array.from(new Set([...prev, ...currentPageIds])));
-    }
-    // Don't clear on selectAll = false here, let the checkbox handler do it
-  }, [selectAll, leads]);
 
   // Add new lead
   const handleAddLead = async () => {
@@ -1209,13 +1228,13 @@ const handleBulkStageChange = async () => {
   const resetFilters = () => {
     setFilters({
       search: '',
-      status: 'all',
-      source: 'all',
+      status: [],
+      source: [],
       source_compain: '',
-      stageId: 'all',
-      poolId: 'all',
+      stageId: [],
+      poolId: [],
       location: '',
-      assignedTo: 'all',
+      assignedTo: [],
       modifiedBy: 'all',
       isActive: 'all',
       sort: 'new',
@@ -1234,7 +1253,6 @@ const handleBulkStageChange = async () => {
     setIsAssignmentMode(!isAssignmentMode);
     if (!isAssignmentMode) {
       setSelectedLeads([]);
-      setSelectAll(false);
     }
   };
 
@@ -1347,33 +1365,8 @@ const handleBulkStageChange = async () => {
   const exportToCSV = async () => {
     try {
       // Build query params for all data (no pagination)
-      const queryParams: Record<string, any> = {};
-
-      // Apply all active filters (only if not "all")
-      if (filters.search && filters.search !== "all") queryParams.search = filters.search;
-      if (filters.status && filters.status !== "all") queryParams.status = filters.status;
-      if (filters.source && filters.source !== "all") queryParams.source = filters.source;
-      if (filters.stageId && filters.stageId !== "all") queryParams.stageId = filters.stageId;
-      if (filters.location) queryParams.location = filters.location;
-      if (filters.assignedTo && filters.assignedTo !== "all") queryParams.assignedTo = filters.assignedTo;
-      if (filters.modifiedBy && filters.modifiedBy !== "all") queryParams.modifiedBy = filters.modifiedBy;
-
-      if (filters.isActive && filters.isActive !== "all") {
-        queryParams.isActive = filters.isActive === "true" ? true :
-          filters.isActive === "false" ? false : filters.isActive;
-      }
-
-      if (filters.sort && filters.sort !== "all") queryParams.sort = filters.sort;
-
-      if (filters.dateFilter && filters.dateFilter !== "all") {
-        queryParams.dateFilter = filters.dateFilter;
-      }
-
-      if (filters.fromDate && filters.fromDate !== "all") queryParams.fromDate = filters.fromDate;
-      if (filters.toDate && filters.toDate !== "all") queryParams.toDate = filters.toDate;
-      if (filters.assignedDateFilter && filters.assignedDateFilter !== "all") queryParams.assignedDateFilter = filters.assignedDateFilter;
-      if (filters.assignedDateFrom && filters.assignedDateFrom !== "all") queryParams.assignedDateFrom = filters.assignedDateFrom;
-      if (filters.assignedDateTo && filters.assignedDateTo !== "all") queryParams.assignedDateTo = filters.assignedDateTo;
+      // Same filters as the table (incl. pool, source campaign, date presets)
+      const queryParams: Record<string, any> = buildQueryParams();
 
       // Fetch all data without pagination
       queryParams.page = 1;
@@ -1451,8 +1444,8 @@ const handleBulkStageChange = async () => {
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
       const filterInfo = [];
       if (filters.search) filterInfo.push(`search-${filters.search}`);
-      if (filters.status !== "all") filterInfo.push(`status-${filters.status}`);
-      if (filters.source !== "all") filterInfo.push(`source-${filters.source}`);
+      if (filters.status.length) filterInfo.push(`status-${filters.status.join('+')}`);
+      if (filters.source.length) filterInfo.push(`source-${filters.source.join('+')}`);
 
       const filename = `leads_export_${timestamp}${filterInfo.length > 0 ? `_${filterInfo.join('_')}` : ''}.csv`;
 
@@ -2058,41 +2051,23 @@ const handleBulkStageChange = async () => {
         </div>
         <div className="space-y-1">
           <Label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Status</Label>
-          <Select
+          <FilterMultiSelect
+            options={[{ value: 'active', label: 'Active' }, { value: 'lost', label: 'Lost' }, { value: 'converted', label: 'Converted' }]}
             value={filters.status}
-            onValueChange={(value) => setFilters({ ...filters, status: value })}
-          >
-            <SelectTrigger className="h-9 text-sm rounded-lg border-slate-200">
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
-            <SelectContent className="rounded-lg">
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="lost">Lost</SelectItem>
-              <SelectItem value="converted">Converted</SelectItem>
-            </SelectContent>
-          </Select>
+            onChange={(value) => setFilters({ ...filters, status: value })}
+            allLabel="All statuses"
+            searchPlaceholder="Search status…"
+          />
         </div>
         <div className="space-y-1">
           <Label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Source</Label>
-          <Select
+          <FilterMultiSelect
+            options={[{ value: 'manual', label: 'Manual' }, { value: 'facebook', label: 'Facebook' }, { value: 'google', label: 'Google' }, { value: 'positive', label: 'Positive' }, { value: 'bootcamp', label: 'Bootcamp' }, { value: 'refurbished', label: 'Refurbished' }, { value: 'api', label: 'API' }]}
             value={filters.source}
-            onValueChange={(value) => setFilters({ ...filters, source: value })}
-          >
-            <SelectTrigger className="h-9 text-sm rounded-lg border-slate-200">
-              <SelectValue placeholder="All sources" />
-            </SelectTrigger>
-            <SelectContent className="rounded-lg">
-              <SelectItem value="all">All Sources</SelectItem>
-              <SelectItem value="manual">Manual</SelectItem>
-              <SelectItem value="facebook">Facebook</SelectItem>
-              <SelectItem value="google">Google</SelectItem>
-              <SelectItem value="positive">Positive</SelectItem>
-              <SelectItem value="bootcamp">Bootcamp</SelectItem>
-              <SelectItem value="refurbished">Refurbished</SelectItem>
-              <SelectItem value="api">API</SelectItem>
-            </SelectContent>
-          </Select>
+            onChange={(value) => setFilters({ ...filters, source: value })}
+            allLabel="All sources"
+            searchPlaceholder="Search source…"
+          />
         </div>
       </div>
 
@@ -2100,21 +2075,14 @@ const handleBulkStageChange = async () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="space-y-1">
           <Label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Stage</Label>
-          <Select
+          <FilterMultiSelect
+            options={stages.map(stage => ({ value: stage._id, label: stage.name }))}
             value={filters.stageId}
-            onValueChange={(value) => setFilters({ ...filters, stageId: value })}
+            onChange={(value) => setFilters({ ...filters, stageId: value })}
+            allLabel="All stages"
+            searchPlaceholder="Search stage…"
             disabled={loadingStages}
-          >
-            <SelectTrigger className="h-9 text-sm rounded-lg border-slate-200">
-              <SelectValue placeholder="All stages" />
-            </SelectTrigger>
-            <SelectContent className="rounded-lg max-h-60">
-              <SelectItem value="all">All Stages</SelectItem>
-              {stages.map((stage) => (
-                <SelectItem key={stage._id} value={stage._id}>{stage.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
         </div>
         <div className="space-y-1">
           <Label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Location</Label>
@@ -2157,43 +2125,29 @@ const handleBulkStageChange = async () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1">
           <Label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Assigned To</Label>
-          <SearchableDropdown
-            options={[
-              { value: "all", label: "All Users" },
-              ...users.filter(user => user.status=="active").map(user => ({
+          <FilterMultiSelect
+              options={users.filter(user => user.status == "active").map(user => ({
                 value: user._id,
                 label: user.name,
-                role: user.role?.name,
-                empId: user.employeeId
-              }))
-            ]}
-            value={filters.assignedTo}
-            onValueChange={(value) => setFilters({ ...filters, assignedTo: value })}
-            placeholder="All Users"
-            searchPlaceholder="Search user..."
-            emptyMessage="No users found"
-            disabled={loadingUsers}
-            triggerClassName="h-9 text-sm rounded-lg border-slate-200"
-            contentClassName="rounded-lg"
-          />
+                hint: user.employeeId ? `#${user.employeeId}` : user.role?.name,
+              }))}
+              value={filters.assignedTo}
+              onChange={(value) => setFilters({ ...filters, assignedTo: value })}
+              allLabel="All users"
+              searchPlaceholder="Search user / emp id…"
+              disabled={loadingUsers}
+            />
         </div>
         <div className="space-y-1">
           <Label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Pool</Label>
-          <Select
+          <FilterMultiSelect
+            options={pools.filter(pool => pool.isActive).map(pool => ({ value: pool._id, label: pool.name }))}
             value={filters.poolId}
-            onValueChange={(value) => setFilters({ ...filters, poolId: value })}
+            onChange={(value) => setFilters({ ...filters, poolId: value })}
+            allLabel="All pools"
+            searchPlaceholder="Search pool…"
             disabled={loadingPools}
-          >
-            <SelectTrigger className="h-9 text-sm rounded-lg border-slate-200">
-              <SelectValue placeholder="All pools" />
-            </SelectTrigger>
-            <SelectContent className="rounded-lg max-h-60">
-              <SelectItem value="all">All Pools</SelectItem>
-              {pools.filter(pool => pool.isActive).map(pool => (
-                <SelectItem key={pool._id} value={pool._id}>{pool.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
         </div>
       </div>
 
@@ -2289,20 +2243,20 @@ const handleBulkStageChange = async () => {
       {/* Active filters summary */}
       <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
         <span className="text-xs text-slate-400">Active filters:</span>
-        {filters.status !== 'all' && (
-          <Badge variant="secondary" className="bg-slate-100 text-slate-600 text-xs rounded-full">Status: {filters.status}</Badge>
+        {filters.status.length > 0 && (
+          <Badge variant="secondary" className="bg-slate-100 text-slate-600 text-xs rounded-full">Status: {filters.status.join(', ')}</Badge>
         )}
-        {filters.source !== 'all' && (
-          <Badge variant="secondary" className="bg-slate-100 text-slate-600 text-xs rounded-full">Source: {filters.source}</Badge>
+        {filters.source.length > 0 && (
+          <Badge variant="secondary" className="bg-slate-100 text-slate-600 text-xs rounded-full">Source: {filters.source.join(', ')}</Badge>
         )}
-        {filters.stageId !== 'all' && (
-          <Badge variant="secondary" className="bg-slate-100 text-slate-600 text-xs rounded-full">Stage: {stages.find(s => s._id === filters.stageId)?.name}</Badge>
+        {filters.stageId.length > 0 && (
+          <Badge variant="secondary" className="bg-slate-100 text-slate-600 text-xs rounded-full">Stage: {filters.stageId.map(id => stages.find(s => s._id === id)?.name || id).join(', ')}</Badge>
         )}
-        {filters.assignedTo !== 'all' && (
-          <Badge variant="secondary" className="bg-slate-100 text-slate-600 text-xs rounded-full">Assigned to: {users.find(u => u._id === filters.assignedTo)?.name}</Badge>
+        {filters.assignedTo.length > 0 && (
+          <Badge variant="secondary" className="bg-slate-100 text-slate-600 text-xs rounded-full">Assigned to: {filters.assignedTo.map(id => users.find(u => u._id === id)?.name || id).join(', ')}</Badge>
         )}
-        {filters.poolId !== 'all' && filters.poolId && (
-          <Badge variant="secondary" className="bg-slate-100 text-slate-600 text-xs rounded-full">Pool: {pools.find(p => p._id === filters.poolId)?.name}</Badge>
+        {filters.poolId.length > 0 && (
+          <Badge variant="secondary" className="bg-slate-100 text-slate-600 text-xs rounded-full">Pool: {filters.poolId.map(id => pools.find(p => p._id === id)?.name || id).join(', ')}</Badge>
         )}
       </div>
     </CardContent>
@@ -2336,7 +2290,8 @@ const handleBulkStageChange = async () => {
               <input
                 type="checkbox"
                 checked={selectAll}
-                onChange={() => setSelectAll(!selectAll)}
+                ref={el => { if (el) el.indeterminate = someSelectedOnPage; }}
+                onChange={() => toggleSelectAll()}
                 className="w-4 h-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
               />
             </th>

@@ -33,6 +33,7 @@ import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { KpiCard, KpiGrid, ChartCard, Gauge, TargetProgressList, PersonCell } from './ReportUI';
+import { useReportColumns, useReportScope, RT, Num, ReportTableHeader } from './ReportTable';
 
 /* -------------------------------------------------------------------------- */
 /*                              Money & Formatters                             */
@@ -66,6 +67,7 @@ const getCurrentMonthKey = () => {
 const ROWS_PER_PAGE = 10;
 
 export function RevenueTargetReport() {
+  const { filterRows } = useReportScope();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -114,8 +116,17 @@ export function RevenueTargetReport() {
 
   // ─── Derived data ───
   const months = data?.months || [];
-  const users = data?.users || [];
+  const users = filterRows(data?.users || [], (u: any) => u.userId); // BD: self + own team
   const summary = data?.summary || {};
+
+  // Customisable column groups: each month (Target + Ach) and Combined
+  const columnsUi = useReportColumns('revenue-target-report', [
+    { key: 'employee', label: 'Employee', locked: true },
+    ...months.map((m: any) => ({ key: `month:${m.monthKey}`, label: m.label })),
+    { key: 'combined', label: 'Combined' },
+  ]);
+  const groupColumns = columnsUi.visibleColumns.filter(c => !c.locked);
+  const monthIndexByKey = new Map<string, number>(months.map((m: any, i: number) => [`month:${m.monthKey}`, i]));
 
   const filteredUsers = useMemo(() => {
     if (!searchTerm) return users;
@@ -290,67 +301,66 @@ export function RevenueTargetReport() {
           </div>
 
           {/* Table */}
-          <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
-            <Table style={{ minWidth: `${420 + months.length * 220}px` }}>
+          <ReportTableHeader title="Target vs Achievement" chooser={columnsUi.chooser} />
+          <div className={RT.wrap}>
+            <Table style={{ minWidth: `${420 + groupColumns.length * 220}px` }}>
               <TableHeader>
-                <TableRow className="bg-amber-50 hover:bg-amber-50 border-b border-amber-200">
-                  <TableHead rowSpan={2} className="text-xs font-semibold text-amber-900 uppercase sticky left-0 z-20 bg-amber-50">
-                    Employee
-                  </TableHead>
-                  {months.map((month: any) => (
-                    <TableHead key={month.monthKey} colSpan={2} className="text-center text-xs font-semibold text-amber-900 uppercase">
-                      {month.label}
-                    </TableHead>
+                <TableRow className={RT.headRow}>
+                  <TableHead rowSpan={2} className={cn(RT.thLeft, RT.thSticky, 'min-w-[220px]')}>Employee</TableHead>
+                  {groupColumns.map((c) => (
+                    <TableHead key={c.key} colSpan={2} className={cn(RT.th, 'border-l border-slate-200 text-slate-700')}>{c.label}</TableHead>
                   ))}
-                  <TableHead colSpan={2} className="text-center text-xs font-semibold text-amber-900 uppercase">
-                    Combined
-                  </TableHead>
                 </TableRow>
-                <TableRow className="bg-amber-100/50 hover:bg-amber-100/50">
-                  {months.map((month: any) => (
-                    <Fragment key={`${month.monthKey}-sub`}>
-                      <TableHead className="text-center text-xs font-medium text-amber-800">Target</TableHead>
-                      <TableHead className="text-center text-xs font-medium text-amber-800">Ach</TableHead>
+                <TableRow className="bg-slate-50/60 hover:bg-slate-50/60 border-b border-slate-200">
+                  {groupColumns.map((c) => (
+                    <Fragment key={`${c.key}-sub`}>
+                      <TableHead className={cn(RT.th, 'h-8 border-l border-slate-200 normal-case')}>Target</TableHead>
+                      <TableHead className={cn(RT.th, 'h-8 normal-case')}>Ach</TableHead>
                     </Fragment>
                   ))}
-                  <TableHead className="text-center text-xs font-medium text-amber-800">Target</TableHead>
-                  <TableHead className="text-center text-xs font-medium text-amber-800">Ach</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedUsers.map((user: any) => (
-                  <TableRow key={user.userId} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
-                    <TableCell className="sticky left-0 z-10 bg-white border-r py-3">
+                  <TableRow key={user.userId} className={RT.row}>
+                    <TableCell className={cn(RT.tdLeft, RT.tdSticky)}>
                       <PersonCell
                         name={user.name}
                         sub={`${user.employeeId ? `ID: ${user.employeeId}` : ''}${user.roleName ? ` | ${user.roleName}` : ''}`}
                       />
                     </TableCell>
-                    {months.map((month: any, index: number) => {
+                    {groupColumns.map((c) => {
+                      if (c.key === 'combined') {
+                        return (
+                          <Fragment key="combined">
+                            <TableCell className={cn(RT.td, 'border-l border-slate-100')}>
+                              <Num value={Number(user.combinedTarget || 0)} bold format={formatMoney} />
+                            </TableCell>
+                            <TableCell className={RT.td}>
+                              <span className="inline-flex justify-center rounded-md bg-slate-100 text-slate-900 ring-1 ring-inset ring-slate-200 px-2.5 py-1 text-[13px] font-bold tabular-nums">{formatMoney(user.combinedAchieved || 0)}</span>
+                            </TableCell>
+                          </Fragment>
+                        );
+                      }
+                      const index = monthIndexByKey.get(c.key) ?? -1;
                       const monthRow = user.months?.[index] || {};
                       const achieved = Number(monthRow.achieved || 0);
                       const target = Number(monthRow.target || 0);
                       const achievedClass = achieved >= target && target > 0 ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : achieved > 0 ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-slate-50 text-slate-400 ring-slate-200';
                       return (
-                        <Fragment key={`${user.userId}-${month.monthKey}`}>
-                          <TableCell className="text-center py-3">
-                            <div className="font-semibold text-[13px] text-slate-800 tabular-nums">{formatMoney(target)}</div>
-                            <div className="text-[10px] text-slate-400 mt-0.5">
-                              {monthRow.percentage != null ? formatPercent(monthRow.percentage) : '-'}
+                        <Fragment key={`${user.userId}-${c.key}`}>
+                          <TableCell className={cn(RT.td, 'border-l border-slate-100')}>
+                            <div><Num value={target} bold format={formatMoney} /></div>
+                            <div className="text-[10.5px] text-slate-400 mt-0.5">
+                              {monthRow.percentage != null ? formatPercent(monthRow.percentage) : '–'}
                             </div>
                           </TableCell>
-                          <TableCell className="text-center py-3">
+                          <TableCell className={RT.td}>
                             <span className={`inline-flex justify-center min-w-[3.5rem] rounded-full px-2.5 py-1 text-[12.5px] font-semibold tabular-nums ring-1 ring-inset ${achievedClass}`}>{formatMoney(achieved)}</span>
                           </TableCell>
                         </Fragment>
                       );
                     })}
-                    <TableCell className="text-center py-3 bg-slate-50/50">
-                      <span className="font-bold text-[13px] text-slate-900 tabular-nums">{formatMoney(user.combinedTarget || 0)}</span>
-                    </TableCell>
-                    <TableCell className="text-center py-3 bg-slate-50/50">
-                      <span className="inline-flex justify-center rounded-lg bg-slate-900 px-2.5 py-1 text-[13px] font-bold text-white tabular-nums">{formatMoney(user.combinedAchieved || 0)}</span>
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

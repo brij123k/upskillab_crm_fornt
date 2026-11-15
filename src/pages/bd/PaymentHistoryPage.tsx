@@ -183,13 +183,18 @@ export function PaymentHistoryPage() {
             if (filters.search) params.search = filters.search;
             if (filters.orderId) params.orderId = filters.orderId;
             if (filters.leadId) params.leadId = filters.leadId;
-            if (filters.counsellorId) params.counsellorId = filters.counsellorId;
-            if (filters.groupFilter) params.group = true;
-            if (filters.dateFilter && filters.dateFilter !== 'all') {
+            // counsellor picker is only visible in Group mode
+            if (filters.groupFilter) {
+                params.group = true;
+                if (filters.counsellorId) params.counsellorId = filters.counsellorId;
+            }
+            // custom inputs are only visible for "custom" – don't send stale values
+            if (filters.dateFilter === 'custom') {
+                if (filters.fromDate) params.fromDate = filters.fromDate;
+                if (filters.toDate) params.toDate = filters.toDate;
+            } else if (filters.dateFilter && filters.dateFilter !== 'all') {
                 params.dateFilter = filters.dateFilter;
             }
-            if (filters.fromDate) params.fromDate = filters.fromDate;
-            if (filters.toDate) params.toDate = filters.toDate;
             
             const response = await getDataHandlerWithToken("getPaymentHistory", params, null);
             if (response) {

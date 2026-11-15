@@ -324,11 +324,13 @@ export function LoanManagementPage() {
             } else {
                 params.counsellorId = currentUser._id;
             }
-            if (filters.dateFilter && filters.dateFilter !== 'all') {
+            // custom inputs are only visible for "custom" – don't send stale values
+            if (filters.dateFilter === 'custom') {
+                if (filters.fromDate) params.fromDate = filters.fromDate;
+                if (filters.toDate) params.toDate = filters.toDate;
+            } else if (filters.dateFilter && filters.dateFilter !== 'all') {
                 params.dateFilter = filters.dateFilter;
             }
-            if (filters.fromDate) params.fromDate = filters.fromDate;
-            if (filters.toDate) params.toDate = filters.toDate;
 
             const response = await getDataHandlerWithToken("getLoanHistory", params, null);
             if (response) {

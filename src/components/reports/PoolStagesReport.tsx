@@ -46,6 +46,7 @@ import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { KpiCard, KpiGrid, ChartCard, DonutWithLegend, RankedBars, HeatChip } from './ReportUI';
+import { defaultLevelForUser, fetchLevelsForUser, useReportColumns, RT, ReportTableHeader } from './ReportTable';
 import { Layers as LayersIcon, Trophy as TrophyIcon, BarChart3 as BarChartIcon, Building2 as PoolIcon } from 'lucide-react';
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -341,8 +342,8 @@ export function PoolStagesReport() {
 
   // Level filter
   const [levels, setLevels] = useState<LevelType[]>([]);
-  const [selectedLevel, setSelectedLevel] = useState<string>('1');
-  const [levelInput, setLevelInput] = useState<string>('1');
+  const [selectedLevel, setSelectedLevel] = useState<string>(() => defaultLevelForUser('1'));
+  const [levelInput, setLevelInput] = useState<string>(() => defaultLevelForUser('1'));
 
   // Team filter (checkbox)
   const [showTeamOnly, setShowTeamOnly] = useState<boolean>(false);
@@ -375,7 +376,7 @@ export function PoolStagesReport() {
   useEffect(() => {
     const fetchLevels = async () => {
       try {
-        const response = await getDataHandlerWithToken('getAllLevels', null, null);
+        const response = await fetchLevelsForUser();
         if (response) {
           setLevels(response);
           if (response.length > 0) {
@@ -661,6 +662,17 @@ export function PoolStagesReport() {
     const extra = Array.from(stageSet).filter(s => !ordered.includes(s));
     return [...ordered, ...extra];
   })();
+
+  // Customisable columns: one per pool (Lead Stage stays first)
+  const columnsUi = useReportColumns('pool-stages', [
+    { key: 'stage', label: 'Lead Stage', locked: true },
+    ...poolStageMap.map(pool => ({ key: `pool:${pool.poolId}`, label: pool.poolName })),
+  ]);
+  const poolById = new Map(poolStageMap.map(pool => [`pool:${pool.poolId}`, pool]));
+  const visiblePools = columnsUi.visibleColumns
+    .filter(c => !c.locked)
+    .map(c => poolById.get(c.key))
+    .filter(Boolean) as typeof poolStageMap;
 
   // Check if team mode is active
   const isTeamMode = data?.filters?.team === true || showTeamOnly;
@@ -973,23 +985,19 @@ export function PoolStagesReport() {
               <p className="ml-2 text-sm text-slate-500">Loading stage headers...</p>
             </div>
           ) : (
-            <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
+            <div className="space-y-3">
+            <ReportTableHeader title="Stage × Pool" subtitle={`${visiblePools.length} pool${visiblePools.length === 1 ? '' : 's'} shown`} chooser={columnsUi.chooser} />
+            <div className={RT.wrap}>
               <Table className="min-w-[800px]">
                 <TableHeader>
-                  <TableRow className="bg-slate-50 hover:bg-slate-50 border-b border-slate-100">
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase sticky left-0 bg-slate-50 z-10 min-w-[140px]">
-                      Lead Stage
-                    </TableHead>
-                    {poolStageMap.map(pool => (
-                      <TableHead key={pool.poolId} className="text-xs text-left min-w-[110px] py-3">
-                        <div className="font-semibold text-slate-800">{pool.poolName}</div>
-                        <div className="text-[10px] font-normal text-slate-400 mt-0.5">
-                          Total: {pool.totalLead}
-                        </div>
+                  <TableRow className={RT.headRow}>
+                    <TableHead className={cn(RT.thLeft, RT.thSticky, 'min-w-[180px]')}>Lead Stage</TableHead>
+                    {visiblePools.map(pool => (
+                      <TableHead key={pool.poolId} className={cn(RT.th, 'min-w-[120px] normal-case tracking-normal')}>
+                        <div className="text-[12px] font-semibold text-slate-800">{pool.poolName}</div>
+                        <div className="text-[10px] font-normal text-slate-400">Total {pool.totalLead}</div>
                         {pool.teamSize && pool.teamSize > 1 && (
-                          <div className="text-[9px] font-normal text-orange-500 mt-0.5">
-                            Team: {pool.teamSize}
-                          </div>
+                          <div className="text-[10px] font-normal text-orange-500">Team {pool.teamSize}</div>
                         )}
                       </TableHead>
                     ))}
@@ -998,43 +1006,35 @@ export function PoolStagesReport() {
                 <TableBody>
                   {relevantStages.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={poolStageMap.length + 1} className="text-center py-8 text-sm text-slate-500">
+                      <TableCell colSpan={visiblePools.length + 1} className="text-center py-8 text-sm text-slate-500">
                         No stage data for the selected level / date range.
                       </TableCell>
                     </TableRow>
                   ) : (
                     relevantStages.map(stageName => (
-                      <TableRow
-                        key={stageName}
-                        className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors"
-                      >
-                        <TableCell className="text-xs font-medium text-slate-700 sticky left-0 bg-white border-r z-10 py-3">
+                      <TableRow key={stageName} className={RT.row}>
+                        <TableCell className={cn(RT.tdLeft, RT.tdSticky, 'font-medium text-slate-800')}>
                           {stageName}
                         </TableCell>
-                        {poolStageMap.map(pool => {
+                        {visiblePools.map(pool => {
                           const count = pool.stageMap.get(stageName) || 0;
                           const total = pool.totalLead || 1;
                           const pct = ((count / total) * 100).toFixed(1);
                           const isLoadingDetail = loadingStageDetail === `${pool.poolId}-${stageName}`;
-                          
                           return (
-                            <TableCell key={pool.poolId} className="text-xs text-center py-3 px-auto">
+                            <TableCell key={pool.poolId} className={RT.td}>
                               <button
                                 onClick={() => count > 0 && handleStageClick(pool.poolId, stageName)}
                                 disabled={count === 0 || isLoadingDetail}
                                 className={cn(
                                   "mx-auto flex flex-col items-center transition-transform",
                                   count > 0 && "hover:scale-105 cursor-pointer",
-                                  count === 0 && "cursor-default opacity-50",
+                                  count === 0 && "cursor-default",
                                   isLoadingDetail && "opacity-50 cursor-wait"
                                 )}
                                 title={count > 0 ? `Click to view ${stageName} leads` : 'No leads'}
                               >
-                                {isLoadingDetail ? (
-                                  <Loader2 className="w-3 h-3 animate-spin text-orange-500" />
-                                ) : (
-                                  <HeatChip count={count} pct={Number(pct)} />
-                                )}
+                                {isLoadingDetail ? <Loader2 className="w-3 h-3 animate-spin text-orange-500" /> : <HeatChip count={count} pct={Number(pct)} />}
                               </button>
                             </TableCell>
                           );
@@ -1044,6 +1044,7 @@ export function PoolStagesReport() {
                   )}
                 </TableBody>
               </Table>
+            </div>
             </div>
           )}
 

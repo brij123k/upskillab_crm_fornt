@@ -40,6 +40,7 @@ import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useReportColumns, RT, Num, ReportTableHeader, type ReportColumn } from './ReportTable';
 
 /* -------------------------------------------------------------------------- */
 /*                             Stage Summary Report                           */
@@ -88,7 +89,15 @@ const KPI_TONES = [
   { icon: Target,        iconBg: 'bg-rose-100',    iconText: 'text-rose-600',    label: 'text-rose-600',    bar: 'bg-rose-500' },
 ];
 
+
+const STAGE_SUMMARY_COLUMNS: ReportColumn[] = [
+  { key: 'stage', label: 'Lead Stage', locked: true },
+  { key: 'count', label: 'Count' },
+  { key: 'percentage', label: 'Percentage' },
+];
+
 export function StageSummaryReport() {
+  const columnsUi = useReportColumns('stage-summary', STAGE_SUMMARY_COLUMNS);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ReportData | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -429,19 +438,20 @@ export function StageSummaryReport() {
 
             {/* Breakdown table */}
             <div className="xl:col-span-3 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-[15px] font-semibold text-slate-900">Lead Stage Breakdown</h4>
-                <span className="text-xs text-slate-500">
-                  Total: <span className="font-semibold text-orange-600">{total}</span>
-                </span>
+              <div className="mb-4">
+                <ReportTableHeader
+                  title="Lead Stage Breakdown"
+                  subtitle={<>Total: <span className="font-semibold text-orange-600">{total}</span></>}
+                  chooser={columnsUi.chooser}
+                />
               </div>
-              <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">
+              <div className={RT.wrap}>
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-slate-50 hover:bg-slate-50 border-b border-slate-100">
-                      <TableHead className="text-xs font-semibold text-slate-500 uppercase">Lead Stage</TableHead>
-                      <TableHead className="text-xs font-semibold text-slate-500 uppercase text-right">Count</TableHead>
-                      <TableHead className="text-xs font-semibold text-slate-500 uppercase text-right">Percentage</TableHead>
+                    <TableRow className={RT.headRow}>
+                      {columnsUi.visibleColumns.map((c) => (
+                        <TableHead key={c.key} className={c.key === 'stage' ? RT.thLeft : RT.th}>{c.label}</TableHead>
+                      ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -449,25 +459,32 @@ export function StageSummaryReport() {
                       const percentage = pctOf(item.count);
                       const color = stageColor.get(item.leadStage) || OTHERS_COLOR;
                       return (
-                        <TableRow key={idx} className="border-b border-slate-50 transition-colors">
-                          <TableCell className="text-sm font-medium text-slate-800 py-2.5">
-                            <span className="inline-flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-                              {item.leadStage}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-sm text-slate-700 text-right tabular-nums py-2.5">{item.count}</TableCell>
-                          <TableCell className="text-sm text-slate-600 text-right py-2.5">
-                            <span className="inline-flex items-center justify-end gap-3">
-                              <span className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                <span
-                                  className="block h-full rounded-full"
-                                  style={{ width: `${percentage}%`, backgroundColor: color }}
-                                />
-                              </span>
-                              <span className="w-12 tabular-nums">{percentage}%</span>
-                            </span>
-                          </TableCell>
+                        <TableRow key={idx} className={RT.row}>
+                          {columnsUi.visibleColumns.map((c) => {
+                            if (c.key === 'stage') {
+                              return (
+                                <TableCell key={c.key} className={cn(RT.tdLeft, 'font-medium text-slate-800')}>
+                                  <span className="inline-flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                                    {item.leadStage}
+                                  </span>
+                                </TableCell>
+                              );
+                            }
+                            if (c.key === 'count') {
+                              return <TableCell key={c.key} className={RT.td}><Num value={item.count} bold /></TableCell>;
+                            }
+                            return (
+                              <TableCell key={c.key} className={RT.td}>
+                                <span className="inline-flex items-center justify-center gap-3">
+                                  <span className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                    <span className="block h-full rounded-full" style={{ width: `${percentage}%`, backgroundColor: color }} />
+                                  </span>
+                                  <span className="w-12 tabular-nums">{percentage}%</span>
+                                </span>
+                              </TableCell>
+                            );
+                          })}
                         </TableRow>
                       );
                     })}

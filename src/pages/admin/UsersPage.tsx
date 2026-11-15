@@ -528,6 +528,9 @@ export function UsersPage() {
         reportingSeniorId: data.reportingSeniorId || null,
         poolIds: data.poolIds || [],
 
+        // Personal details (also filled by employee via onboarding link)
+        ...(data.personalDetails ? { personalDetails: data.personalDetails } : {}),
+
         // Profile image
         profileImage: data.profileImage || '',
 

@@ -394,11 +394,15 @@ export function OrderManagementPage() {
     if (filters.search) params.search = filters.search;
     if (filters.paymentMode && filters.paymentMode !== "all") params.paymentMode = filters.paymentMode;
     if (filters.status && filters.status !== "all") params.status = filters.status;
-    if (filters.dateFilter && filters.dateFilter !== "all") params.dateFilter = filters.dateFilter;
-    if (filters.fromDate) params.fromDate = filters.fromDate;
-    if (filters.toDate) params.toDate = filters.toDate;
-    if (filters.counsellorId && filters.counsellorId !== "all") params.counsellorId = filters.counsellorId;
-    if (filters.groupFilter) params.group = true;
+    if (filters.dateFilter === "custom") {
+      if (filters.fromDate) params.fromDate = filters.fromDate;
+      if (filters.toDate) params.toDate = filters.toDate;
+    } else if (filters.dateFilter && filters.dateFilter !== "all") params.dateFilter = filters.dateFilter;
+    // Counsellor picker is only visible in Group mode – don't send a hidden selection
+    if (filters.groupFilter) {
+      params.group = true;
+      if (filters.counsellorId && filters.counsellorId !== "all") params.counsellorId = filters.counsellorId;
+    }
 
     return params;
 }, [filters]);

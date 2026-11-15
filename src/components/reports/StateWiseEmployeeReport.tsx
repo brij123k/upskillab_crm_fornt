@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { Fragment, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -53,6 +53,7 @@ import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { KpiCard, KpiGrid, ChartCard, RankedBars, DonutWithLegend, Avatar, MetricPill } from './ReportUI';
+import { defaultLevelForUser, fetchLevelsForUser, useReportColumns, useReportScope, RT, Num, ReportTableHeader, type ReportColumn } from './ReportTable';
 
 /* -------------------------------------------------------------------------- */
 /*                               Type Definitions                              */
@@ -150,6 +151,56 @@ const dateFilterOptions = [
 /*                          Sub-component: Team Member Table                   */
 /* -------------------------------------------------------------------------- */
 
+
+/* ── Column config (customisable via the Columns menu) ─────────────────── */
+const STATE_EMP_COLUMNS: ReportColumn[] = [
+  { key: 'employee', label: 'Employee', locked: true },
+  { key: 'totalLeads', label: 'Leads' },
+  { key: 'registrations', label: 'Reg.' },
+  { key: 'admissions', label: 'Adm.' },
+  { key: 'regPct', label: 'Reg. %' },
+  { key: 'convPct', label: 'Conv. %' },
+  { key: 'revenue', label: 'Revenue' },
+  { key: 'states', label: 'States' },
+];
+
+function stateEmpCell(key: string, e: EmployeeData) {
+  switch (key) {
+    case 'totalLeads':
+      return <Num value={e.totalLeads} bold />;
+    case 'registrations':
+      return <MetricPill value={e.totalRegistrationDone} tone="violet" />;
+    case 'admissions':
+      return <MetricPill value={e.totalAdmissionDone} tone="green" />;
+    case 'regPct':
+      return (
+        <span className={cn(
+          "px-2.5 py-1 rounded-full font-semibold text-[11.5px] tabular-nums ring-1 ring-inset ring-black/5",
+          e.registrationConversionPercentage > 20 ? "bg-purple-100 text-purple-700" :
+          e.registrationConversionPercentage > 10 ? "bg-indigo-100 text-indigo-700" :
+          "bg-slate-100 text-slate-600"
+        )}>{e.registrationConversionPercentage || 0}%</span>
+      );
+    case 'convPct':
+      return (
+        <span className={cn(
+          "px-2.5 py-1 rounded-full font-semibold text-[11.5px] tabular-nums ring-1 ring-inset ring-black/5",
+          e.conversionPercentage > 15 ? "bg-emerald-100 text-emerald-700" :
+          e.conversionPercentage > 8 ? "bg-amber-100 text-amber-700" :
+          "bg-slate-100 text-slate-600"
+        )}>{e.conversionPercentage || 0}%</span>
+      );
+    case 'revenue':
+      return e.totalRevenue > 0
+        ? <span className="inline-flex justify-center rounded-md bg-slate-100 text-slate-900 ring-1 ring-inset ring-slate-200 px-2.5 py-1 text-[13px] font-bold tabular-nums">₹{e.totalRevenue.toLocaleString('en-IN')}</span>
+        : <span className="text-slate-400">₹0</span>;
+    case 'states':
+      return <Num value={e.states?.length || 0} />;
+    default:
+      return null;
+  }
+}
+
 interface TeamMemberTableProps {
   teamMembers: EmployeeData[];
   level: number;
@@ -157,6 +208,7 @@ interface TeamMemberTableProps {
   loadingHierarchy: Set<string>;
   toggleExpand: (employeeId: string, hasTeam: boolean) => void;
   onEmployeeClick: (employee: EmployeeData) => void;
+  columns: ReportColumn[];
 }
 
 function TeamMemberTable({
@@ -166,6 +218,7 @@ function TeamMemberTable({
   loadingHierarchy,
   toggleExpand,
   onEmployeeClick,
+  columns,
 }: TeamMemberTableProps) {
   return (
     <div className="mt-2 mb-1">
@@ -176,114 +229,60 @@ function TeamMemberTable({
       <div className="overflow-x-auto border border-slate-200 rounded-lg">
         <Table>
           <TableHeader>
-            <TableRow className="bg-orange-50/50 hover:bg-orange-50/50 border-b border-slate-200">
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase sticky left-0 bg-orange-50/50 z-10 min-w-[160px] py-2">
-                Employee
-              </TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[80px] py-2">
-                Leads
-              </TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[80px] py-2">
-                Reg.
-              </TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[80px] py-2">
-                Adm.
-              </TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[100px] py-2">
-                Reg. %
-              </TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[100px] py-2">
-                Conv. %
-              </TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[120px] py-2 bg-orange-50/50">
-                Revenue
-              </TableHead>
+            <TableRow className={RT.headRow}>
+              {columns.map((c) => (
+                <TableHead key={c.key} className={c.key === 'employee' ? cn(RT.thLeft, RT.thSticky, 'min-w-[220px]') : RT.th}>{c.label}</TableHead>
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
             {teamMembers.map((member) => {
-              const hasTeam = member.teamSize && member.teamSize > 1;
+              const hasTeam = !!(member.teamSize && member.teamSize > 1);
               const isExpanded = expandedEmployees.has(member.employeeId);
               const isLoading = loadingHierarchy.has(member.employeeId);
 
               return (
-                <>
-                  <TableRow
-                    key={member.employeeId}
-                    className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors cursor-pointer"
-                    onClick={() => onEmployeeClick(member)}
-                  >
-                    <TableCell className="sticky left-0 bg-white border-r z-10 py-2">
-                      <div className="flex flex-col min-w-[130px]">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-medium text-slate-800 truncate max-w-[100px] hover:text-orange-600">
-                            {member.employeeName}
-                          </span>
-                          {hasTeam && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleExpand(member.employeeId, true);
-                              }}
-                              disabled={isLoading}
-                              className={cn(
-                                "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
-                                "hover:bg-orange-100 text-orange-500 border border-orange-200",
-                                isExpanded && "bg-orange-100 border-orange-300",
-                                isLoading && "opacity-50 cursor-not-allowed"
-                              )}
-                            >
-                              {isLoading ? (
-                                <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                              ) : isExpanded ? (
-                                <Minus className="w-2.5 h-2.5" />
-                              ) : (
-                                <Plus className="w-2.5 h-2.5" />
-                              )}
-                            </button>
-                          )}
-                          {member.teamSize && member.teamSize > 1 && (
-                            <span className="text-[7px] bg-orange-100 text-orange-700 px-1 py-0.5 rounded-full whitespace-nowrap">
-                              Team: {member.teamSize}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[8px] text-slate-400 truncate max-w-[120px]">
-                          {member.employeeEmail}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-xs text-center py-2 font-medium text-slate-700">
-                      {member.totalLeads}
-                    </TableCell>
-                    <TableCell className="text-xs text-center py-2 "><MetricPill value={member.totalRegistrationDone} tone="violet" /></TableCell>
-                    <TableCell className="text-xs text-center py-2 "><MetricPill value={member.totalAdmissionDone} tone="green" /></TableCell>
-                    <TableCell className="text-xs text-center py-2">
-                      <span className={cn(
-                        "px-2.5 py-1 rounded-full font-semibold text-[11.5px] tabular-nums ring-1 ring-inset ring-black/5",
-                        member.registrationConversionPercentage > 20 ? "bg-purple-100 text-purple-700" :
-                        member.registrationConversionPercentage > 10 ? "bg-indigo-100 text-indigo-700" :
-                        "bg-slate-100 text-slate-600"
-                      )}>
-                        {member.registrationConversionPercentage || 0}%
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-xs text-center py-2">
-                      <span className={cn(
-                        "px-2.5 py-1 rounded-full font-semibold text-[11.5px] tabular-nums ring-1 ring-inset ring-black/5",
-                        member.conversionPercentage > 15 ? "bg-emerald-100 text-emerald-700" :
-                        member.conversionPercentage > 8 ? "bg-amber-100 text-amber-700" :
-                        "bg-slate-100 text-slate-600"
-                      )}>
-                        {member.conversionPercentage || 0}%
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-xs text-center py-2 bg-orange-50/30"><span className="inline-flex justify-center rounded-lg bg-slate-900 px-2.5 py-1 text-[13px] font-bold text-white tabular-nums">₹{member.totalRevenue.toLocaleString()}</span></TableCell>
+                <Fragment key={member.employeeId}>
+                  <TableRow className={cn(RT.row, 'cursor-pointer')} onClick={() => onEmployeeClick(member)}>
+                    {columns.map((c) =>
+                      c.key === 'employee' ? (
+                        <TableCell key={c.key} className={cn(RT.tdLeft, RT.tdSticky)}>
+                          <div className="flex items-center gap-2.5 min-w-[200px]">
+                              <Avatar name={member.employeeName} />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-slate-900 truncate max-w-[160px] hover:text-orange-600">{member.employeeName}</span>
+                                  {hasTeam && (
+                                    <button
+                                      onClick={(ev) => { ev.stopPropagation(); toggleExpand(member.employeeId, true); }}
+                                      disabled={isLoading}
+                                      title={isExpanded ? 'Hide team' : 'Show team'}
+                                      className={cn(
+                                        "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
+                                        "hover:bg-orange-100 text-orange-500 border border-orange-200",
+                                        isExpanded && "bg-orange-100 border-orange-300",
+                                        isLoading && "opacity-50 cursor-not-allowed"
+                                      )}
+                                    >
+                                      {isLoading ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : isExpanded ? <Minus className="w-2.5 h-2.5" /> : <Plus className="w-2.5 h-2.5" />}
+                                    </button>
+                                  )}
+                                  {hasTeam && (
+                                    <span className="text-[10px] bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">Team {member.teamSize}</span>
+                                  )}
+                                </div>
+                                <div className="text-[12px] text-slate-500 truncate max-w-[180px]">{member.employeeEmail}</div>
+                              </div>
+                            </div>
+                        </TableCell>
+                      ) : (
+                        <TableCell key={c.key} className={RT.td}>{stateEmpCell(c.key, member)}</TableCell>
+                      ),
+                    )}
                   </TableRow>
-                  {/* Nested team members */}
                   {isExpanded && member.children && member.children.length > 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="p-0">
+                      <TableCell colSpan={columns.length} className="p-0">
                         <div className="ml-6 pl-4 border-l-2 border-orange-200">
                           <TeamMemberTable
                             teamMembers={member.children}
@@ -292,12 +291,13 @@ function TeamMemberTable({
                             loadingHierarchy={loadingHierarchy}
                             toggleExpand={toggleExpand}
                             onEmployeeClick={onEmployeeClick}
+                            columns={columns}
                           />
                         </div>
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </TableBody>
@@ -473,6 +473,8 @@ interface LevelType {
 }
 
 export function StateWiseEmployeeReport() {
+  const columnsUi = useReportColumns('state-wise-employee', STATE_EMP_COLUMNS);
+  const { filterRows } = useReportScope();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -482,7 +484,7 @@ export function StateWiseEmployeeReport() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [levels, setLevels] = useState<LevelType[]>([]);
-  const [selectedLevel, setSelectedLevel] = useState('1');
+  const [selectedLevel, setSelectedLevel] = useState(() => defaultLevelForUser('1'));
   const [showTeamOnly, setShowTeamOnly] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [stateSearch, setStateSearch] = useState('');
@@ -503,7 +505,7 @@ export function StateWiseEmployeeReport() {
   useEffect(() => {
     const fetchLevels = async () => {
       try {
-        const response = await getDataHandlerWithToken('getAllLevels', null, null);
+        const response = await fetchLevelsForUser();
         if (response) {
           setLevels(response);
           if (response.length) {
@@ -770,14 +772,14 @@ export function StateWiseEmployeeReport() {
   }, []);
 
   // ─── Filtered employees ───
-  const flattenedData = flattenHierarchy(hierarchicalData);
+  const flattenedData = flattenHierarchy(filterRows(hierarchicalData, (e: any) => e.employeeId));
   
   const filteredEmployees = flattenedData.filter((emp: EmployeeData) =>
     employeeSearch ? emp.employeeName?.toLowerCase().includes(employeeSearch.toLowerCase()) : true
   );
 
   // For display, use top-level only
-  const topLevelEmployees = hierarchicalData;
+  const topLevelEmployees = filterRows(hierarchicalData, (e: any) => e.employeeId); // BD: self + own team
 
   const hasActiveFilters =
     dateFilter !== 'today' ||
@@ -1057,135 +1059,66 @@ export function StateWiseEmployeeReport() {
           })()}
 
           {/* Main Table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+          <ReportTableHeader title="Employee Performance – State-wise" subtitle="Click an employee for state details" chooser={columnsUi.chooser} />
+          <div className={RT.wrap}>
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50/80 border-b border-slate-200">
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50/80 z-10 min-w-[180px] py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-3.5 h-3.5" />
-                        Employee
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[80px] py-3 px-4">
-                      Leads
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[80px] py-3 px-4">
-                      Reg.
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[80px] py-3 px-4">
-                      Adm.
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[100px] py-3 px-4">
-                      Reg. %
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[100px] py-3 px-4">
-                      Conv. %
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[130px] py-3 px-4 bg-orange-50/50">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <IndianRupee className="w-3.5 h-3.5 text-orange-500" />
-                        <span className="text-orange-700">Revenue</span>
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center min-w-[80px] py-3 px-4">
-                      States
-                    </TableHead>
+                  <TableRow className={RT.headRow}>
+                    {columnsUi.visibleColumns.map((c) => (
+                      <TableHead key={c.key} className={c.key === 'employee' ? cn(RT.thLeft, RT.thSticky, 'min-w-[240px]') : RT.th}>{c.label}</TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {topLevelEmployees.map((employee) => {
-                    const hasTeam = employee.teamSize && employee.teamSize > 1;
+                    const hasTeam = !!(employee.teamSize && employee.teamSize > 1 && showTeamOnly);
                     const isExpanded = expandedEmployees.has(employee.employeeId);
                     const isLoading = loadingHierarchy.has(employee.employeeId);
 
                     return (
-                      <>
-                        <TableRow
-                          key={employee.employeeId}
-                          className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors cursor-pointer"
-                          onClick={() => handleEmployeeClick(employee)}
-                        >
-                          <TableCell className="text-sm sticky left-0 bg-white border-r border-slate-100 z-10 py-3 px-4">
-                            <div className="flex flex-col">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <Avatar name={employee.employeeName} className="w-7 h-7 text-[10px] mr-1" />
-                                <span className="font-medium text-slate-800 hover:text-orange-600">
-                                  {employee.employeeName}
-                                </span>
-                                {hasTeam && showTeamOnly ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleExpand(employee.employeeId, true);
-                                    }}
-                                    disabled={isLoading}
-                                    className={cn(
-                                      "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
-                                      "hover:bg-orange-100 text-orange-500 border border-orange-200",
-                                      isExpanded && "bg-orange-100 border-orange-300",
-                                      isLoading && "opacity-50 cursor-not-allowed"
-                                    )}
-                                  >
-                                    {isLoading ? (
-                                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                                    ) : isExpanded ? (
-                                      <Minus className="w-2.5 h-2.5" />
-                                    ) : (
-                                      <Plus className="w-2.5 h-2.5" />
-                                    )}
-                                  </button>
-                                ):(<></>)}
-                                {employee.teamSize && employee.teamSize > 1 && showTeamOnly ? (
-                                  <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                                    Team: {employee.teamSize}
-                                  </span>
-                                ):(<></>)}
-                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-slate-50">
-                                  {employee.employeeCode}
-                                </Badge>
+                      <Fragment key={employee.employeeId}>
+                        <TableRow className={cn(RT.row, 'cursor-pointer')} onClick={() => handleEmployeeClick(employee)}>
+                          {columnsUi.visibleColumns.map((c) =>
+                            c.key === 'employee' ? (
+                              <TableCell key={c.key} className={cn(RT.tdLeft, RT.tdSticky)}>
+                                <div className="flex items-center gap-2.5 min-w-[200px]">
+                              <Avatar name={employee.employeeName} />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-slate-900 truncate max-w-[160px] hover:text-orange-600">{employee.employeeName}</span>
+                                  {hasTeam && (
+                                    <button
+                                      onClick={(ev) => { ev.stopPropagation(); toggleExpand(employee.employeeId, true); }}
+                                      disabled={isLoading}
+                                      title={isExpanded ? 'Hide team' : 'Show team'}
+                                      className={cn(
+                                        "w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0",
+                                        "hover:bg-orange-100 text-orange-500 border border-orange-200",
+                                        isExpanded && "bg-orange-100 border-orange-300",
+                                        isLoading && "opacity-50 cursor-not-allowed"
+                                      )}
+                                    >
+                                      {isLoading ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : isExpanded ? <Minus className="w-2.5 h-2.5" /> : <Plus className="w-2.5 h-2.5" />}
+                                    </button>
+                                  )}
+                                  {hasTeam && (
+                                    <span className="text-[10px] bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">Team {employee.teamSize}</span>
+                                  )}
+                                {employee.employeeCode && <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-slate-50">{employee.employeeCode}</Badge>}
+                                </div>
+                                <div className="text-[12px] text-slate-500 truncate max-w-[180px]">{employee.employeeEmail}</div>
                               </div>
-                              <span className="text-xs text-slate-400 truncate max-w-[160px]">
-                                {employee.employeeEmail}
-                              </span>
                             </div>
-                          </TableCell>
-                          <TableCell className="text-sm text-center py-3 px-4 font-medium text-slate-700">
-                            {employee.totalLeads}
-                          </TableCell>
-                          <TableCell className="text-sm text-center py-3 px-4 "><MetricPill value={employee.totalRegistrationDone} tone="violet" /></TableCell>
-                          <TableCell className="text-sm text-center py-3 px-4 "><MetricPill value={employee.totalAdmissionDone} tone="green" /></TableCell>
-                          <TableCell className="text-sm text-center py-3 px-4">
-                            <span className={cn(
-                              "px-2.5 py-1 rounded-full font-semibold text-[11.5px] tabular-nums ring-1 ring-inset ring-black/5",
-                              employee.registrationConversionPercentage > 20 ? "bg-purple-100 text-purple-700" :
-                              employee.registrationConversionPercentage > 10 ? "bg-indigo-100 text-indigo-700" :
-                              "bg-slate-100 text-slate-600"
-                            )}>
-                              {employee.registrationConversionPercentage || 0}%
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-sm text-center py-3 px-4">
-                            <span className={cn(
-                              "px-2.5 py-1 rounded-full font-semibold text-[11.5px] tabular-nums ring-1 ring-inset ring-black/5",
-                              employee.conversionPercentage > 15 ? "bg-emerald-100 text-emerald-700" :
-                              employee.conversionPercentage > 8 ? "bg-amber-100 text-amber-700" :
-                              "bg-slate-100 text-slate-600"
-                            )}>
-                              {employee.conversionPercentage || 0}%
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-sm text-center py-3 px-4 bg-orange-50/30 "><span className="inline-flex justify-center rounded-lg bg-slate-900 px-2.5 py-1 text-[13px] font-bold text-white tabular-nums">₹{employee.totalRevenue.toLocaleString()}</span></TableCell>
-                          <TableCell className="text-sm text-center py-3 px-4">
-                            <span className="text-sm text-slate-500">{employee.states.length}</span>
-                          </TableCell>
+                              </TableCell>
+                            ) : (
+                              <TableCell key={c.key} className={RT.td}>{stateEmpCell(c.key, employee)}</TableCell>
+                            ),
+                          )}
                         </TableRow>
 
-                        {/* Nested Team Members */}
                         {isExpanded && employee.children && employee.children.length > 0 && (
                           <TableRow>
-                            <TableCell colSpan={8} className="p-0 bg-slate-50/30">
+                            <TableCell colSpan={columnsUi.colCount} className="p-0 bg-slate-50/30">
                               <div className="px-4 py-2">
                                 <TeamMemberTable
                                   teamMembers={employee.children}
@@ -1194,16 +1127,16 @@ export function StateWiseEmployeeReport() {
                                   loadingHierarchy={loadingHierarchy}
                                   toggleExpand={toggleExpand}
                                   onEmployeeClick={handleEmployeeClick}
+                                  columns={columnsUi.visibleColumns}
                                 />
                               </div>
                             </TableCell>
                           </TableRow>
                         )}
 
-                        {/* Show message if expanded but no team members */}
                         {isExpanded && (!employee.children || employee.children.length === 0) && (
                           <TableRow>
-                            <TableCell colSpan={8} className="p-0">
+                            <TableCell colSpan={columnsUi.colCount} className="p-0">
                               <div className="px-4 py-2">
                                 <div className="text-xs text-slate-400 py-2 px-4 bg-slate-50 rounded-lg border border-slate-200">
                                   No team members found
@@ -1212,12 +1145,11 @@ export function StateWiseEmployeeReport() {
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </TableBody>
               </Table>
-            </div>
           </div>
 
           {/* Pagination */}

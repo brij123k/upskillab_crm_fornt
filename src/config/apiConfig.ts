@@ -36,6 +36,14 @@ const ApiConfig = {
   togglePoolActive:(id:string)=>`${url}/pool/toggle/${id}`,
   blockUser:(id:string)=>`${url}/users/${id}/toggle-block`,
   profileGen:(id:string)=>`${url}/users/${id}/toggle-dashboard`,
+  // Employee onboarding (staff)
+  getOnboarding:(id:string)=>`${url}/users/${id}/onboarding`,
+  generateOnboardingLink:(id:string)=>`${url}/users/${id}/onboarding/link`,
+  revokeOnboardingLink:(id:string)=>`${url}/users/${id}/onboarding/revoke`,
+  approveOnboarding:(id:string)=>`${url}/users/${id}/onboarding/approve`,
+  // Employee onboarding (public, token based)
+  publicOnboarding:(token:string)=>`${url}/onboarding/${token}`,
+  publicOnboardingUpload:(token:string)=>`${url}/onboarding/${token}/upload`,
   getAllLeads:`${url}/leads`,
   createNewLead:`${url}/leads`,
   updateLead:(leadid:string)=>`${url}/leads/${leadid}`,

@@ -53,6 +53,7 @@ import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { KpiCard, KpiGrid, ChartCard, TrendChart, RankedBars, Avatar } from './ReportUI';
+import { defaultLevelForUser, fetchLevelsForUser, useReportColumns, useReportScope, RT, ReportTableHeader } from './ReportTable';
 
 /* -------------------------------------------------------------------------- */
 /*                               Types                                        */
@@ -176,13 +177,13 @@ function TeamMemberTable({
       <div className="overflow-x-auto border border-slate-200 rounded-lg">
         <Table>
           <TableHeader>
-            <TableRow className="bg-orange-50/50 hover:bg-orange-50/50 border-b border-slate-200">
-              <TableHead className="text-[10px] font-semibold text-slate-500 uppercase sticky left-0 bg-orange-50/50 z-10 min-w-[140px] py-2">
+            <TableRow className={RT.headRow}>
+              <TableHead className={cn(RT.thLeft, RT.thSticky, 'min-w-[200px]')}>
                 Employee
               </TableHead>
               {dates.map((date: string) => (
-                <TableHead key={date} className="text-[10px] font-semibold text-slate-500 uppercase text-center min-w-[80px] py-2">
-                  <div className="font-semibold text-slate-700">{formatDateShort(date)}</div>
+                <TableHead key={date} className={cn(RT.th, 'min-w-[90px]')}>
+                  {formatDateShort(date)}
                 </TableHead>
               ))}
             </TableRow>
@@ -197,9 +198,9 @@ function TeamMemberTable({
                 <>
                   <TableRow
                     key={member.employeeId}
-                    className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
+                    className={RT.row}
                   >
-                    <TableCell className="sticky left-0 bg-white border-r z-10 py-2">
+                    <TableCell className={cn(RT.tdLeft, RT.tdSticky)}>
                       <div className="flex flex-col min-w-[120px]">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <Avatar name={member.employeeName} className="w-7 h-7 text-[10px]" />
@@ -501,13 +502,14 @@ function CallDetailsModal({
 /* -------------------------------------------------------------------------- */
 
 export function DailyUtilizationReport() {
+  const { filterRows } = useReportScope();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [showFilters, setShowFilters] = useState(false);
 
   // Level filter
   const [levels, setLevels] = useState<any[]>([]);
-  const [selectedLevel, setSelectedLevel] = useState('1');
+  const [selectedLevel, setSelectedLevel] = useState(() => defaultLevelForUser('1'));
 
   // Team filter (checkbox)
   const [showTeamOnly, setShowTeamOnly] = useState<boolean>(false);
@@ -542,7 +544,7 @@ export function DailyUtilizationReport() {
   useEffect(() => {
     const fetchLevels = async () => {
       try {
-        const res = await getDataHandlerWithToken('getAllLevels', null, null);
+        const res = await fetchLevelsForUser();
         if (res) {
           setLevels(res);
           if (res.length) setSelectedLevel(extractLevelNumber(res[0].name).toString());
@@ -884,19 +886,25 @@ export function DailyUtilizationReport() {
   }, []);
 
   // ─── Filtered employees (client‑side search) ───
-  const flattenedData = flattenHierarchy(hierarchicalData);
+  const flattenedData = flattenHierarchy(filterRows(hierarchicalData, (e: any) => e.employeeId));
   
   const filteredEmployees = flattenedData.filter((emp: EmployeeDailyData) =>
     searchTerm ? emp.employeeName?.toLowerCase().includes(searchTerm.toLowerCase()) : true
   );
 
   // For display, use top-level only
-  const topLevelEmployees = hierarchicalData;
+  const topLevelEmployees = filterRows(hierarchicalData, (e: any) => e.employeeId); // BD: self + own team
   const filteredTopLevel = topLevelEmployees.filter((emp: EmployeeDailyData) =>
     searchTerm ? emp.employeeName?.toLowerCase().includes(searchTerm.toLowerCase()) : true
   );
 
-  const dates = data?.dateStrings || [];
+  const allDates: string[] = data?.dateStrings || [];
+  // Customisable date columns (Employee stays first)
+  const columnsUi = useReportColumns('daily-utilization', [
+    { key: 'employee', label: 'Employee', locked: true },
+    ...allDates.map((d: string) => ({ key: `date:${d}`, label: formatDateShort(d) })),
+  ]);
+  const dates: string[] = columnsUi.visibleColumns.filter(c => !c.locked).map(c => c.key.slice(5));
 
   // Check if team mode is active
   const isTeamMode = data?.filters?.team === true || showTeamOnly;
@@ -1142,7 +1150,7 @@ export function DailyUtilizationReport() {
 
           {/* KPI tiles + charts */}
           {(() => {
-            const dayTotals = dates.map((date: string) => {
+            const dayTotals = allDates.map((date: string) => {
               let dial = 0, answered = 0;
               filteredTopLevel.forEach(emp => {
                 const m = emp.dailyMetrics?.find((x: any) => x.date === date);
@@ -1191,16 +1199,17 @@ export function DailyUtilizationReport() {
             );
           })()}
 
-          <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
+          <ReportTableHeader title="Daily Inputs" subtitle="Dials / answered per day — click a cell for call details" chooser={columnsUi.chooser} />
+          <div className={RT.wrap}>
             <Table className="min-w-[600px]">
               <TableHeader>
-                <TableRow className="bg-slate-50 hover:bg-slate-50 border-b border-slate-100">
-                  <TableHead className="text-xs font-semibold text-slate-500 uppercase sticky left-0 bg-slate-50 z-10 min-w-[140px]">
+                <TableRow className={RT.headRow}>
+                  <TableHead className={cn(RT.thLeft, RT.thSticky, 'min-w-[220px]')}>
                     Employee
                   </TableHead>
                   {dates.map((date: string) => (
-                    <TableHead key={date} className="text-xs text-center min-w-[100px] py-3">
-                      <div className="font-semibold text-slate-800">{formatDateShort(date)}</div>
+                    <TableHead key={date} className={cn(RT.th, 'min-w-[100px]')}>
+                      {formatDateShort(date)}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -1213,8 +1222,8 @@ export function DailyUtilizationReport() {
 
                   return (
                     <>
-                      <TableRow key={emp.employeeId || idx} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
-                        <TableCell className="text-xs font-medium text-slate-800 sticky left-0 bg-white border-r z-10 py-3">
+                      <TableRow key={emp.employeeId || idx} className={RT.row}>
+                        <TableCell className={cn(RT.tdLeft, RT.tdSticky)}>
                           <div className="flex flex-col">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <Avatar name={emp.employeeName} />

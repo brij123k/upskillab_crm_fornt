@@ -39,7 +39,6 @@ import { getDataHandlerWithToken, postDataHandlerWithToken } from '@/config/serv
 import { Avatar, KpiCard, KpiGrid, StageBadge, Tag } from '@/components/reports/ReportUI';
 import { ActiveBadge, BatchStatusPill, EnrolledLeadDetailDialog, startEnrolledCall } from '@/components/enrolled/EnrolledLeadDetailDialog';
 import { EnrolledCallData, EnrolledCallFeedbackModal } from '@/components/enrolled/EnrolledCallFeedbackModal';
-import { EnrolledStagesDialog } from '@/components/enrolled/EnrolledStagesDialog';
 import {
   ACTION_LABEL,
   ENROLLED_CALL_SAVED_EVENT,
@@ -175,7 +174,6 @@ export function EnrolledLeadsPage({ panel = 'bd' }: Props) {
   const [callingId, setCallingId] = useState<string | null>(null);
   const [pendingCalls, setPendingCalls] = useState<EnrolledCallData[]>([]);
   const [feedbackCall, setFeedbackCall] = useState<EnrolledCallData | null>(null);
-  const [stagesOpen, setStagesOpen] = useState(false);
 
   // ---------------- sync ----------------
   const [syncing, setSyncing] = useState(false);
@@ -451,9 +449,6 @@ export function EnrolledLeadsPage({ panel = 'bd' }: Props) {
           <h1 className="flex items-center gap-2 text-xl font-semibold text-slate-900">
             <GraduationCap className="w-5 h-5 text-orange-500" /> Enrolled Leads
           </h1>
-          <p className="text-sm text-slate-500">
-            Students from Upskillab. New students are fetched every night at 12 AM; use Fetch more to fetch now.
-          </p>
           {lastSync && (
             <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
               {lastSync.status === 'SUCCESS' ? (
@@ -494,11 +489,7 @@ export function EnrolledLeadsPage({ panel = 'bd' }: Props) {
               </Button>
             )
           )}
-          {perms.canManageStages && (
-            <Button variant="outline" onClick={() => setStagesOpen(true)} className="rounded-xl border-slate-200 hover:bg-orange-50 hover:text-orange-600">
-              <Settings2 className="w-4 h-4 mr-2" /> Stages
-            </Button>
-          )}
+          {/* Stages are a fixed list (Enrolled + feedback outcomes) – no management UI */}
           {perms.canSync && (
             <Button onClick={runSync} disabled={syncing} className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white">
               {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <DownloadCloud className="w-4 h-4 mr-2" />}
@@ -572,6 +563,7 @@ export function EnrolledLeadsPage({ panel = 'bd' }: Props) {
             {stages.map((s) => (
               <button
                 key={s._id}
+                title={s.description || s.name}
                 onClick={() => setFilter('stageId', s._id)}
                 className={cn(
                   'flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
@@ -666,7 +658,7 @@ export function EnrolledLeadsPage({ panel = 'bd' }: Props) {
                     <SelectTrigger className="h-9 rounded-xl"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value={ALL}>All stages</SelectItem>
-                      {stages.map((s) => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}
+                      {stages.map((s) => <SelectItem key={s._id} value={s._id} title={(s as any).description || s.name}>{s.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1014,7 +1006,6 @@ export function EnrolledLeadsPage({ panel = 'bd' }: Props) {
         callData={feedbackCall}
       />
 
-      <EnrolledStagesDialog open={stagesOpen} onOpenChange={setStagesOpen} onChanged={() => { fetchMeta(); fetchLeads(); }} />
 
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
         <DialogContent className="sm:max-w-[460px] rounded-2xl border-slate-200">
@@ -1041,7 +1032,7 @@ export function EnrolledLeadsPage({ panel = 'bd' }: Props) {
           <Select value={bulkStageId} onValueChange={setBulkStageId}>
             <SelectTrigger className="h-9 rounded-xl"><SelectValue placeholder="Select stage" /></SelectTrigger>
             <SelectContent>
-              {stages.map((s) => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}
+              {stages.map((s) => <SelectItem key={s._id} value={s._id} title={(s as any).description || s.name}>{s.name}</SelectItem>)}
             </SelectContent>
           </Select>
           <Textarea value={bulkNote} onChange={(e) => setBulkNote(e.target.value)} rows={2} maxLength={2000} placeholder="Note (optional)" className="rounded-xl" />

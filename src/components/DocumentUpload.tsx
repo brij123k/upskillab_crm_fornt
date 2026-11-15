@@ -8,7 +8,18 @@ import { postDataHandlerWithTokenFormData } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
 
+/** Custom upload function (e.g. public onboarding link). Must resolve to the file URL. */
+export type FileUploader = (file: File) => Promise<string | null | undefined>;
+
+async function defaultUploader(file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await postDataHandlerWithTokenFormData(ApiConfig.uploadImage, formData, true);
+  return response?.success ? response?.data?.url : null;
+}
+
 interface DocumentUploadProps {
+  uploader?: FileUploader;
   label: string;
   value?: string;
   onChange: (url: string) => void;
@@ -16,7 +27,7 @@ interface DocumentUploadProps {
   accept?: string;
 }
 
-function SingleDocumentUpload({ label, value, onChange, disabled = false, accept = "image/*" }: DocumentUploadProps) {
+function SingleDocumentUpload({ label, value, onChange, disabled = false, accept = "image/*", uploader = defaultUploader }: DocumentUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>('');
 
@@ -28,14 +39,11 @@ function SingleDocumentUpload({ label, value, onChange, disabled = false, accept
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
       setUploading(true);
-      const response = await postDataHandlerWithTokenFormData(ApiConfig.uploadImage, formData, true);
-      if (response?.success && response?.data?.url) {
-        onChange(response.data.url);
+      const uploadedUrl = await uploader(file);
+      if (uploadedUrl) {
+        onChange(uploadedUrl);
         toast({
           title: "Success",
           description: `${label} uploaded successfully`,
@@ -167,12 +175,13 @@ function SingleDocumentUpload({ label, value, onChange, disabled = false, accept
 }
 
 interface DocumentsUploadProps {
+  uploader?: FileUploader;
   value: any;
   onChange: (documents: any) => void;
   disabled?: boolean;
 }
 
-export function DocumentsUpload({ value = {}, onChange, disabled = false }: DocumentsUploadProps) {
+export function DocumentsUpload({ value = {}, onChange, disabled = false, uploader }: DocumentsUploadProps) {
   const handleChange = (field: string, url: string) => {
     onChange({
       ...value,
@@ -202,18 +211,21 @@ export function DocumentsUpload({ value = {}, onChange, disabled = false }: Docu
             value={value?.aadhaarFront}
             onChange={(url) => handleChange('aadhaarFront', url)}
             disabled={disabled}
+            uploader={uploader}
           />
           <SingleDocumentUpload
             label="Aadhaar Card (Back)"
             value={value?.aadhaarBack}
             onChange={(url) => handleChange('aadhaarBack', url)}
             disabled={disabled}
+            uploader={uploader}
           />
           <SingleDocumentUpload
             label="PAN Card"
             value={value?.panCard}
             onChange={(url) => handleChange('panCard', url)}
             disabled={disabled}
+            uploader={uploader}
             accept="image/*"
           />
         </div>
@@ -224,6 +236,7 @@ export function DocumentsUpload({ value = {}, onChange, disabled = false }: Docu
             value={value?.educationalCertificates || []}
             onChange={handleCertificatesChange}
             disabled={disabled}
+            uploader={uploader}
           />
         </div>
       </CardContent>
@@ -232,12 +245,13 @@ export function DocumentsUpload({ value = {}, onChange, disabled = false }: Docu
 }
 
 interface MultiDocumentUploadProps {
+  uploader?: FileUploader;
   value: string[];
   onChange: (urls: string[]) => void;
   disabled?: boolean;
 }
 
-function MultiDocumentUpload({ value = [], onChange, disabled = false }: MultiDocumentUploadProps) {
+function MultiDocumentUpload({ value = [], onChange, disabled = false, uploader = defaultUploader }: MultiDocumentUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [previewUrls, setPreviewUrls] = useState<Map<number, string>>(new Map());
 
@@ -255,16 +269,16 @@ function MultiDocumentUpload({ value = [], onChange, disabled = false }: MultiDo
     });
     setPreviewUrls(newPreviews);
 
+    // accumulate locally so multiple files don't overwrite each other
+    let uploadedSoFar = [...value];
     for (let i = 0; i < filesArray.length; i++) {
       const file = filesArray[i];
-      const formData = new FormData();
-      formData.append('file', file);
-
       try {
         setUploading(true);
-        const response = await postDataHandlerWithTokenFormData(ApiConfig.uploadImage, formData, true);
-        if (response?.success && response?.data?.url) {
-          onChange([...value, response.data.url]);
+        const uploadedUrl = await uploader(file);
+        if (uploadedUrl) {
+          uploadedSoFar = [...uploadedSoFar, uploadedUrl];
+          onChange(uploadedSoFar);
           // Remove preview for this specific file
           setPreviewUrls(prev => {
             const newMap = new Map(prev);
