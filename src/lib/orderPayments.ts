@@ -523,9 +523,9 @@ export function validateDraft(draft: PaymentSourcesDraft, finalFee: number): str
     const label = `Lumpsum #${i + 1}`;
     if (isLumpsumInactive(d)) return;
     if (toMoney(d.registrationAmount) < 0) errors.push(`${label}: registration amount cannot be negative`);
-    if (!(toMoney(d.amountReceived) > 0)) errors.push(`${label}: amount received must be greater than 0`);
+    if (!(toMoney(d.amountReceived) > 0)) errors.push(`${label}: registration amount + admission fee must be greater than 0`);
     if (toMoney(d.registrationAmount) - toMoney(d.amountReceived) > MONEY_EPSILON)
-      errors.push(`${label}: amount received cannot be less than the registration amount`);
+      errors.push(`${label}: admission fee cannot be negative`);
   });
   draft.loans.forEach((d, i) => {
     const label = `Loan #${i + 1}`;
@@ -545,6 +545,7 @@ export function validateDraft(draft: PaymentSourcesDraft, finalFee: number): str
     const label = `Credit #${i + 1}`;
     if (!(toMoney(c.amount) > 0)) errors.push(`${label}: amount must be greater than 0`);
     if (!c.dueDate) errors.push(`${label}: due date is required`);
+    if (!isCreditPaid(c) && !c.remarks.trim()) errors.push(`${label}: credit remark is required`);
   });
 
   const cov = calculateDraftCoverage(draft, finalFee);

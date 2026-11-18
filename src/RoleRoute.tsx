@@ -20,7 +20,7 @@ const RoleProtectedRoute = ({ allowedRoles, children }: Props) => {
       case "Admin":
         return <Navigate to="/admin" replace />;
       case "hr":
-        return <Navigate to="/hr" replace />;
+        return <Navigate to="/bd" replace />;
       default:
         return <Navigate to="/bd" replace />;
     }

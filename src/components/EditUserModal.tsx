@@ -441,16 +441,6 @@ export function EditUserModal({
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-sm font-medium text-slate-700">Education</Label>
-                      <Input
-                        value={editUserForm.education}
-                        onChange={(e) => setEditUserForm({ ...editUserForm, education: e.target.value })}
-                        placeholder="Highest qualification"
-                        disabled={updatingUser}
-                        className="h-10 rounded-lg border-slate-200 focus:ring-orange-500"
-                      />
-                    </div>
-                    <div className="space-y-1">
                       <Label className="text-sm font-medium text-slate-700">Pools</Label>
                       <MultiSelect
                         options={pools

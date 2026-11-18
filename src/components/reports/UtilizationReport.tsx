@@ -50,6 +50,7 @@ import {
   User,
   UserPlus,
 } from 'lucide-react';
+import { LeadHistoryModal } from '@/components/modal/LeadHistory';
 import { getDataHandlerWithToken } from '@/config/services';
 import ApiConfig from '@/config/apiConfig';
 import { toast } from '@/hooks/use-toast';
@@ -124,7 +125,77 @@ function LeadDetailsModal({
   stageName: string;
   employeeName: string;
 }) {
+  // Clicking a lead opens its details + full history.
+  const [historyLead, setHistoryLead] = useState<any | null>(null);
+  const [history, setHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const loadHistory = async (lead: any) => {
+    setHistoryLoading(true);
+    try {
+      let key = lead?.leadId;
+      if ((key === undefined || key === null) && lead?._id) {
+        const full: any = await getDataHandlerWithToken(ApiConfig.updateLead(String(lead._id)), null, null, true);
+        key = full?.leadId ?? full?.data?.leadId;
+      }
+      if (key === undefined || key === null) throw new Error('This lead has no history id');
+      const res: any = await getDataHandlerWithToken(ApiConfig.leadHistory(String(key)), null, null, true);
+      setHistory(Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []);
+    } catch (e: any) {
+      setHistory([]);
+      toast({ title: 'Error', description: e?.message || 'Failed to load lead history', variant: 'destructive' });
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const openLead = (lead: any) => {
+    setHistoryLead(lead);
+    setHistory([]);
+    loadHistory(lead);
+  };
+
+  const detailItems: [string, any][] = historyLead
+    ? [
+        ['Lead ID', historyLead.leadId],
+        ['Phone', historyLead.phone],
+        ['Email', historyLead.email],
+        ['Source', historyLead.source],
+        ['Campaign', historyLead.source_campaign],
+        ['Stage', historyLead.stageName || historyLead.stage],
+        ['Location', [historyLead.city, historyLead.state].filter(Boolean).join(', ')],
+        ['Assigned to', historyLead.employeeName],
+        ['Assigned date', historyLead.assignedDate ? formatDate(historyLead.assignedDate) : ''],
+        ['Created', historyLead.createdAt || historyLead.createdDate ? formatDate(historyLead.createdAt || historyLead.createdDate) : ''],
+      ]
+    : [];
+
   return (
+    <>
+    <LeadHistoryModal
+      open={!!historyLead}
+      onOpenChange={(o) => !o && setHistoryLead(null)}
+      leadHistory={history}
+      loadingHistory={historyLoading}
+      selectedLeadName={historyLead?.name}
+      onRefresh={() => historyLead && loadHistory(historyLead)}
+      title={historyLead?.name ? `${historyLead.name} – details & history` : 'Lead details & history'}
+      details={
+        historyLead && (
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Lead details</p>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+              {detailItems.map(([k, v]) => (
+                <div key={k} className="min-w-0">
+                  <dt className="text-[11px] text-slate-500">{k}</dt>
+                  <dd className="truncate text-sm font-medium capitalize text-slate-800" title={String(v ?? '')}>{v || '—'}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )
+      }
+    />
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] max-h-[90vh] p-4 flex flex-col rounded-2xl">
         <DialogHeader className="flex-shrink-0">
@@ -132,7 +203,7 @@ function LeadDetailsModal({
             {stageName} Leads — {employeeName}
           </DialogTitle>
           {!loading && totalLeads > 0 && (
-            <div className="text-sm text-slate-500 mt-1">Total leads: {totalLeads}</div>
+            <div className="text-sm text-slate-500 mt-1">Total leads: {totalLeads} · click a lead to see its details and history</div>
           )}
         </DialogHeader>
 
@@ -163,12 +234,31 @@ function LeadDetailsModal({
                   </TableHeader>
                   <TableBody>
                     {leads.map((lead: any, idx: number) => (
-                      <TableRow key={lead.leadId || lead._id || idx} className="hover:bg-slate-50/60">
-                        <TableCell className="text-sm font-medium text-slate-800">{lead.name || '-'}</TableCell>
+                      <TableRow
+                        key={lead.leadId || lead._id || idx}
+                        className="cursor-pointer hover:bg-orange-50/60"
+                        onClick={() => openLead(lead)}
+                        title="View lead details & history"
+                      >
+                        <TableCell className="text-sm font-medium text-orange-700 underline-offset-2 hover:underline">{lead.name || '-'}</TableCell>
                         <TableCell className="text-sm text-slate-600">{lead.phone || '-'}</TableCell>
                         <TableCell className="text-sm text-slate-600">{lead.email || '-'}</TableCell>
                         <TableCell className="text-sm capitalize text-slate-600">{lead.source || '-'}</TableCell>
-                        <TableCell className="text-sm capitalize text-slate-600">{lead.stageName || lead.stage || '-'}</TableCell>
+                        <TableCell className="text-sm capitalize text-slate-600">
+                          {lead.stageMovedAt ? (
+                            <div>
+                              <span className="font-medium text-slate-700">{stageName}</span>
+                              <p className="text-[11px] normal-case text-slate-400">moved here {formatDate(lead.stageMovedAt)}</p>
+                              {(lead.stageName || '').toLowerCase() !== String(stageName || '').toLowerCase() && lead.stageName && (
+                                <span className="mt-0.5 inline-block rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium normal-case text-amber-700 ring-1 ring-inset ring-amber-200">
+                                  now: {lead.stageName}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            lead.stageName || lead.stage || '-'
+                          )}
+                        </TableCell>
                         <TableCell className="text-sm text-slate-600">{formatDate(lead.assignedDate)}</TableCell>
                         <TableCell className="text-sm text-slate-600">{formatDate(lead.createdAt || lead.createdDate)}</TableCell>
                         <TableCell className="text-sm text-slate-600">{lead.employeeName || '-'}</TableCell>
@@ -198,6 +288,7 @@ function LeadDetailsModal({
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
 

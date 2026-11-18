@@ -1,4 +1,5 @@
-﻿import { useState, useMemo } from 'react';
+﻿import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import {
@@ -10,7 +11,8 @@ import {
   Building2,
   Calendar,
   Award,
-  FileText
+  FileText,
+  GraduationCap
 } from 'lucide-react';
 import { hasPermission } from '@/utils/permissions';
 
@@ -29,7 +31,8 @@ import {
   SalarySheetReport,
   RevenueTargetReport,
   StateWiseReport,
-  StateWiseEmployeeReport
+  StateWiseEmployeeReport,
+  EnrolledStagesReport
 } from '@/components/reports';
 
 /* -------------------------------------------------------------------------- */
@@ -51,7 +54,11 @@ const REPORTS = [
   { id: 'salary-sheet',            name: 'Salary Sheet',                      icon: IndianRupee, component: SalarySheetReport,           permission: { module: 'reports', action: 'salary_sheet' } },
   { id: 'state-wise',              name: 'State Campaign Performance Report', icon: BarChart3,   component: StateWiseReport,             permission: { module: 'reports', action: 'state-wise' } },
   { id: 'state-wise-employee',     name: 'Employee Performance – State-wise', icon: Users,       component: StateWiseEmployeeReport,     permission: { module: 'reports', action: 'state-wise-employee' } },
+  { id: 'enrolled-stages',         name: 'Enrolled Students – Stages',        icon: GraduationCap, component: EnrolledStagesReport,      permission: { module: 'reports', action: 'enrolled-stages' } },
 ];
+
+/** Report id used by deep links, e.g. /admin/reports?report=enrolled-stages */
+const ENROLLED_STAGES_REPORT_ID = 'enrolled-stages';
 
 
 export function ReportsPage() {
@@ -71,8 +78,23 @@ export function ReportsPage() {
     });
   }, [permissions]);
 
-  // Set the first visible report as default
-  const [activeReport, setActiveReport] = useState(() => visibleReports[0]?.id || REPORTS[0].id);
+  // ?report=<id> opens that tab (deep link), else the first visible report
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linked = searchParams.get('report');
+  const [activeReport, setActiveReport] = useState(() =>
+    linked && visibleReports.some((r) => r.id === linked) ? linked : visibleReports[0]?.id || REPORTS[0].id,
+  );
+
+  useEffect(() => {
+    if (linked && linked !== activeReport && visibleReports.some((r) => r.id === linked)) setActiveReport(linked);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linked]);
+
+  const selectReport = (id: string) => {
+    setActiveReport(id);
+    // drop report-specific params (courseId, batchId…) when switching tabs
+    setSearchParams(id === ENROLLED_STAGES_REPORT_ID ? { report: id } : {}, { replace: true });
+  };
 
   // Ensure active report is still visible when permissions change
   useMemo(() => {
@@ -123,7 +145,7 @@ export function ReportsPage() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveReport(tab.id)}
+                onClick={() => selectReport(tab.id)}
                 className={cn(
                   "inline-flex items-center gap-2 h-10 px-4 text-sm font-medium rounded-lg transition-colors",
                   isActive

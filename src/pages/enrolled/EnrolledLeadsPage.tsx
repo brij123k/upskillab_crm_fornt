@@ -21,6 +21,7 @@ import {
   Users,
   X,
   XCircle,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +35,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
+import { hasPermission } from '@/utils/permissions';
+import { isAdminUser } from '@/components/reports/ReportTable';
 import ApiConfig from '@/config/apiConfig';
 import { getDataHandlerWithToken, postDataHandlerWithToken } from '@/config/services';
 import { Avatar, KpiCard, KpiGrid, StageBadge, Tag } from '@/components/reports/ReportUI';
@@ -137,6 +141,15 @@ function Pager({
 
 export function EnrolledLeadsPage({ panel = 'bd' }: Props) {
   const perms = useMemo(() => enrolledPermissions(panel), [panel]);
+  const navigate = useNavigate();
+  const canOpenStageReport = useMemo(() => {
+    if (isAdminUser()) return true;
+    try {
+      return hasPermission(JSON.parse(localStorage.getItem('permissions') || '[]'), 'reports', 'enrolled-stages');
+    } catch {
+      return false;
+    }
+  }, []);
 
   const [tab, setTab] = useState('students');
   const [meta, setMeta] = useState<EnrolledMeta | null>(null);
@@ -374,12 +387,16 @@ export function EnrolledLeadsPage({ panel = 'bd' }: Props) {
   const toggleSelect = (id: string) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   const allOnPageSelected = leads.length > 0 && leads.every((l) => selected.includes(l._id));
-  const toggleSelectPage = () =>
-    setSelected((prev) =>
-      allOnPageSelected
-        ? prev.filter((id) => !leads.some((l) => l._id === id))
-        : [...new Set([...prev, ...leads.map((l) => l._id)])],
-    );
+  const someOnPageSelected = !allOnPageSelected && leads.some((l) => selected.includes(l._id));
+  // Selection persists across pages and filter changes (pick students from
+  // several filters, then act on all of them). The header box only adds /
+  // removes the students on the current page.
+  const selectedOnPage = leads.filter((l) => selected.includes(l._id)).length;
+  const toggleSelectPage = () => {
+    const pageIds = leads.map((l) => l._id);
+    // Unticking the header resets the whole selection (every page / filter).
+    setSelected((prev) => (allOnPageSelected ? [] : [...new Set([...prev, ...pageIds])]));
+  };
   const exitSelect = () => {
     setSelectMode(false);
     setSelected([]);
@@ -430,8 +447,6 @@ export function EnrolledLeadsPage({ panel = 'bd' }: Props) {
 
   // ---------------- derived ----------------
   const stages = meta?.stages || [];
-  const stageCount = (id: string) => stats?.byStage?.find((s: any) => s.stageId === id)?.count || 0;
-  const stageTotal = (stats?.byStage || []).reduce((sum: number, s: any) => sum + s.count, 0);
   const batchOptions = (meta?.batches || []).filter((b) => filters.courseId === ALL || b.courseId === filters.courseId);
   const activeFilterCount = (Object.keys(EMPTY_FILTERS) as (keyof typeof EMPTY_FILTERS)[]).filter(
     (k) => filters[k] !== EMPTY_FILTERS[k],
@@ -467,7 +482,19 @@ export function EnrolledLeadsPage({ panel = 'bd' }: Props) {
         <div className="flex flex-wrap items-center gap-2">
           {selectMode ? (
             <>
-              <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 rounded-lg">{selected.length} selected</Badge>
+              <Badge
+                variant="outline"
+                className="bg-orange-50 text-orange-700 border-orange-200 rounded-lg"
+                title="Selection is kept when you change filters or pages"
+              >
+                {selected.length} selected
+                {selected.length > selectedOnPage && <span className="ml-1 font-normal text-orange-600/80">({selectedOnPage} on this page)</span>}
+              </Badge>
+              {selected.length > 0 && (
+                <Button variant="ghost" size="sm" onClick={() => setSelected([])} className="h-8 rounded-lg text-slate-500">
+                  Clear selection
+                </Button>
+              )}
               <Button variant="outline" onClick={exitSelect} className="rounded-xl border-slate-200">
                 <X className="w-4 h-4 mr-2" /> Cancel
               </Button>
@@ -488,6 +515,21 @@ export function EnrolledLeadsPage({ panel = 'bd' }: Props) {
                 <Users className="w-4 h-4 mr-2" /> Select Students
               </Button>
             )
+          )}
+          {canOpenStageReport && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                const q = new URLSearchParams({ report: 'enrolled-stages' });
+                if (filters.courseId !== ALL) q.set('courseId', filters.courseId);
+                if (filters.batchId !== ALL) q.set('batchId', filters.batchId);
+                navigate(`/${panel}/reports?${q.toString()}`);
+              }}
+              className="rounded-xl border-slate-200 hover:bg-orange-50 hover:text-orange-600"
+              title="Enrolled students by stage report"
+            >
+              <BarChart3 className="w-4 h-4 mr-2" /> Stage report
+            </Button>
           )}
           {/* Stages are a fixed list (Enrolled + feedback outcomes) – no management UI */}
           {perms.canSync && (
@@ -549,33 +591,6 @@ export function EnrolledLeadsPage({ panel = 'bd' }: Props) {
             <KpiCard icon={Users} tone="blue" label="Unassigned" value={(stats?.unassigned || 0).toLocaleString('en-IN')} sub="no counsellor yet" />
           </KpiGrid>
 
-          {/* Stage chips */}
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setFilter('stageId', ALL)}
-              className={cn(
-                'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                filters.stageId === ALL ? 'border-orange-500 bg-orange-500 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
-              )}
-            >
-              All stages <span className="ml-1 opacity-80">{stageTotal}</span>
-            </button>
-            {stages.map((s) => (
-              <button
-                key={s._id}
-                title={s.description || s.name}
-                onClick={() => setFilter('stageId', s._id)}
-                className={cn(
-                  'flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                  filters.stageId === s._id ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
-                )}
-              >
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
-                {s.name} <span className="opacity-70">{stageCount(s._id)}</span>
-              </button>
-            ))}
-          </div>
-
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative w-full sm:w-72">
@@ -598,7 +613,7 @@ export function EnrolledLeadsPage({ panel = 'bd' }: Props) {
 
           {showFilters && (
             <Card className="rounded-xl border-slate-200 shadow-sm">
-              <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4">
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 [&>*]:min-w-0">
                 <div className="space-y-1">
                   <Label className="text-xs text-slate-500">Student status (Active / Inactive)</Label>
                   <Select value={filters.active} onValueChange={(v) => setFilter('active', v)}>
@@ -675,11 +690,17 @@ export function EnrolledLeadsPage({ panel = 'bd' }: Props) {
                     />
                   </div>
                 )}
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1 sm:col-span-2">
                   <Label className="text-xs text-slate-500">Enrolled between</Label>
-                  <div className="flex gap-2">
-                    <Input type="date" value={filters.fromDate} onChange={(e) => setFilter('fromDate', e.target.value)} className="h-9 rounded-xl text-xs" />
-                    <Input type="date" value={filters.toDate} onChange={(e) => setFilter('toDate', e.target.value)} className="h-9 rounded-xl text-xs" />
+                  <div className="grid min-w-0 grid-cols-1 gap-2 min-[420px]:grid-cols-2">
+                    <div className="min-w-0">
+                      <span className="sr-only">From</span>
+                      <Input type="date" aria-label="Enrolled from" value={filters.fromDate} max={filters.toDate || undefined} onChange={(e) => setFilter('fromDate', e.target.value)} className="h-9 w-full min-w-0 rounded-xl text-xs" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="sr-only">To</span>
+                      <Input type="date" aria-label="Enrolled to" value={filters.toDate} min={filters.fromDate || undefined} onChange={(e) => setFilter('toDate', e.target.value)} className="h-9 w-full min-w-0 rounded-xl text-xs" />
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -698,7 +719,14 @@ export function EnrolledLeadsPage({ panel = 'bd' }: Props) {
                   <tr>
                     {selectMode && (
                       <th className="w-8 px-3 py-2">
-                        <input type="checkbox" checked={allOnPageSelected} onChange={toggleSelectPage} className="w-4 h-4 rounded border-slate-300 accent-orange-500" />
+                        <input
+                          type="checkbox"
+                          checked={allOnPageSelected}
+                          ref={(el) => { if (el) el.indeterminate = someOnPageSelected; }}
+                          onChange={toggleSelectPage}
+                          className="w-4 h-4 rounded border-slate-300 accent-orange-500"
+                          title={allOnPageSelected ? 'Clear all selected students' : 'Select all on this page'}
+                        />
                       </th>
                     )}
                     {['Student', 'Contact', 'Courses', 'Batches', 'Batch status', 'Payment', 'Stage', 'Status', 'Enrolled', 'Assigned To', 'Last Activity', 'Actions'].map((h) => (

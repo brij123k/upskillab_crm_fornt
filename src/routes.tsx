@@ -132,7 +132,7 @@ const AppRoutes = () => {
         {/* BD Panel */}
         <Route path="/bd" element={
             <ProtectedRoute>
-                <RoleProtectedRoute allowedRoles={["bd"]}>
+                <RoleProtectedRoute allowedRoles={["bd", "hr"]}>
                 <PanelLayout panel="bd" />
                 </RoleProtectedRoute>
                 </ProtectedRoute>}>

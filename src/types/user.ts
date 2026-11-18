@@ -34,6 +34,11 @@ export interface PersonalDetails {
   gender?: string;
   aadhaarNumber?: string;
   panNumber?: string;
+  bloodGroup?: string;
+  alternateMobile?: string;
+  emergencyContactName?: string;
+  emergencyContactNumber?: string;
+  emergencyContactRelation?: string;
 }
 
 export interface Address {
@@ -60,12 +65,15 @@ export interface EducationalDetail {
   boardOrUniversity: string;
   passingYear: number;
   percentageOrCGPA: string;
+  /** Uploaded marksheet / certificate URL. */
+  certificate?: string;
 }
 
 export interface Documents {
   aadhaarFront?: string;
   aadhaarBack?: string;
   panCard?: string;
+  passbook?: string;
   educationalCertificates?: string[];
 }
 
@@ -90,6 +98,7 @@ poolIds?: string[] | PoolType[];
 
   personalDetails?: PersonalDetails;
    address?: Address;
+  currentAddress?: Address;
   bankDetails?: BankDetails;
   educationalDetails?: EducationalDetail[];
   documents?: Documents;

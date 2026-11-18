@@ -3,6 +3,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Trash2, GraduationCap } from 'lucide-react';
+import { FileField } from '@/components/onboarding/FileField';
+import { postDataHandlerWithTokenFormData } from '@/config/services';
+import ApiConfig from '@/config/apiConfig';
+
+async function defaultUploader(file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await postDataHandlerWithTokenFormData(ApiConfig.uploadImage, formData, true);
+  return response?.success ? response?.data?.url : null;
+}
 
 interface EducationalDetail {
   qualification: string;
@@ -10,15 +20,17 @@ interface EducationalDetail {
   boardOrUniversity: string;
   passingYear: number;
   percentageOrCGPA: string;
+  certificate?: string;
 }
 
 interface EducationalDetailsFormProps {
   value: EducationalDetail[];
   onChange: (details: EducationalDetail[]) => void;
   disabled?: boolean;
+  uploader?: (file: File) => Promise<string | null | undefined>;
 }
 
-export function EducationalDetailsForm({ value = [], onChange, disabled = false }: EducationalDetailsFormProps) {
+export function EducationalDetailsForm({ value = [], onChange, disabled = false, uploader = defaultUploader }: EducationalDetailsFormProps) {
   const handleAdd = () => {
     onChange([
       ...value,
@@ -131,6 +143,13 @@ export function EducationalDetailsForm({ value = [], onChange, disabled = false 
                   disabled={disabled}
                 />
               </div>
+              <FileField
+                label="Marksheet / Certificate"
+                value={detail.certificate}
+                onChange={(url) => handleChange(index, 'certificate', url)}
+                uploader={uploader}
+                disabled={disabled}
+              />
             </div>
           </div>
         ))}

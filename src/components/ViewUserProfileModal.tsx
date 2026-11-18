@@ -184,12 +184,6 @@ export function ViewUserProfileModal({
                         </p>
                       </div>
                       <div>
-                        <div className="text-xs text-slate-500">Education</div>
-                        <p className="text-sm font-medium text-slate-800 mt-0.5">
-                          {selectedUser.profile.education || 'N/A'}
-                        </p>
-                      </div>
-                      <div>
                         <div className="text-xs text-slate-500">Salary</div>
                         <p className="text-sm font-medium text-slate-800 mt-0.5">
                           {selectedUser.profile.salary ? `₹${selectedUser.profile.salary.toLocaleString()}` : 'N/A'}

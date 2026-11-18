@@ -226,7 +226,15 @@ export function DocumentsUpload({ value = {}, onChange, disabled = false, upload
             onChange={(url) => handleChange('panCard', url)}
             disabled={disabled}
             uploader={uploader}
-            accept="image/*"
+            accept="image/*,application/pdf"
+          />
+          <SingleDocumentUpload
+            label="Bank Passbook / Cancelled Cheque"
+            value={value?.passbook}
+            onChange={(url) => handleChange('passbook', url)}
+            disabled={disabled}
+            uploader={uploader}
+            accept="image/*,application/pdf"
           />
         </div>
         

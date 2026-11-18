@@ -62,6 +62,7 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'status', label: 'Change User Status' },
       { id: 'block', label: 'Block/Unblock User' },
       { id: 'user_activity', label: 'View User Activity' },
+      { id: 'onboarding', label: 'Employee Onboarding (HR) – manage all users' },
       // { id: 'password_reset', label: 'Reset Password' }
     ]
   },
@@ -111,7 +112,8 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'create', label: 'Create Order' },
       { id: 'read', label: 'View Order' },
       { id: 'update', label: 'Update Order' },
-      { id: 'approve', label: 'Approve Order' },
+      { id: 'approve', label: 'Approve Order (HR approval of juniors’ orders; Admin = final)' },
+      { id: 'manager_approve', label: 'HR Approve Order (juniors’ orders)' },
       { id: 'read_loans', label: 'Read Loans' },
       { id: 'send_reminders', label: 'Send Reminders' },
       { id: 'payment_link_generator', label: 'Generate Payment Link' },
@@ -170,6 +172,7 @@ export const modulesConfig: Record<string, ModuleConfig> = {
       { id: 'salary_sheet', label: 'Report: Salary Sheet' },
       { id: 'state-wise', label: 'Report: State Campaign Performance' },
       { id: 'state-wise-employee', label: 'Report: Employee Performance – State-wise' },
+      { id: 'enrolled-stages', label: 'Report: Enrolled Students by Stage' },
     ]
   },
   targets: {

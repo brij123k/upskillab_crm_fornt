@@ -1,5 +1,5 @@
-// const url = "http://localhost:3000"
-const url = "https://crm.upskillab.in"
+const url = "http://localhost:3000"
+// const url = "https://crm.upskillab.in"
 const ApiConfig = {
   url,
   login:`${url}/users/login`,
@@ -36,6 +36,8 @@ const ApiConfig = {
   togglePoolActive:(id:string)=>`${url}/pool/toggle/${id}`,
   blockUser:(id:string)=>`${url}/users/${id}/toggle-block`,
   profileGen:(id:string)=>`${url}/users/${id}/toggle-dashboard`,
+  // Lead filters
+  suggestSourceCampaigns:`${url}/leads/source-campaigns/suggest`,
   // Employee onboarding (staff)
   getOnboarding:(id:string)=>`${url}/users/${id}/onboarding`,
   generateOnboardingLink:(id:string)=>`${url}/users/${id}/onboarding/link`,
@@ -86,6 +88,8 @@ addNewLevel: `${url}/level`,
   getOrderById:(orderId:string)=>`${url}/order/${orderId}`,
   updateOrder:(orderId:string)=>`${url}/order/${orderId}`,
   toggleOrder:(orderId:string)=>`${url}/order/approve/${orderId}`,
+  managerApproveOrder:(orderId:string)=>`${url}/order/manager-approve/${orderId}`,
+  orderInvoice:(orderId:string)=>`${url}/order/${orderId}/invoice`,
   // order payments v2 (multiple sources + credits)
   getOrderFinancials:(orderId:string)=>`${url}/order/${orderId}/financials`,
   updateOrderFinancials:(orderId:string)=>`${url}/order/${orderId}/financials`,
@@ -104,6 +108,9 @@ addNewLevel: `${url}/level`,
   enrolledLeadsBulkStage:`${url}/enrolled-leads/stage`,
   enrolledLeadsSync:`${url}/enrolled-leads/sync`,
   enrolledLeadsSyncRuns:`${url}/enrolled-leads/sync/runs`,
+  enrolledStageReportOptions:`${url}/enrolled-leads/report/stage-options`,
+  enrolledStageReport:`${url}/enrolled-leads/report/stages`,
+  enrolledStageReportStudents:`${url}/enrolled-leads/report/stages/students`,
   enrolledLeadStages:`${url}/enrolled-leads/stages`,
   enrolledLeadStage:(id:string)=>`${url}/enrolled-leads/stages/${id}`,
   enrolledCourses:`${url}/enrolled-leads/courses`,

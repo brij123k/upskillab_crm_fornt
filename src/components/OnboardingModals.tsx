@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -13,13 +13,16 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
+import { MultiSelect } from '@/components/ui/multi-select';
 import {
-  Copy, ExternalLink, Link2, Loader2, Mail, RefreshCw, Unlock, Lock, CheckCircle2, AlertTriangle,
+  Copy, ExternalLink, Link2, Loader2, Mail, RefreshCw, Unlock, Lock, CheckCircle2, AlertTriangle, Briefcase,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ApiConfig from '@/config/apiConfig';
 import { getDataHandlerWithToken, patchTokenDataHandler, postDataHandlerWithToken } from '@/config/services';
-import type { OnboardingInfo, OnboardingStatus, PersonalDetails, UserType } from '@/types/user';
+import type { DepartmentType, OnboardingInfo, OnboardingStatus, PersonalDetails, PoolType, UserType } from '@/types/user';
 import { PersonalDetailsForm, EMPTY_PERSONAL_DETAILS, toPersonalDetails, validatePersonalDetails } from './PersonalDetailsForm';
 import { AddressForm } from './AddressForm';
 import { BankDetailsForm } from './BankDetailsForm';
@@ -235,22 +238,33 @@ interface ReviewProps {
   onOpenChange: (open: boolean) => void;
   user: UserType | null;
   onChanged?: () => void;
+  departments?: DepartmentType[];
+  pools?: PoolType[];
+  /** Everyone the staff member can see – used as reporting-senior options. */
+  users?: UserType[];
 }
 
 const EMPTY_ADDRESS = { addressLine1: '', addressLine2: '', city: '', state: '', country: '', pincode: '' };
 const EMPTY_BANK = { accountHolderName: '', bankName: '', accountNumber: '', ifscCode: '', branchName: '', accountType: '' };
-const EMPTY_DOCS = { aadhaarFront: '', aadhaarBack: '', panCard: '', educationalCertificates: [] as string[] };
+const EMPTY_DOCS = { aadhaarFront: '', aadhaarBack: '', panCard: '', passbook: '', educationalCertificates: [] as string[] };
+const EMPTY_EMPLOYMENT = { departmentId: '', salary: '', reportingSeniorId: '', poolIds: [] as string[] };
 
-export function OnboardingReviewModal({ open, onOpenChange, user, onChanged }: ReviewProps) {
+const idOf = (v: any) => (v && typeof v === 'object' ? v._id : v) || '';
+
+export function OnboardingReviewModal({ open, onOpenChange, user, onChanged, departments = [], pools = [], users = [] }: ReviewProps) {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<'approve' | 'reopen' | null>(null);
   const [info, setInfo] = useState<OnboardingInfo | null>(null);
-  const [tab, setTab] = useState('personal');
+  const [tab, setTab] = useState('employment');
   const [activateUser, setActivateUser] = useState(true);
+  const [employment, setEmployment] = useState({ ...EMPTY_EMPLOYMENT });
+  const [deptUsers, setDeptUsers] = useState<any[]>([]);
+  const [loadingDeptUsers, setLoadingDeptUsers] = useState(false);
   const [form, setForm] = useState({
     profileImage: '',
     personalDetails: { ...EMPTY_PERSONAL_DETAILS } as PersonalDetails,
     address: { ...EMPTY_ADDRESS },
+    currentAddress: { ...EMPTY_ADDRESS },
     bankDetails: { ...EMPTY_BANK },
     educationalDetails: [] as any[],
     documents: { ...EMPTY_DOCS },
@@ -258,28 +272,77 @@ export function OnboardingReviewModal({ open, onOpenChange, user, onChanged }: R
 
   useEffect(() => {
     if (!open || !user) return;
-    setTab('personal');
     setActivateUser(user.status !== 'active');
     setLoading(true);
     getDataHandlerWithToken(ApiConfig.getOnboarding(user._id), {}, null, true)
       .then((res: any) => {
         setInfo(res.onboarding);
+        setTab(res.onboarding?.status === 'submitted' ? 'employment' : 'personal');
         const p = res.profile || {};
         setForm({
           profileImage: p.profileImage || '',
           personalDetails: toPersonalDetails(p.personalDetails),
           address: { ...EMPTY_ADDRESS, ...(p.address || {}) },
+          currentAddress: { ...EMPTY_ADDRESS, ...(p.currentAddress || {}) },
           bankDetails: { ...EMPTY_BANK, ...(p.bankDetails || {}) },
           educationalDetails: p.educationalDetails || [],
           documents: { ...EMPTY_DOCS, ...(p.documents || {}) },
+        });
+        setEmployment({
+          departmentId: idOf(p.departmentId),
+          salary: p.salary ? String(p.salary) : '',
+          reportingSeniorId: idOf(p.reportingSeniorId),
+          poolIds: (p.poolIds || []).map(idOf).filter(Boolean),
         });
       })
       .catch((e: any) => toast.error(errorMessage(e, 'Failed to load submitted details')))
       .finally(() => setLoading(false));
   }, [open, user]);
 
+  // Seniors from the chosen department are listed first.
+  useEffect(() => {
+    if (!open || !employment.departmentId) {
+      setDeptUsers([]);
+      return;
+    }
+    setLoadingDeptUsers(true);
+    getDataHandlerWithToken(ApiConfig.getUserBydepId(employment.departmentId), null, null, true)
+      .then((res: any) => setDeptUsers(Array.isArray(res) ? res : []))
+      .catch(() => setDeptUsers([]))
+      .finally(() => setLoadingDeptUsers(false));
+  }, [open, employment.departmentId]);
+
+  const seniorOptions = useMemo(() => {
+    const seen = new Set<string>([user?._id || '']);
+    const opts: { value: string; label: string }[] = [];
+    for (const d of deptUsers) {
+      const u = d?.userId;
+      if (!u?._id || seen.has(u._id)) continue;
+      seen.add(u._id);
+      opts.push({ value: u._id, label: `${u.name}${u.employeeId ? ` (${u.employeeId})` : ''} · this department` });
+    }
+    for (const u of users) {
+      if (!u?._id || seen.has(u._id) || u.status === 'resigned') continue;
+      seen.add(u._id);
+      opts.push({ value: u._id, label: `${u.name}${u.employeeId ? ` (${u.employeeId})` : ''}${u.role?.name ? ` · ${u.role.name}` : ''}` });
+    }
+    return opts;
+  }, [deptUsers, users, user?._id]);
+
   const approve = async () => {
     if (!user) return;
+    const missing = !employment.departmentId
+      ? 'department'
+      : !(Number(employment.salary) > 0)
+        ? 'CTC'
+        : !employment.reportingSeniorId
+          ? 'reporting senior'
+          : null;
+    if (missing) {
+      setTab('employment');
+      toast.error(`Please choose the ${missing} before approving`);
+      return;
+    }
     const pdErr = validatePersonalDetails(form.personalDetails);
     if (pdErr) {
       setTab('personal');
@@ -292,9 +355,14 @@ export function OnboardingReviewModal({ open, onOpenChange, user, onChanged }: R
         ApiConfig.approveOnboarding(user._id),
         {
           activateUser,
+          departmentId: employment.departmentId,
+          salary: Number(employment.salary),
+          reportingSeniorId: employment.reportingSeniorId,
+          poolIds: employment.poolIds,
           ...(form.profileImage ? { profileImage: form.profileImage } : {}),
           personalDetails: form.personalDetails,
           address: form.address,
+          currentAddress: form.currentAddress,
           bankDetails: form.bankDetails,
           educationalDetails: form.educationalDetails.map((d) => ({ ...d, passingYear: Number(d.passingYear) || undefined })),
           documents: form.documents,
@@ -317,12 +385,16 @@ export function OnboardingReviewModal({ open, onOpenChange, user, onChanged }: R
     try {
       const res: any = await postDataHandlerWithToken(ApiConfig.generateOnboardingLink(user._id), { baseUrl: window.location.origin }, true);
       setInfo(res.onboarding);
-      try { await navigator.clipboard.writeText(`${window.location.origin}/onboarding/${res.onboarding.token}`); } catch { /* ignore */ }
-      toast.success('Link re-opened and copied — send it back to the employee for corrections');
+      try {
+        await navigator.clipboard.writeText(`${window.location.origin}/onboarding/${res.onboarding.token}`);
+      } catch {
+        /* ignore */
+      }
+      toast.success('Link re-activated and copied — send it back to the employee for corrections');
       onChanged?.();
       onOpenChange(false);
     } catch (e: any) {
-      toast.error(errorMessage(e, 'Failed to re-open link'));
+      toast.error(errorMessage(e, 'Failed to re-activate link'));
     } finally {
       setBusy(null);
     }
@@ -332,22 +404,23 @@ export function OnboardingReviewModal({ open, onOpenChange, user, onChanged }: R
   const canApprove = info?.status === 'submitted';
   const disabled = !!busy || loading;
   const tabCls = 'data-[state=active]:bg-orange-500 data-[state=active]:text-white rounded-lg px-3 py-1.5 text-sm font-medium';
+  const employmentReady = !!employment.departmentId && Number(employment.salary) > 0 && !!employment.reportingSeniorId;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[900px] rounded-2xl border-slate-200 p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-[920px] rounded-2xl border-slate-200 p-0 overflow-hidden">
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <DialogTitle className="text-xl font-bold text-slate-800 flex items-center gap-3">
+          <DialogTitle className="text-xl font-bold text-slate-800 flex flex-wrap items-center gap-3">
             Review onboarding: {user.name}
             <OnboardingBadge onboarding={info || undefined} />
           </DialogTitle>
           <DialogDescription className="text-sm text-slate-500">
-            Check what the employee submitted, fix anything that's wrong, then approve.
+            Onboarding ID <strong>{user.employeeId ?? '—'}</strong>. Set the employment details, check what the employee submitted, then approve.
             {info?.submittedAt && <> Submitted {new Date(info.submittedAt).toLocaleString()}.</>}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
+        <div className="px-6 py-4 max-h-[62vh] overflow-y-auto">
           {loading ? (
             <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-orange-500" /></div>
           ) : (
@@ -356,7 +429,7 @@ export function OnboardingReviewModal({ open, onOpenChange, user, onChanged }: R
                 <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                   {info?.status === 'approved'
-                    ? 'This onboarding is already approved. Use Edit User to change details, or re-open the link for the employee.'
+                    ? 'This onboarding is already approved. Use Edit User to change details, or re-activate the link for the employee.'
                     : 'The employee has not submitted the form yet.'}
                 </div>
               )}
@@ -368,17 +441,95 @@ export function OnboardingReviewModal({ open, onOpenChange, user, onChanged }: R
               )}
               <Tabs value={tab} onValueChange={setTab}>
                 <TabsList className="flex flex-wrap h-auto gap-1 bg-transparent border-b border-slate-200 pb-2 mb-4">
+                  <TabsTrigger value="employment" className={tabCls}>
+                    Employment
+                    {canApprove && !employmentReady && <span className="ml-1.5 h-2 w-2 rounded-full bg-red-500" />}
+                  </TabsTrigger>
                   <TabsTrigger value="personal" className={tabCls}>Personal</TabsTrigger>
                   <TabsTrigger value="address" className={tabCls}>Address</TabsTrigger>
                   <TabsTrigger value="bank" className={tabCls}>Bank</TabsTrigger>
                   <TabsTrigger value="education" className={tabCls}>Education</TabsTrigger>
                   <TabsTrigger value="documents" className={tabCls}>Documents</TabsTrigger>
                 </TabsList>
+                <TabsContent value="employment">
+                  <div className="rounded-xl border border-slate-200 p-4">
+                    <div className="mb-4 flex flex-wrap items-center gap-2">
+                      <Briefcase className="h-4 w-4 text-orange-500" />
+                      <h4 className="text-sm font-semibold text-slate-800">Employment details</h4>
+                      <span className="text-xs text-slate-400">Required before approval (pools optional)</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label>Department <span className="text-red-500">*</span></Label>
+                        <Select
+                          value={employment.departmentId}
+                          onValueChange={(v) =>
+                            setEmployment((e) => ({ ...e, departmentId: v, reportingSeniorId: e.departmentId === v ? e.reportingSeniorId : '' }))
+                          }
+                          disabled={disabled}
+                        >
+                          <SelectTrigger className="h-10"><SelectValue placeholder="Select department" /></SelectTrigger>
+                          <SelectContent>
+                            {departments.map((d) => <SelectItem key={d._id} value={d._id}>{d.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Monthly CTC (₹) <span className="text-red-500">*</span></Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-10"
+                          value={employment.salary}
+                          onChange={(e) => setEmployment((x) => ({ ...x, salary: e.target.value }))}
+                          placeholder="e.g. 25000"
+                          disabled={disabled}
+                        />
+                        {Number(employment.salary) > 0 && (
+                          <p className="text-xs text-slate-500">≈ ₹{(Number(employment.salary) * 12).toLocaleString('en-IN')} per year</p>
+                        )}
+                      </div>
+                      <div className="space-y-1.5 md:col-span-2">
+                        <Label>Reporting Senior <span className="text-red-500">*</span></Label>
+                        <SearchableDropdown
+                          options={seniorOptions}
+                          value={employment.reportingSeniorId}
+                          onValueChange={(v) => setEmployment((e) => ({ ...e, reportingSeniorId: v }))}
+                          placeholder={employment.departmentId ? 'Select reporting senior' : 'Select a department first'}
+                          searchPlaceholder="Search by name or ID…"
+                          emptyMessage={loadingDeptUsers ? 'Loading…' : 'No users found'}
+                          disabled={disabled || !employment.departmentId}
+                          allowClear
+                          onClear={() => setEmployment((e) => ({ ...e, reportingSeniorId: '' }))}
+                          triggerClassName="h-10"
+                        />
+                      </div>
+                      <div className="space-y-1.5 md:col-span-2">
+                        <Label>Pools <span className="text-xs font-normal text-slate-400">(optional)</span></Label>
+                        <MultiSelect
+                          options={pools.filter((p) => p.isActive).map((p) => ({ value: p._id, label: p.name }))}
+                          selected={employment.poolIds}
+                          onChange={(poolIds: string[]) => setEmployment((e) => ({ ...e, poolIds }))}
+                          placeholder="Select pools…"
+                          disabled={disabled}
+                          emptyMessage="No active pools"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
                 <TabsContent value="personal">
                   <PersonalDetailsForm value={form.personalDetails} onChange={(personalDetails) => setForm({ ...form, personalDetails })} disabled={disabled} />
                 </TabsContent>
-                <TabsContent value="address">
-                  <AddressForm value={form.address} onChange={(address) => setForm({ ...form, address })} disabled={disabled} />
+                <TabsContent value="address" className="space-y-4">
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Permanent address</p>
+                    <AddressForm value={form.address} onChange={(address) => setForm({ ...form, address })} disabled={disabled} />
+                  </div>
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Current address</p>
+                    <AddressForm value={form.currentAddress} onChange={(currentAddress) => setForm({ ...form, currentAddress })} disabled={disabled} />
+                  </div>
                 </TabsContent>
                 <TabsContent value="bank">
                   <BankDetailsForm value={form.bankDetails} onChange={(bankDetails) => setForm({ ...form, bankDetails })} disabled={disabled} />
@@ -390,12 +541,6 @@ export function OnboardingReviewModal({ open, onOpenChange, user, onChanged }: R
                   <DocumentsUpload value={form.documents} onChange={(documents) => setForm({ ...form, documents })} disabled={disabled} />
                 </TabsContent>
               </Tabs>
-
-              {!user.isDashboardEnabled && (
-                <p className="mt-4 text-xs text-slate-500">
-                  Note: dashboard access isn't enabled yet. After approving, use <strong>View Profile → Create Profile</strong> to assign department, reporting senior, pools and permissions.
-                </p>
-              )}
             </>
           )}
         </div>
@@ -406,14 +551,14 @@ export function OnboardingReviewModal({ open, onOpenChange, user, onChanged }: R
               <Checkbox id="activate-user" checked={activateUser} onCheckedChange={(v) => setActivateUser(v === true)} disabled={disabled || !canApprove} />
               <Label htmlFor="activate-user" className="text-sm font-normal text-slate-600">Set employee status to Active</Label>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Button variant="outline" onClick={reopen} disabled={disabled} className="rounded-lg border-slate-200">
                 {busy === 'reopen' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Unlock className="mr-2 h-4 w-4" />}
-                Re-open for employee
+                Re-activate link
               </Button>
               <Button onClick={approve} disabled={disabled || !canApprove} className="rounded-lg bg-orange-500 hover:bg-orange-600 text-white">
                 {busy === 'approve' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                Save & approve
+                Approve
               </Button>
             </div>
           </div>

@@ -30,7 +30,9 @@ import {
     BookOpen,
     ExternalLink,
     Wallet,
-    AlertTriangle
+    AlertTriangle,
+    UserCheck,
+    FileDown,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -56,6 +58,7 @@ import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 import ApiConfig from '@/config/apiConfig';
 import { format } from 'date-fns';
 import axios from 'axios';
+import { PaymentBalanceSheet } from '@/components/orders/PaymentBalanceSheet';
 import { PaymentSourcesEditor } from '@/components/orders/PaymentSourcesEditor';
 import { OrderFinancialsDialog, PaymentLinkTarget } from '@/components/orders/OrderFinancialsDialog';
 import {
@@ -185,6 +188,12 @@ interface OrderType {
         name: string;
         email: string;
     };
+    approvedAt?: string;
+    managerApproved?: boolean;
+    managerApprovedBy?: { _id: string; name: string; email: string };
+    managerApprovedAt?: string;
+    invoiceNumber?: string;
+    invoiceSentAt?: string;
     GSTEnabled?: boolean;
     GSTAmount?: number;
 }
@@ -572,7 +581,11 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
     // ===== Order payments v2 =====
 
     // Client-side checks of the payment structure (the API re-validates and returns errors[]).
-    const getPaymentErrors = () => validateDraft(orderForm.payments, calculateFinalFee());
+    // The order remark is mandatory; the credit remark is checked in validateDraft.
+    const getPaymentErrors = () => [
+        ...(orderForm.remarks?.trim() ? [] : ['Order remark is required']),
+        ...validateDraft(orderForm.payments, calculateFinalFee()),
+    ];
 
     const showApiError = (error: any, fallback: string) => {
         const { message, errors } = extractApiError(error, fallback);
@@ -705,8 +718,57 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
         }
     };
 
-    // Approve order (refused by the API when sources + credits do not equal the final fee)
+    const currentUser = (() => {
+        try {
+            return JSON.parse(localStorage.getItem('user') || 'null');
+        } catch {
+            return null;
+        }
+    })();
+    const currentUserId = String(currentUser?.id || currentUser?._id || '');
+    // Admin gives the final approval; everyone else with approve access gives the HR approval.
+    const isAdminApprover = currentUser?.role?.name === 'Admin' || !!currentUser?.role?.isSuperAdmin;
+    const canHrApprove = !isAdminApprover &&
+        (hasPermission(permissions, 'orders', 'approve') || hasPermission(permissions, 'orders', 'manager_approve'));
+
+    // Manager (first-level) approval; the order still needs the admin approval
+    const handleManagerApprove = async (orderId: string) => {
+        try {
+            setApprovingOrder(true);
+            await patchTokenDataHandler(ApiConfig.managerApproveOrder(orderId), null, true);
+            toast({ title: "HR approved", description: "The order now waits for admin approval." });
+            fetchOrders();
+        } catch (error: any) {
+            const { message, errors } = extractApiError(error, "Failed to approve the order");
+            toast({
+                title: "Cannot approve",
+                description: errors.length ? `${message}: ${errors.join('; ')}` : message,
+                variant: "destructive",
+            });
+        } finally {
+            setApprovingOrder(false);
+        }
+    };
+
+    // Open the invoice PDF (auth header needed, so fetch as a blob)
+    const handleDownloadInvoice = async (orderId: string) => {
+        try {
+            const res = await axios.get(ApiConfig.orderInvoice(orderId), {
+                responseType: 'blob',
+                headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+            });
+            const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+            window.open(url, '_blank', 'noopener');
+            setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        } catch {
+            toast({ title: "Error", description: "Could not load the invoice", variant: "destructive" });
+        }
+    };
+
+    // Final (admin) approval – refused by the API when sources + credits do not equal the final fee.
+    // On success the invoice PDF is emailed to the student and the counsellor.
     const handleApproveOrder = async (orderId: string, currentApprovalStatus: boolean) => {
+        if (!currentApprovalStatus && !window.confirm('Give final approval to this order?\n\nThe invoice will be emailed to the student and the counsellor.')) return;
         try {
             setApprovingOrder(true);
             const endpoint = ApiConfig.toggleOrder(orderId);
@@ -714,7 +776,7 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
 
             toast({
                 title: "Success",
-                description: `Order ${!currentApprovalStatus ? 'approved' : 'unapproved'} successfully`,
+                description: !currentApprovalStatus ? 'Order approved. The invoice is being emailed to the student and the counsellor.' : 'Order unapproved',
             });
 
             fetchOrders();
@@ -1481,17 +1543,24 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
                 {getStatusBadge(order.status, order.Approved)}
               </TableCell>
               <TableCell>
-                {order.Approved ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Approved
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">
-                    <XCircle className="w-3 h-3" />
-                    Pending
-                  </span>
-                )}
+                <div className="flex flex-col gap-1">
+                  {[
+                    { label: 'HR', done: !!(order.managerApproved || order.Approved), by: order.managerApprovedBy?.name },
+                    { label: 'Admin', done: !!order.Approved, by: order.approvedBy?.name },
+                  ].map((step) => (
+                    <span
+                      key={step.label}
+                      title={step.done ? `${step.label} approved${step.by ? ` by ${step.by}` : ''}` : `Waiting for ${step.label.toLowerCase()} approval`}
+                      className={cn(
+                        "inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset",
+                        step.done ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-amber-50 text-amber-700 ring-amber-200"
+                      )}
+                    >
+                      {step.done ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                      {step.label} {step.done ? 'approved' : 'pending'}
+                    </span>
+                  ))}
+                </div>
               </TableCell>
               <TableCell className="whitespace-nowrap text-sm text-slate-600">
                 {formatDate(order.orderDate)}
@@ -1518,16 +1587,40 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
                       <Edit className="w-4 h-4 text-slate-400" />
                     </Button>
                   )}
-                  {hasPermission(permissions, 'orders', 'approve') && !order.Approved && (
+                  {canHrApprove && !order.Approved && !order.managerApproved &&
+                    String(order.counsellorId?._id || order.counsellorId) !== currentUserId && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleManagerApprove(order._id)}
+                      className="h-8 gap-1 rounded-lg border-sky-200 px-2 text-xs font-semibold text-sky-700 hover:bg-sky-50 hover:text-sky-800"
+                      title="HR approval (admin approval still required)"
+                      disabled={approvingOrder}
+                    >
+                      <UserCheck className="w-3.5 h-3.5" /> HR
+                    </Button>
+                  )}
+                  {isAdminApprover && !order.Approved && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleApproveOrder(order._id, order.Approved)}
+                      className="h-8 gap-1 rounded-lg border-emerald-200 px-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                      title={order.managerApproved ? "Final approval – emails the invoice" : "Final approval (also marks the HR step) – emails the invoice"}
+                      disabled={approvingOrder}
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" /> Admin
+                    </Button>
+                  )}
+                  {order.Approved && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleApproveOrder(order._id, order.Approved)}
+                      onClick={() => handleDownloadInvoice(order._id)}
                       className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100"
-                      title="Approve Order"
-                      disabled={approvingOrder}
+                      title="Invoice PDF"
                     >
-                      <ShieldCheck className="w-4 h-4 text-green-500" />
+                      <FileDown className="w-4 h-4 text-slate-500" />
                     </Button>
                   )}
                   <Button
@@ -1954,7 +2047,7 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
         </div>
 
         <div className="mt-4">
-          <Label className="text-xs font-semibold text-slate-500 uppercase">Remarks</Label>
+          <Label className="text-xs font-semibold text-slate-500 uppercase">Order remark *</Label>
           <Textarea
             value={orderForm.remarks}
             onChange={(e) => setOrderForm({ ...orderForm, remarks: e.target.value })}
@@ -2126,8 +2219,8 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
             </div>
           </div>
 
-          {/* Payment Details */}
-          <div className="bg-white rounded-xl border border-slate-100 p-5">
+          {/* Payment Details – balance sheet */}
+          <div className="bg-white rounded-xl border border-slate-100 p-5 md:col-span-2">
             <h3 className="text-base font-semibold text-slate-800 mb-4">Payment Details</h3>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -2149,51 +2242,7 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
                 ))}
               </div>
 
-              {selectedOrder.paymentSummary ? (
-                <div className="bg-slate-50 rounded-xl p-4 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Payment sources</span>
-                    <span className="text-slate-800">{formatCurrency(selectedOrder.paymentSummary.plannedPaymentCoverage)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Credits</span>
-                    <span className="text-slate-800">{formatCurrency(selectedOrder.paymentSummary.totalCredits)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Received</span>
-                    <span className="text-emerald-600 font-medium">{formatCurrency(selectedOrder.paymentSummary.actualReceivedRevenue)}</span>
-                  </div>
-                  {selectedOrder.paymentSummary.reportedRevenue !== undefined &&
-                    selectedOrder.paymentSummary.reportedRevenue !== selectedOrder.paymentSummary.actualReceivedRevenue && (
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Revenue in reports (loans: disbursed)</span>
-                        <span className="text-slate-800">{formatCurrency(selectedOrder.paymentSummary.reportedRevenue)}</span>
-                      </div>
-                    )}
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Outstanding</span>
-                    <span className="text-orange-600 font-medium">{formatCurrency(selectedOrder.paymentSummary.outstandingAmount)}</span>
-                  </div>
-                  {selectedOrder.paymentSummary.pendingCreditCount > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Pending credits</span>
-                      <span className="text-amber-600">
-                        {formatCurrency(selectedOrder.paymentSummary.pendingCreditAmount)} · {selectedOrder.paymentSummary.pendingCreditCount}
-                      </span>
-                    </div>
-                  )}
-                  {selectedOrder.paymentSummary.coverageStatus !== 'BALANCED' && (
-                    <p className="flex items-center gap-1 pt-1 text-xs text-amber-700">
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      {formatCurrency(selectedOrder.paymentSummary.unallocatedAmount)} of the final fee is not allocated
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="bg-slate-50 rounded-xl p-4 text-sm text-slate-500">
-                  Legacy order: open Payments &amp; Credits for its received amounts and payment sources.
-                </div>
-              )}
+              <PaymentBalanceSheet order={selectedOrder} loanPartners={loanPartners} />
 
               <Button
                 variant="outline"
@@ -2240,17 +2289,36 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
                 </div>
               </div>
 
-              {selectedOrder.approvedBy && (
-                <div>
-                  <p className="text-xs text-slate-500 uppercase font-semibold">Approved By</p>
-                  <p className="text-sm font-medium text-slate-800 mt-1">{selectedOrder.approvedBy.name}</p>
-                  <p className="text-xs text-slate-400">{selectedOrder.approvedBy.email}</p>
+              <div className="rounded-xl border border-slate-200 p-3">
+                <p className="text-xs text-slate-500 uppercase font-semibold mb-2">Approvals</p>
+                <div className="space-y-2">
+                  {[
+                    { label: 'HR approval', done: !!(selectedOrder.managerApproved || selectedOrder.Approved), by: selectedOrder.managerApprovedBy?.name, at: selectedOrder.managerApprovedAt },
+                    { label: 'Admin approval', done: !!selectedOrder.Approved, by: selectedOrder.approvedBy?.name, at: selectedOrder.approvedAt },
+                  ].map((step) => (
+                    <div key={step.label} className="flex items-start gap-2">
+                      {step.done ? <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-500" /> : <XCircle className="mt-0.5 h-4 w-4 text-amber-500" />}
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">{step.label}</p>
+                        <p className="text-xs text-slate-500">
+                          {step.done ? [step.by && `by ${step.by}`, step.at && formatDate(step.at)].filter(Boolean).join(' · ') || 'Approved' : 'Pending'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
+                {selectedOrder.Approved && (
+                  <Button variant="outline" size="sm" className="mt-3 w-full rounded-lg" onClick={() => handleDownloadInvoice(selectedOrder._id)}>
+                    <FileDown className="mr-2 h-4 w-4" />
+                    Invoice {selectedOrder.invoiceNumber || ''}
+                    {selectedOrder.invoiceSentAt && <span className="ml-1 text-xs text-slate-400">· emailed {formatDate(selectedOrder.invoiceSentAt)}</span>}
+                  </Button>
+                )}
+              </div>
 
               {selectedOrder.remarks && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-                  <p className="text-xs text-amber-600 uppercase font-semibold mb-1">Remarks</p>
+                  <p className="text-xs text-amber-600 uppercase font-semibold mb-1">Order remark</p>
                   <p className="text-sm text-amber-700">{selectedOrder.remarks}</p>
                 </div>
               )}
@@ -2504,7 +2572,7 @@ const handleFilterChange = (key: keyof Filters, value: any) => {
         </div>
 
         <div className="mt-4">
-          <Label className="text-xs font-semibold text-slate-500 uppercase">Remarks</Label>
+          <Label className="text-xs font-semibold text-slate-500 uppercase">Order remark *</Label>
           <Textarea
             value={orderForm.remarks}
             onChange={(e) => setOrderForm({ ...orderForm, remarks: e.target.value })}

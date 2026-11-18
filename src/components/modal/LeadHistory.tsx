@@ -45,6 +45,9 @@ interface LeadHistoryModalProps {
   loadingHistory: boolean;
   selectedLeadName?: string;
   onRefresh: () => void;
+  /** Optional lead summary shown above the timeline (e.g. from a report drill-down). */
+  details?: React.ReactNode;
+  title?: string;
 }
 
 export function LeadHistoryModal({
@@ -54,6 +57,8 @@ export function LeadHistoryModal({
   loadingHistory,
   selectedLeadName,
   onRefresh,
+  details,
+  title = 'Lead History',
 }: LeadHistoryModalProps) {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -380,7 +385,7 @@ case 'status_changed':
             <div>
               <DialogTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
                 <FileText className="w-5 h-5 text-orange-500" />
-                Lead History
+                {title}
               </DialogTitle>
               <DialogDescription className="text-sm text-slate-500 mt-1">
                 {selectedLeadName ? `Activity timeline for ${selectedLeadName}` : 'Lead activity timeline'}
@@ -404,6 +409,7 @@ case 'status_changed':
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-6 py-6 bg-slate-50/30">
+          {details && <div className="mb-6">{details}</div>}
           {loadingHistory ? (
             <div className="flex items-center justify-center py-16">
               <div className="text-center">

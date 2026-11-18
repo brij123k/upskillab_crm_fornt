@@ -36,3 +36,19 @@ export function hasPermission(
     return false;
   });
 }
+
+
+/**
+ * Employee onboarding (links, review, approve) is limited to Admin and roles
+ * granted `user:onboarding` (e.g. HR). Mirrors UserLogic.hasFullUserAccess.
+ */
+export function canManageOnboarding(): boolean {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    if (user?.role?.name === 'Admin' || user?.role?.isSuperAdmin) return true;
+    const permissions = JSON.parse(localStorage.getItem('permissions') || '[]');
+    return hasPermission(permissions, 'user', 'onboarding');
+  } catch {
+    return false;
+  }
+}

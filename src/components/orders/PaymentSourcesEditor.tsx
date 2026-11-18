@@ -89,7 +89,15 @@ function SectionHeader({
           <p className="text-xs text-slate-500">{hint}</p>
         </div>
       </div>
-      <Button type="button" variant="outline" size="sm" onClick={onAdd} disabled={disabled} className="h-8 shrink-0 rounded-lg">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onAdd}
+        disabled={disabled}
+        title={disabled ? 'The final fee is already fully covered' : undefined}
+        className="h-8 shrink-0 rounded-lg"
+      >
         <Plus className="mr-1 h-3.5 w-3.5" />
         {addLabel}
       </Button>
@@ -169,6 +177,10 @@ export function PaymentSourcesEditor({
 
   const activePartners = loanPartners.filter((p) => p.isActive !== false);
 
+  // Once sources + credits reach the final fee exactly (or more), nothing more can be added.
+  const fullyCovered = coverage.finalFee > 0 && coverage.coverageStatus !== 'UNDER_COVERED';
+  const addDisabled = disabled || fullyCovered;
+
   const statusTone =
     coverage.coverageStatus === 'BALANCED'
       ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
@@ -220,6 +232,13 @@ export function PaymentSourcesEditor({
         </div>
       </div>
 
+      {fullyCovered && !disabled && (
+        <p className="-mt-2 flex items-center gap-1.5 text-xs text-emerald-700">
+          <Lock className="h-3.5 w-3.5" /> The final fee is fully covered, so no more payment sources or credits can be added.
+          Reduce an amount first to add another.
+        </p>
+      )}
+
       {!!serverErrors?.length && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
           <p className="mb-1 font-semibold">The server rejected the payment structure:</p>
@@ -236,9 +255,9 @@ export function PaymentSourcesEditor({
         <SectionHeader
           icon={Wallet}
           title="Lumpsum payments"
-          hint="The registration amount is added to the amount received. Update the amount received when more is paid."
+          hint="Registration amount + admission fee (partial or full) = amount received. Only the received total counts toward the fee."
           addLabel="Add lumpsum"
-          disabled={disabled}
+          disabled={addDisabled}
           onAdd={() => update('lumpsumPayments', [...value.lumpsumPayments, newLumpsumDraft(remainingForSources)])}
         />
         {value.lumpsumPayments.map((d, i) => {
@@ -282,20 +301,23 @@ export function PaymentSourcesEditor({
                   />
                 </div>
                 <div>
-                  <Label className={fieldLabel}>Amount received *</Label>
+                  <Label className={fieldLabel}>Admission fee (partial/full)</Label>
                   <Input
                     type="number"
-                    min={Math.max(toMoney(d.registrationAmount), locked ? toMoney(d.orig?.amountReceived) : 0)}
+                    min={Math.max(0, locked ? toMoney(toMoney(d.orig?.amountReceived) - toMoney(d.registrationAmount)) : 0)}
                     className={cn(inputCls, 'font-semibold text-emerald-700')}
-                    value={d.amountReceived}
+                    value={Math.max(0, toMoney(toMoney(d.amountReceived) - toMoney(d.registrationAmount)))}
                     disabled={disabled || inactive}
-                    onChange={(e) => patchLumpsum(d.key, { amountReceived: num(e.target.value) })}
+                    onChange={(e) =>
+                      patchLumpsum(d.key, { amountReceived: toMoney(toMoney(d.registrationAmount) + Math.max(0, num(e.target.value))) })
+                    }
                   />
-                  {toMoney(d.amountReceived) > toMoney(d.registrationAmount) && (
-                    <p className="mt-1 text-[10px] text-slate-500">
-                      {formatINR(d.registrationAmount)} registration + {formatINR(toMoney(d.amountReceived) - toMoney(d.registrationAmount))} Recieved
-                    </p>
-                  )}
+                </div>
+                <div className="col-span-2 md:col-span-4 -mt-1 rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-1.5 text-[11px] text-emerald-800">
+                  Registration {formatINR(d.registrationAmount)} + Admission fee{' '}
+                  {formatINR(Math.max(0, toMoney(d.amountReceived) - toMoney(d.registrationAmount)))} ={' '}
+                  <strong>Received {formatINR(d.amountReceived)}</strong>{' '}
+                  <span className="text-emerald-700/70">(this amount is counted)</span>
                 </div>
                 <div>
                   <Label className={fieldLabel}>Payment date</Label>
@@ -315,8 +337,8 @@ export function PaymentSourcesEditor({
                   </Select>
                 </div>
                 <div className="col-span-2 md:col-span-4">
-                  <Label className={fieldLabel}>Remarks</Label>
-                  <Input className={inputCls} value={d.remarks} disabled={disabled}
+                  <Label className={fieldLabel}>Lumpsum remark</Label>
+                  <Input className={inputCls} value={d.remarks} disabled={disabled} placeholder="Optional"
                     onChange={(e) => patchLumpsum(d.key, { remarks: e.target.value })} />
                 </div>
               </div>
@@ -348,7 +370,7 @@ export function PaymentSourcesEditor({
           title="Loans"
           hint="The loan amount counts as received on the order; reports count the disbursed amount as revenue."
           addLabel="Add loan"
-          disabled={disabled}
+          disabled={addDisabled}
           onAdd={() => update('loans', [...value.loans, newLoanDraft(remainingForSources)])}
         />
         {value.loans.map((d, i) => {
@@ -422,8 +444,8 @@ export function PaymentSourcesEditor({
                     onChange={(e) => patchLoan(d.key, { disbursementDate: e.target.value })} />
                 </div>
                 <div className="col-span-2 md:col-span-1">
-                  <Label className={fieldLabel}>Remarks</Label>
-                  <Input className={inputCls} value={d.remarks} disabled={disabled}
+                  <Label className={fieldLabel}>Loan remark</Label>
+                  <Input className={inputCls} value={d.remarks} disabled={disabled} placeholder="Optional"
                     onChange={(e) => patchLoan(d.key, { remarks: e.target.value })} />
                 </div>
               </div>
@@ -449,7 +471,7 @@ export function PaymentSourcesEditor({
           title="Subscriptions"
           hint="Covers installment × count; revenue counts successful installments."
           addLabel="Add subscription"
-          disabled={disabled}
+          disabled={addDisabled}
           onAdd={() => update('subscriptions', [...value.subscriptions, newSubscriptionDraft()])}
         />
         {value.subscriptions.map((d, i) => {
@@ -492,8 +514,8 @@ export function PaymentSourcesEditor({
                     onChange={(e) => patchSubscription(d.key, { lastInstallmentDate: e.target.value })} />
                 </div>
                 <div className="col-span-2 md:col-span-4">
-                  <Label className={fieldLabel}>Remarks</Label>
-                  <Input className={inputCls} value={d.remarks} disabled={disabled}
+                  <Label className={fieldLabel}>Subscription remark</Label>
+                  <Input className={inputCls} value={d.remarks} disabled={disabled} placeholder="Optional"
                     onChange={(e) => patchSubscription(d.key, { remarks: e.target.value })} />
                 </div>
               </div>
@@ -514,7 +536,7 @@ export function PaymentSourcesEditor({
           title="Credits (pending dues)"
           hint="Only for the part of the fee the sources don't cover. Marked paid later with a verified reference."
           addLabel="Add credit"
-          disabled={disabled}
+          disabled={addDisabled}
           onAdd={() => update('credits', [...value.credits, newCreditDraft(uncovered)])}
         />
         {coverage.coverageStatus === 'UNDER_COVERED' && uncovered > 0 && (
@@ -567,9 +589,14 @@ export function PaymentSourcesEditor({
                     onChange={(e) => patchCredit(c.key, { dueDate: e.target.value })} />
                 </div>
                 <div className="col-span-2">
-                  <Label className={fieldLabel}>Remarks</Label>
-                  <Input className={inputCls} value={c.remarks} disabled={disabled || paid}
-                    onChange={(e) => patchCredit(c.key, { remarks: e.target.value })} />
+                  <Label className={fieldLabel}>Credit remark *</Label>
+                  <Input
+                    className={cn(inputCls, !paid && !c.remarks.trim() && 'border-amber-300')}
+                    value={c.remarks}
+                    disabled={disabled || paid}
+                    placeholder="Why is this amount on credit?"
+                    onChange={(e) => patchCredit(c.key, { remarks: e.target.value })}
+                  />
                 </div>
               </div>
               {paid && c.orig?.paymentReferenceId && (

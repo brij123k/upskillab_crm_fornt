@@ -40,6 +40,7 @@ import { CreateProfileModal } from './CreateProfileModal';
 import { ViewUserProfileModal } from './ViewUserProfileModal';
 import { EditUserModal } from './EditUserModal';
 import { OnboardingLinkModal, OnboardingReviewModal, OnboardingBadge } from './OnboardingModals';
+import { canManageOnboarding } from '@/utils/permissions';
 import { Link2, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
@@ -102,6 +103,7 @@ export function UsersTab({
   const [selectedIVRUser, setSelectedIVRUser] = useState<UserType | null>(null);
   const hasMountedRef = useRef(false);
   const navigate = useNavigate();
+  const onboardingAllowed = canManageOnboarding();
 
   // Filter users
   const matchesText = (user: UserType, raw: string) => {
@@ -477,7 +479,7 @@ const formatJoinedDate = (dateString: string) => {
                       <span className="text-[11px] font-semibold text-red-600 ml-1">Blocked</span>
                     )}
                   </div>
-                  {user.onboarding?.status && user.onboarding.status !== 'not_shared' && (
+                  {onboardingAllowed && user.onboarding?.status && user.onboarding.status !== 'not_shared' && (
                     <button
                       type="button"
                       className="mt-1 block"
@@ -515,16 +517,20 @@ const formatJoinedDate = (dateString: string) => {
                       <DropdownMenuItem onClick={() => handleEditClick(user)} className="text-sm">
                         <Edit className="mr-2 h-3.5 w-3.5" /> Edit User
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setSelectedUser(user); setOnboardingLinkOpen(true); }} className="text-sm">
-                        <Link2 className="mr-2 h-3.5 w-3.5" /> Onboarding Link
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => { setSelectedUser(user); setOnboardingReviewOpen(true); }}
-                        className={cn("text-sm", user.onboarding?.status === 'submitted' && "text-amber-700 font-medium")}
-                      >
-                        <ClipboardCheck className="mr-2 h-3.5 w-3.5" />
-                        {user.onboarding?.status === 'submitted' ? 'Review Onboarding' : 'Onboarding Details'}
-                      </DropdownMenuItem>
+                      {onboardingAllowed && (
+                        <>
+                          <DropdownMenuItem onClick={() => { setSelectedUser(user); setOnboardingLinkOpen(true); }} className="text-sm">
+                            <Link2 className="mr-2 h-3.5 w-3.5" /> Onboarding Link
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => { setSelectedUser(user); setOnboardingReviewOpen(true); }}
+                            className={cn("text-sm", user.onboarding?.status === 'submitted' && "text-amber-700 font-medium")}
+                          >
+                            <ClipboardCheck className="mr-2 h-3.5 w-3.5" />
+                            {user.onboarding?.status === 'submitted' ? 'Review Onboarding' : 'Onboarding Details'}
+                          </DropdownMenuItem>
+                        </>
+                      )}
                       <DropdownMenuItem onClick={() => navigate(`/admin/user-activity/${user._id}`)} className="text-sm">
                         <Activity className="mr-2 h-3.5 w-3.5" /> View Activity
                       </DropdownMenuItem>
@@ -689,6 +695,9 @@ const formatJoinedDate = (dateString: string) => {
         open={onboardingReviewOpen}
         onOpenChange={setOnboardingReviewOpen}
         user={selectedUser}
+        departments={departments}
+        pools={pools}
+        users={users}
         onChanged={() => onRefresh({ status: filters.status })}
       />
 

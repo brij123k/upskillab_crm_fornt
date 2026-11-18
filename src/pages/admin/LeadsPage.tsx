@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { CampaignSuggestInput, SortableTh } from '@/components/leads/LeadTableControls';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -2095,10 +2096,9 @@ const handleBulkStageChange = async () => {
         </div>
         <div className="space-y-1">
           <Label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Source Campaign</Label>
-          <Input
-            placeholder="Campaign name"
+          <CampaignSuggestInput
             value={filters.source_compain}
-            onChange={(e) => setFilters({ ...filters, source_compain: e.target.value })}
+            onChange={(v) => setFilters((f: any) => ({ ...f, source_compain: v }))}
             className="h-9 text-sm rounded-lg border-slate-200 focus:ring-orange-500"
           />
         </div>
@@ -2116,6 +2116,8 @@ const handleBulkStageChange = async () => {
               <SelectItem value="old">Oldest First</SelectItem>
               <SelectItem value="name_asc">Name A–Z</SelectItem>
               <SelectItem value="name_desc">Name Z–A</SelectItem>
+              <SelectItem value="last_call_desc">Last Call: Newest First</SelectItem>
+              <SelectItem value="last_call_asc">Last Call: Oldest First</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -2304,8 +2306,8 @@ const handleBulkStageChange = async () => {
           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Stage</th>
           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Pool</th>
           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Status</th>
-          <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Last Call</th>
-          <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Created At</th>
+          <SortableTh label="Last Call" sort={filters.sort} desc="last_call_desc" asc="last_call_asc" onSort={(v) => setFilters((f: any) => ({ ...f, sort: v }))} />
+          <SortableTh label="Created At" sort={filters.sort} desc="new" asc="old" onSort={(v) => setFilters((f: any) => ({ ...f, sort: v }))} />
           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Assigned To</th>
           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Actions</th>
         </tr>
